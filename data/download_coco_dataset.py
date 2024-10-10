@@ -18,5 +18,41 @@ import subprocess
 __author__ = "Matheus Oliveira de Souza (msouza.os@hotmail.com)"
 
 
-if __name__=="__main__":
+def cli_args():
+	"""
+	Get all CLI arguments to be used in script.
+	"""
+	# Define parser.
+	parser = argparse.ArgumentParser(prog="dataset_downloader")
+
+	# Arguments.
+	parser.add_argument("--output", "-o", type=str, required=True, help="Path to save the downloaded dataset.")
+	parser.add_argument("--no-valid", action="store_true", help="Disable the download for validation set.")
+	parser.add_argument("--no-test", action="store_true", help="Disable the download for test set.")
+
+	args = parser.parse_args()
+
+	# Validate arguments.
+	# --output
+	if not os.path.isdir(s=args.output):
+		raise "Invalid value for --output. It must be a real directory to store the dataset."
+
+	return args
+
+
+async def download_dataset_file():
+	# TODO: create function that downloads a file given 
+	# an URL.
 	pass
+
+
+def main():
+	"""
+	Main function to run the script.
+	"""
+	# Get CLI arguments.
+	args = cli_args()
+
+
+if __name__=="__main__":
+	main()
