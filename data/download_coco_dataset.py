@@ -5,10 +5,10 @@ evaluate and test the model came from it.
 
 To run the script, you can simply run the following command:
 ```
-$ python download_coco_dataset.py --output-dir <path-to-dir>
+$ python download_coco_dataset.py --output <path-to-dir>
 ```
 It will automatically download all three sets (train, validation and test) and store inside 
-the output path specified by `--output-dir` tag.
+the output path specified by `--output` tag.
 """
 import os
 import sys
