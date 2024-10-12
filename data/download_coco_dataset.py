@@ -32,7 +32,7 @@ __author__ = "Matheus Oliveira de Souza (msouza.os@hotmail.com)"
 logger = get_logger(name="dataset_downloader", level="debug")
 
 
-# Enums.
+# Structures.
 @dataclass
 class DatasetMetadata:
 	"""
@@ -43,6 +43,7 @@ class DatasetMetadata:
 	url: str
 
 
+# Enums.
 class DatasetURL(Enum):
 	"""
 	Enum storing all URLs for each set.
