@@ -51,7 +51,7 @@ class DatasetURL(Enum):
 	train = DatasetMetadata(name="train", filename="train_images.zip", url="http://images.cocodataset.org/zips/train2017.zip")
 	valid = DatasetMetadata(name="valid", filename="valid_images.zip", url="http://images.cocodataset.org/zips/val2017.zip")
 	test = DatasetMetadata(name="test", filename="test_images.zip", url="http://images.cocodataset.org/zips/test2017.zip")
-	annot = DatasetMetadata(name="annot", filename="annot_train_valid.zip", url="http://images.cocodataset.org/zips/test2017.zip")
+	annot = DatasetMetadata(name="annot", filename="annot_train_valid.zip", url="http://images.cocodataset.org/annotations/annotations_trainval2017.zip")
 
 
 # Functions.
