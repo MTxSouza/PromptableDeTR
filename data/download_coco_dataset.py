@@ -141,7 +141,7 @@ async def download_datasets(urls, output):
 		asyncio.gather: Gather object to be ran.
 	"""
 	# Define limit of concurrent downloads.
-	semaphore = asyncio.Semaphore(value=3)
+	semaphore = asyncio.Semaphore(value=4)
 
 	async def semaphore_download(name, url, output):
 		try:
