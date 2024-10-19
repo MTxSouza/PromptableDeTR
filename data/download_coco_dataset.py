@@ -51,6 +51,7 @@ class DatasetURL(Enum):
 	train = DatasetMetadata(name="train", filename="train_images.zip", url="http://images.cocodataset.org/zips/train2017.zip")
 	valid = DatasetMetadata(name="valid", filename="valid_images.zip", url="http://images.cocodataset.org/zips/val2017.zip")
 	test = DatasetMetadata(name="test", filename="test_images.zip", url="http://images.cocodataset.org/zips/test2017.zip")
+	annot = DatasetMetadata(name="annot", filename="annot_train_valid.zip", url="http://images.cocodataset.org/zips/test2017.zip")
 
 
 # Functions.
@@ -63,8 +64,10 @@ def cli_args():
 
 	# Arguments.
 	parser.add_argument("--output", "-o", type=str, required=True, help="Path to save the downloaded dataset.")
-	parser.add_argument("--no-valid", action="store_true", help="Disable the download for validation set.")
-	parser.add_argument("--no-test", action="store_true", help="Disable the download for test set.")
+	parser.add_argument("--train", action="store_true", help="Download the train set.")
+	parser.add_argument("--valid", action="store_true", help="Download the validation set.")
+	parser.add_argument("--test", action="store_true", help="Download the test set.")
+	parser.add_argument("--annot", action="store_true", help="Download the annotations for both train and validation set.")
 
 	args = parser.parse_args()
 
@@ -162,11 +165,20 @@ def main():
 
 	# Get URLs.
 	logger.debug(msg="Setting up all file URLs to be downloaded.")
-	url_list = [DatasetURL["train"].value] # Default dataset to download.
-	if not args.no_valid:
+	url_list = []
+	if args.train:
+		url_list.append(DatasetURL["train"].value)
+	if args.valid:
 		url_list.append(DatasetURL["valid"].value)
-	if not args.no_test:
+	if args.test:
 		url_list.append(DatasetURL["test"].value)
+	if args.annot:
+		url_list.append(DatasetURL["annot"].value)
+
+	# Check if any URL has been selected.
+	if not url_list:
+		logger.warning(msg="There is no download to be done.")
+		sys.exit(0)
 
 	# Run tasks.
 	asyncio.run(main=download_datasets(urls=url_list, output=args.output))
