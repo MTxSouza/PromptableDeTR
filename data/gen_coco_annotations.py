@@ -13,6 +13,7 @@ sys.path.append(os.path.abspath(path=os.path.dirname(p=__file__.split(sep=os.sep
 
 import argparse
 import json
+import warnings
 from pathlib import Path
 from uuid import uuid4
 
@@ -108,11 +109,15 @@ def get_annotation(annot, categories, images, image_dir):
     bbox = annot.get("bbox", [])
     if not bbox:
         raise ValueError("Invalid bounding box %s." % bbox)
+    
+    x, y, width, height = bbox
+    cx = x + width / 2
+    cy = y + height / 2
     bbox = Boxes(
-        cx=bbox[0],
-        cy=bbox[1],
-        width=bbox[2],
-        height=bbox[3]
+        cx=cx,
+        cy=cy,
+        width=width,
+        height=height
     )
 
     # Get annotations.
@@ -201,6 +206,10 @@ def main():
         unified_annotations[annotation.image_id][annotation.text].annotations.extend(annotation.annotations)
 
     # Save annotations.
+    warnings.warn(message="The content of the output directory will be deleted before saving the new annotations.")
+    for file in os.listdir(path=args.output_dir):
+        os.remove(path=os.path.join(args.output_dir, file))
+
     tqdm_annot = tqdm(iterable=unified_annotations.items())
     for image_id, annotations in tqdm_annot:
 
