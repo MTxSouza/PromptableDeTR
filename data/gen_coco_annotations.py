@@ -171,46 +171,45 @@ def main():
     images = {image.get("id", None): image for image in images}
 
     # Get new annotations.
-    new_annotations = []
+    new_annotations = {}
     for annotation in tqdm(iterable=annotations.get("annotations", []), desc="Getting annotations..."):
 
-        new_annot = get_annotation(
+        cat_annot, super_cat_annot = get_annotation(
             annot=annotation, 
             categories=custom_categories, 
             images=images, 
             image_dir=args.image_dir
         )
+        assert cat_annot.image_id == super_cat_annot.image_id, "Invalid image ID for normal and super category annotations."
 
-        new_annotations.extend(new_annot)
+        for annot in [cat_annot, super_cat_annot]:
 
-    # Unify annotations.
-    unified_annotations = {}
-    for annotation in tqdm(iterable=new_annotations, desc="Unifying annotations based on image and it text prompt..."):
+            # Add image ID.
+            new_annotations[annot.image_id] = new_annotations.get(annot.image_id, {})
 
-        # Add image ID.
-        unified_annotations[annotation.image_id] = unified_annotations.get(annotation.image_id, {})
-
-        # Add text.
-        unified_annotations[annotation.image_id][annotation.text] = unified_annotations[annotation.image_id].get(
-            annotation.text, 
-            Annotation(
-                text=annotation.text,
-                image_id=annotation.image_id,
-                image_filepath=annotation.image_filepath,
-                category=annotation.category,
-                annotations=[]
+            # Add text.
+            new_annotations[annot.image_id][annot.text] = new_annotations[annot.image_id].get(
+                annot.text, 
+                Annotation(
+                    text=annot.text,
+                    image_id=annot.image_id,
+                    image_filepath=annot.image_filepath,
+                    category=annot.category,
+                    annotations=[]
+                )
             )
-        )
 
-        # Add annotation.
-        unified_annotations[annotation.image_id][annotation.text].annotations.extend(annotation.annotations)
+            # Add annotation.
+            if annot.annotations[0] in new_annotations[annot.image_id][annot.text].annotations:
+                continue # Skip duplicated annotations.
+            new_annotations[annot.image_id][annot.text].annotations.extend(annot.annotations)
 
     # Save annotations.
     warnings.warn(message="The content of the output directory will be deleted before saving the new annotations.")
     for file in os.listdir(path=args.output_dir):
         os.remove(path=os.path.join(args.output_dir, file))
 
-    tqdm_annot = tqdm(iterable=unified_annotations.items())
+    tqdm_annot = tqdm(iterable=new_annotations.items())
     for image_id, annotations in tqdm_annot:
 
         for text, annot in annotations.items():
