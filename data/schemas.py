@@ -136,10 +136,10 @@ class Boxes:
     Structure that store the coordinates of a bounding box 
     on image.
     """
-    cx: float
-    cy: float
-    width: float
-    height: float
+    cx: float | int
+    cy: float | int
+    width: float | int
+    height: float | int
 
 
 @dataclass
@@ -172,9 +172,20 @@ class Annotation:
             if not self.text in _ObjectCategory:
                 raise ValueError("Invalid object category %s." % self.text)
 
-        # Check if the annotations is a list of Boxes.
-        if not all(isinstance(ann, Boxes) for ann in self.annotations):
-            raise ValueError("Invalid annotations. It must be a list of Boxes.")
+        # Check if the annotations is a list of Boxes or dict.
+        for ann in self.annotations:
+            if not isinstance(ann, (Boxes, dict)):
+                raise ValueError("Invalid annotation %s." % ann)
+
+            if isinstance(ann, dict):
+                if not all(isinstance(point, (float, int)) for point in ann.values()):
+                    raise ValueError("Invalid box values %s." % ann)
+        
+        # Convert dict to Boxes.
+        self.annotations = [
+            Boxes(**ann) if isinstance(ann, dict) else ann
+            for ann in self.annotations
+        ]
 
 
     def model_dump(self):
