@@ -5,7 +5,7 @@ from unittest import TestCase
 
 import torch
 
-from models.prompt_vision.embedding import ImageEmbedding
+from models.embedding import ImageEmbedding
 
 
 # Classes.
