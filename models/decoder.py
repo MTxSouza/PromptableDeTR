@@ -27,11 +27,30 @@ class Attention(nn.Module):
 
         # Attributes.
         self.__n_dim = embedding_dim
+        self.__score = None
+        self.__attention = None
 
         # Layers.
         self.__query = nn.Linear(in_features=base_embedding_dim, out_features=embedding_dim)
         self.__key = nn.Linear(in_features=base_embedding_dim, out_features=embedding_dim)
         self.__value = nn.Linear(in_features=base_embedding_dim, out_features=embedding_dim)
+
+
+    # Properties.
+    @property
+    def score(self):
+        """
+        torch.Tensor: The attention scores.
+        """
+        return self.__score
+
+
+    @property
+    def attention(self):
+        """
+        torch.Tensor: The attention matrix.
+        """
+        return self.__attention
 
 
     # Methods.
@@ -55,9 +74,11 @@ class Attention(nn.Module):
         # Compute the attention scores.
         scores = torch.matmul(q, k.transpose(-2, -1))
         scores = scores / (self.__n_dim ** 0.5)
+        self.__score = scores
 
         # Compute the attention matrix.
         attention = torch.nn.functional.softmax(scores, dim=-1)
+        self.__attention = attention
 
         # Compute the attention output.
         return torch.matmul(attention, v)
