@@ -128,7 +128,7 @@ class MultiHeadAttention(nn.Module):
             torch.Tensor: The attention output.
         """
         # Compute the attention heads.
-        attention_heads = self.__attention(query, key, value)
+        attention_heads = [head(query, key, value) for head in self.__attention]
 
         # Concatenate the attention heads.
         attention_heads = torch.cat(attention_heads, dim=-1)
