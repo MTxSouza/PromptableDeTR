@@ -1,2 +1,8 @@
 torch==2.5.1
 torchvision==0.20.1
+torchinfo==1.8.0
+huggingface_hub==0.26.2
+transformers==4.46.2
+sentencepiece==0.2.0
+sacremoses==0.1.1
+importlib_metadata==8.5.0
