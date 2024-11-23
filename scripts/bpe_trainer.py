@@ -7,36 +7,12 @@ import json
 import os
 import re
 import sys
-from dataclasses import dataclass, field
-from enum import Enum
 
 # Add the project directory to the path.
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
+from utils.data import SpecialTokens, TextContent
 from utils.logger import get_logger
-
-
-# Enums.
-class SpecialTokens(Enum):
-    """
-    Enum class for special tokens.
-    """
-    PAD = ("<PAD>", 0) # Used for padding sequences.
-    UNK = ("<UNK>", 1) # Used for unknown tokens.
-    SOS = ("<SOS>", 2) # Used for start of sequence.
-    EOS = ("<EOS>", 3) # Used for end of sequence.
-
-
-    # Methods.
-    @classmethod
-    def get_special_tokens(cls):
-        """
-        Get the list of special tokens.
-
-        Returns:
-            Dict[str, int]: The special tokens with string tokens as keys and integer indices as values.
-        """
-        return {data.value[0]: data.value[1] for data in cls._member_map_.values()}
 
 
 def argument_parser():
@@ -77,20 +53,6 @@ def argument_parser():
 
 
 if __name__ == "__main__":
-
-
-    # Structures.
-    @dataclass
-    class TextContent:
-        """
-        Simple structure used to store the content of a file and it 
-        tokenized version.
-        """
-        raw: str = ""
-        normalized: str = ""
-        regex: list[str] = field(default_factory=lambda: [])
-        tokens: list[str] = field(default_factory=lambda: [])
-        indices: list[int] = field(default_factory=lambda: [])
 
 
     # Functions.
