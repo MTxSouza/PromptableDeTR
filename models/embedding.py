@@ -22,7 +22,7 @@ class _BaseEmbedding(ABC):
             embedding_dim (int): The dimension of the embeddings.
             padding_idx (int): The index of the padding token in the vocabulary.
         """
-        super(_BaseEmbedding, self).__init__()
+        super().__init__()
 
         # Layers.
         self.__pe = nn.Embedding(
@@ -35,6 +35,8 @@ class _BaseEmbedding(ABC):
         self.__num_embedding = num_embedding
         self.__embedding_dim = embedding_dim
         self.__padding_idx = padding_idx
+
+        self.__indices_pe = torch.randint(low=0, high=num_embedding, size=(1, num_embedding))
 
 
     # Properties.
@@ -82,8 +84,71 @@ class _BaseEmbedding(ABC):
         return self.__pe
 
 
-class ImageEmbedding(_BaseEmbedding, nn.Module):
+    @property
+    def indices_pe(self):
+        """
+        Returns the indices used to generate the positional encoding.
 
+        Returns:
+            torch.Tensor: The indices used to generate the positional encoding.
+        """
+        return self.__indices_pe
+
+
+class TextEmbedding(_BaseEmbedding, nn.Module):
+
+
+    # Special methods.
+    def __init__(self, context_size, embedding_dim, padding_idx):
+        """
+        Initializes the TextEmbedding class that computes the embeddings of the text tokens. It 
+        uses a predefined positional encoding layer to add positional information to the embeddings.
+
+        Args:
+            context_size (int): The size of the context.
+            embedding_dim (int): The dimension of the embeddings.
+            padding_idx (int): The index of the padding token in the vocabulary.
+        """
+        # Initialize the parent class.
+        super().__init__(
+            num_embedding=context_size, 
+            embedding_dim=embedding_dim, 
+            padding_idx=padding_idx
+        )
+
+        # Layers.
+        self.__emb = nn.Embedding(
+            num_embeddings=context_size, 
+            embedding_dim=embedding_dim, 
+            padding_idx=padding_idx
+        )
+
+        # Buffers.
+        self.register_buffer(name="positional_tokens", tensor=self.indices_pe)
+
+
+    # Methods.
+    def forward(self, x):
+        """
+        Performs a forward pass through the text embedding layer.
+
+        Args:
+            x (torch.Tensor): The input tensor.
+
+        Returns:
+            torch.Tensor: The output tensor.
+        """
+        # Get embeddings.
+        txt_emb = self.__emb(x)
+
+        # Apply positional encoding.
+        pe = self.positional_encoding(self.positional_tokens)
+        txt_emb_pe = txt_emb + pe
+
+        return txt_emb_pe
+
+
+class ImageEmbedding(_BaseEmbedding, nn.Module):
 
 
     # Special methods.
@@ -110,7 +175,7 @@ class ImageEmbedding(_BaseEmbedding, nn.Module):
         num_embedding = num_patches ** 2
 
         # Initialize the parent class.
-        super(ImageEmbedding, self).__init__(
+        super().__init__(
             num_embedding=num_embedding, 
             embedding_dim=self.__embedding_dim, 
             padding_idx=padding_idx
@@ -123,10 +188,7 @@ class ImageEmbedding(_BaseEmbedding, nn.Module):
         )
 
         # Buffers.
-        self.register_buffer(
-            name="positional_tokens", 
-            tensor=torch.randint(low=0, high=self.num_embedding, size=(1, self.num_embedding))
-        )
+        self.register_buffer(name="positional_tokens", tensor=self.indices_pe)
 
 
     # Methods.
