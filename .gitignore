@@ -5,3 +5,8 @@ __pycache__
 # Environment
 .venv
 .env
+
+# Data.
+train_captions.txt
+valid_captions.txt
+vocab.json
