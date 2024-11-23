@@ -4,9 +4,16 @@ file.
 """
 import argparse
 import json
+import os
 import re
+import sys
 from dataclasses import dataclass, field
 from enum import Enum
+
+# Add the project directory to the path.
+sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
+
+from utils.logger import get_logger
 
 
 # Enums.
@@ -55,8 +62,8 @@ def argument_parser():
         "--output", 
         "-o", 
         type=str, 
-        default="./vocab.json", 
-        help="The path to the output JSON file."
+        default="./", 
+        help="The path to a directory where the vocabulary will be saved."
     )
     parser.add_argument(
         "--max-vocab-size", 
@@ -231,18 +238,26 @@ if __name__ == "__main__":
 
         return frequency
 
+    # Get the logger.
+    logger = get_logger(name="bpe_trainer", level="debug")
 
     # Parse arguments.
     args = argument_parser()
 
     # Load training set.
+    logger.info("Loading training set...")
     training_set = load_tokenzer_training_set(*args.training_files)
+    logger.debug("Training set has been loaded with %d sentences." % len(training_set))
 
     # Get base vocabulary.
+    logger.info(msg="Constructing base vocabulary...")
     base_vocab = get_base_vocab()
     base_vocab_reverse = {indice: token for token, indice in base_vocab.items()}
+    logger.debug(msg="Base vocabulary has been constructed with %d tokens." % len(base_vocab))
 
     # BPE algorithm.
+    logger.info(msg="Running BPE algorithm...")
+    logger.warning(msg="Depending on the training set size, this process may take a while.")
     while len(base_vocab) < args.max_vocab_size:
 
         # Get current indices.
@@ -254,6 +269,7 @@ if __name__ == "__main__":
         # Get the most frequent pair.
         most_frequent_pair = max(pairs, key=pairs.get)
         if pairs[most_frequent_pair] == 1:
+            logger.info("No more frequent pairs found. Exiting...")
             break
 
         # Merge tokens.
@@ -264,6 +280,12 @@ if __name__ == "__main__":
         base_vocab[new_token] = new_indice
         base_vocab_reverse[new_indice] = new_token
 
+        # Check vocab size to display progress.
+        if len(base_vocab) % 10 == 0:
+            logger.debug("Vocabulary size: %d" % len(base_vocab))
+
     # Save vocabulary.
-    with open(file=args.output, mode="w", encoding="utf-8") as file_buffer:
+    output_file = os.path.join(args.output, "vocab.json")
+    logger.info("Saving vocabulary with %d tokens in %s..." % (len(base_vocab), output_file))
+    with open(file=output_file, mode="w", encoding="utf-8") as file_buffer:
         json.dump(base_vocab, file_buffer, indent=4)
