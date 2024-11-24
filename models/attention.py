@@ -134,7 +134,7 @@ class DeformableAttention(nn.Module):
         self.__value = nn.Linear(in_features=in_embedding_dim, out_features=out_embedding_dim)
 
         # Attributes.
-        self.__offset_attention = None
+        self.__attention = None
         self.__patch_size = patch_size
         self.__num_points = num_points
 
@@ -144,14 +144,14 @@ class DeformableAttention(nn.Module):
 
     # Properties.
     @property
-    def offset_attention(self):
+    def attention(self):
         """
-        Get the offset attention matrix computed by the forward pass.
+        Returns the attention matrix computed by the forward pass.
 
         Returns:
-            torch.Tensor: The offset attention matrix.
+            torch.Tensor: The attention matrix.
         """
-        return self.__offset_attention
+        return self.__attention
 
 
     # Methods.
@@ -202,6 +202,8 @@ class DeformableAttention(nn.Module):
         attention_weights = attention_weights.view(B, N, self.__num_points)
         attention_weights = F.softmax(input=attention_weights, dim=-1)
         attention_weights = attention_weights.view(B, N, self.__num_points)
+
+        self.__attention = attention_weights.clone()
 
         # Compute the offsets.
         offsets = self.__offset(query)
@@ -379,14 +381,14 @@ class DeformableMultiHeadAttention(nn.Module):
 
     # Properties.
     @property
-    def offset_attention(self):
+    def attention(self):
         """
         Get the offset attention matrix computed by the forward pass.
 
         Returns:
             Dict[str, torch.Tensor]: The offset attention matrix for each head.
         """
-        return {"head_%d" % i: head.offset_attention for i, head in enumerate(self.__attention_heads)}
+        return {"head_%d" % i: head.attention for i, head in enumerate(self.__attention_heads)}
 
 
     # Methods.

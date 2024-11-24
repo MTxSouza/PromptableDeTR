@@ -248,6 +248,18 @@ class ImageEncoder(nn.Module):
         ])
 
 
+    # Properties.
+    @property
+    def attention(self):
+        """
+        Returns the attention mechanism of all layers.
+
+        Returns:
+            Dict[str, dict]: The attention mechanisms of all layers.
+        """
+        return {"layer_%d" % i: layer.attention for i, layer in enumerate(self.__layers)}
+
+
     # Methods.
     def forward(self, text_emb, image_emb):
         """
