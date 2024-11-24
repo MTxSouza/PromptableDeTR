@@ -129,9 +129,9 @@ class DeformableAttention(nn.Module):
         super().__init__()
 
         # Layers.
-        self.__offset = nn.Linear(in_features=in_embedding_dim, out_features=num_points * 2, bias=False)
-        self.__att_weight = nn.Linear(in_features=in_embedding_dim, out_features=num_points, bias=False)
-        self.__value = nn.Linear(in_features=in_embedding_dim, out_features=out_embedding_dim, bias=False)
+        self.__offset = nn.Linear(in_features=in_embedding_dim, out_features=num_points * 2)
+        self.__att_weight = nn.Linear(in_features=in_embedding_dim, out_features=num_points)
+        self.__value = nn.Linear(in_features=in_embedding_dim, out_features=out_embedding_dim)
 
         # Attributes.
         self.__offset_attention = None
