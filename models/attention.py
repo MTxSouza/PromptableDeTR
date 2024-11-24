@@ -224,7 +224,7 @@ class DeformableAttention(nn.Module):
         # Create the reference points.
         ref_x = torch.linspace(start=0, end=1, steps=width)
         ref_y = torch.linspace(start=0, end=1, steps=height)
-        ref_x, ref_y = torch.meshgrid(ref_x, ref_y)
+        ref_x, ref_y = torch.meshgrid(ref_x, ref_y, indexing="ij")
 
         # Reshape the reference points.
         ref_x = ref_x.reshape(-1)[None]
