@@ -208,8 +208,8 @@ class ImageEmbedding(_BaseEmbedding, nn.Module):
         # Extract patches.
         patches = self.__patch_image(x)
 
-        # Reshape patches and get embeddings.
-        img_emb = patches.view(B, -1, self.embedding_dim)
+        # Change the shape of the patches.
+        img_emb = patches.permute(0, 2, 1) # (B, image_tokens, embedding_dim)
 
         # Apply positional encoding.
         pe = self.positional_encoding(self.positional_tokens)
