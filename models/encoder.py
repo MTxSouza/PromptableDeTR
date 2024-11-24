@@ -211,7 +211,7 @@ class TextEncoder(nn.Module):
             torch.Tensor: The output tensor.
         """
         for layer in self.__layers:
-            text_emb = layer(text_emb, text_emb, text_emb)
+            text_emb = layer(text_emb)
 
         return text_emb
 
