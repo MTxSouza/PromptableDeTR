@@ -1,6 +1,21 @@
 """
 This script is used to display the model architecture.
 """
+import argparse
+
+# Define arguments.
+parser = argparse.ArgumentParser(description="Display the model architecture.")
+parser.add_argument(
+    "--verbose",
+    type=int,
+    default=1,
+    help="The verbosity level of the model architecture."
+)
+
+# Parse the arguments.
+args = parser.parse_args()
+
+
 # Display the model architecture.
 if __name__=="__main__":
     # Imports.
@@ -29,17 +44,26 @@ if __name__=="__main__":
 
     # Create the model object.
     model = PromptVisionTrainer(
-        text_encoder_name="bert-base-uncased",
-        num_image_decoder_blocks=6,
-        num_image_decoder_heads=8,
-        image_decoder_hidden_dim=2048
+        num_text_encoder_layers=4, 
+        num_image_encoder_layers=6, 
+        text_encoder_hidden_dim=1024, 
+        image_encoder_hidden_dim=2048, 
+        num_heads=8, 
+        embedding_dim=768, 
+        context_length=196, 
+        image_size=224, 
+        num_patches=14, 
+        num_points=8, 
+        padding_idx=0
     )
+    model.to(device=device)
 
     # Display the model architecture.
-    image_tensor = torch.randn(1, 3, 196, 768)
+    image_tensor = torch.randn(1, 3, 224, 224)
     tokenized_text_tensor = torch.randint(0, 100, (1, 196))
     summary(
         model=model, 
-        input_data=(image_tensor, tokenized_text_tensor), 
-        device=device
+        input_data=(tokenized_text_tensor, image_tensor), 
+        device=device,
+        verbose=args.verbose
     )

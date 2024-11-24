@@ -1,10 +1,11 @@
 """
 Main module that contains the PromptVision model class.
 """
+import torch
 import torch.nn as nn
 
-from models.decoder import Decoder as ImageDecoder
-from models.encoder import TextEncoder
+from models.embedding import ImageEmbedding, TextEmbedding
+from models.encoder import ImageEncoder, TextEncoder
 
 
 # Classes.
@@ -14,48 +15,67 @@ class PromptVisionTrainer(nn.Module):
     # Special methods.
     def __init__(
             self, 
-            text_encoder_name, 
-            num_image_decoder_blocks, 
-            num_image_decoder_heads, 
-            image_decoder_hidden_dim
+            num_text_encoder_layers, 
+            num_image_encoder_layers, 
+            text_encoder_hidden_dim, 
+            image_encoder_hidden_dim, 
+            num_heads, 
+            embedding_dim, 
+            context_length, 
+            image_size, 
+            num_patches, 
+            num_points, 
+            padding_idx = 0
         ):
-        """
-        Initializes the PromptVisionTrainer class.
-
-        Args:
-            text_encoder_name (str): The name of the text encoder model.
-            num_image_decoder_blocks (int): The number of blocks in the image decoder.
-            num_image_decoder_heads (int): The number of heads in the image decoder.
-            image_decoder_hidden_dim (int): The hidden dimension of the image decoder.
-        """
         super().__init__()
 
-        # Layers.
-        self.text_encoder = TextEncoder(model_name=text_encoder_name)
-        self.image_decoder = ImageDecoder(
-            num_blocks=num_image_decoder_blocks,
-            num_heads=num_image_decoder_heads,
-            hidden_dim=image_decoder_hidden_dim,
-            embedding_dim=768 # The BERT model has an embedding dimension of 768.
+        # Embedding layers.
+        self.__text_embedding = TextEmbedding(
+            context_size=context_length, 
+            embedding_dim=embedding_dim, 
+            padding_idx=padding_idx
+        )
+        self.__image_embedding = ImageEmbedding(
+            image_size=image_size,
+            num_patches=num_patches, 
+            padding_idx=padding_idx
+        )
+
+        # Encoder layers.
+        self.__text_encoder = TextEncoder(
+            num_layers=num_text_encoder_layers, 
+            emb_dim=embedding_dim, 
+            num_heads=num_heads, 
+            hidden_dim=text_encoder_hidden_dim
+        )
+        self.__image_encoder = ImageEncoder(
+            num_layers=num_image_encoder_layers, 
+            emb_dim=embedding_dim, 
+            num_heads=num_heads, 
+            hidden_dim=image_encoder_hidden_dim, 
+            num_points=num_points, 
+            patch_size=num_patches
         )
 
 
     # Methods.
-    def forward(self, image_tensor, tokenized_text_tensor):
+    def forward(self, text, image):
         """
-        Forward pass of the model used specifically for training.
+        Performs a forward pass through the model.
 
         Args:
-            image_tensor (torch.Tensor): The input image tensor.
-            tokenized_text_tensor (torch.Tensor): The tokenized text tensor.
+            text (torch.Tensor): The input text tensor.
+            image (torch.Tensor): The input image tensor.
 
         Returns:
             torch.Tensor: The output tensor.
         """
-        # Encode the text.
-        text_embedding = self.text_encoder(tokenized_text_tensor)
+        # Embedding layers.
+        text_emb = self.__text_embedding(text)
+        image_emb = self.__image_embedding(image)
 
-        # Decode the image.
-        output = self.image_decoder(image_tensor, text_embedding)
+        # Encoder layers.
+        text_enc = self.__text_encoder(text_emb)
+        image_enc = self.__image_encoder(text_enc, image_emb)
 
-        return output
+        return image_enc
