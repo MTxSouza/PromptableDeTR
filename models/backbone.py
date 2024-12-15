@@ -23,8 +23,8 @@ class ImageEncoderOutput:
     """
     Dataclass that stores the output of the image encoder.
     """
-    small_obj: torch.Tensor
-    medium_obj: torch.Tensor
+    high_resolutution_feat: torch.Tensor
+    medium_resolutution_feat: torch.Tensor
 
 
 # Classes.
@@ -71,7 +71,10 @@ class MobileNetv3Backbone(nn.Module):
         feature_map_1 = self.feature_1(feature_map_0)
 
         # Compute new channels.
-        feature_small_obj = self.small_feat(feature_map_0)
-        feature_medium_obj = self.medium_feat(feature_map_1)
+        high_resolutution_feat = self.small_feat(feature_map_0)
+        medium_resolutution_feat = self.medium_feat(feature_map_1)
 
-        return ImageEncoderOutput(small_obj=feature_small_obj, medium_obj=feature_medium_obj)
+        return ImageEncoderOutput(
+            high_resolutution_feat=high_resolutution_feat, 
+            medium_resolutution_feat=medium_resolutution_feat
+        )
