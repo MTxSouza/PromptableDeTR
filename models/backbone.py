@@ -1,13 +1,6 @@
 """
-Main module that stores the image encoder block of the model. It is a MobileNetV3 based model without 
-the classification head.
-
-The model is divided into three parts: the base backbone, the first feature 
-map and the second feature map. The first feature map is used to detect small objects, while the second 
-feature map is used to detect medium objects. 
-
-The feature maps are then passed through a 1x1 convolution 
-layer to increase the number of channels. The model is pre-trained on the ImageNet dataset.
+Main module that stores the image encoder block of the model and the text encoder. It is a MobileNetV3 based model 
+without the classification head and a MobileBERT model.
 """
 from dataclasses import dataclass
 
@@ -15,6 +8,7 @@ import torch
 import torch.nn as nn
 from torchvision.models.mobilenetv3 import (MobileNet_V3_Large_Weights,
                                             mobilenet_v3_large)
+from transformers import AutoTokenizer, MobileBertModel
 
 
 # Structures.
@@ -30,6 +24,14 @@ class ImageEncoderOutput:
 # Classes.
 class MobileNetv3Backbone(nn.Module):
     def __init__(self):
+        """
+        The model is divided into three parts: the base backbone, the first feature map and the second 
+        feature map. The first feature map is used to detect small objects, while the second feature 
+        map is used to detect medium objects. 
+
+        The feature maps are then passed through a 1x1 convolution 
+        layer to increase the number of channels. The model is pre-trained on the ImageNet dataset.
+        """
         super().__init__()
 
         # Load pre-trained model.
@@ -50,8 +52,8 @@ class MobileNetv3Backbone(nn.Module):
         self.feature_1 = nn.Sequential(*feature_1)
 
         # Define final layers.
-        self.small_feat = nn.Conv2d(in_channels=112, out_channels=256, kernel_size=1, stride=1)
-        self.medium_feat = nn.Conv2d(in_channels=160, out_channels=256, kernel_size=1, stride=1)
+        self.high_resolutution_feat = nn.Conv2d(in_channels=112, out_channels=256, kernel_size=1, stride=1)
+        self.medium_resolutution_feat = nn.Conv2d(in_channels=160, out_channels=256, kernel_size=1, stride=1)
 
 
     def forward(self, x):
@@ -71,10 +73,41 @@ class MobileNetv3Backbone(nn.Module):
         feature_map_1 = self.feature_1(feature_map_0)
 
         # Compute new channels.
-        high_resolutution_feat = self.small_feat(feature_map_0)
-        medium_resolutution_feat = self.medium_feat(feature_map_1)
+        high_resolutution_feat = self.high_resolutution_feat(feature_map_0)
+        medium_resolutution_feat = self.medium_resolutution_feat(feature_map_1)
 
         return ImageEncoderOutput(
             high_resolutution_feat=high_resolutution_feat, 
             medium_resolutution_feat=medium_resolutution_feat
         )
+
+
+class MobileBertEncoder(nn.Module):
+
+    def __init__(self):
+        super().__init__()
+
+        # Load pre-trained model.
+        self.tokenizer = AutoTokenizer.from_pretrained(pretrained_model_name_or_path="google/mobilebert-uncased")
+        self.encoder = MobileBertModel.from_pretrained(pretrained_model_name_or_path="google/mobilebert-uncased")
+
+
+    def forward(self, text):
+        """
+        Forward pass of the model. It returns the last hidden state of the model.
+
+        Args:
+            text (str): Input text.
+
+        Returns:
+            torch.Tensor: Last hidden state of the model.
+        """
+
+        # Tokenize input text.
+        input_ids = self.tokenizer(text, return_tensors="pt")
+        input_ids = input_ids.get("input_ids")
+
+        # Forward pass.
+        outputs = self.encoder(input_ids)
+
+        return outputs.last_hidden_state
