@@ -752,7 +752,7 @@ class MobileBertPooler(nn.Module):
         return pooled_output
 
 
-class MobileBertModel(nn.Module):
+class MobileBert(nn.Module):
 
 
     # Special methods.
