@@ -261,7 +261,7 @@ class InvertedResidual(nn.Module):
         return output
 
 
-class MobileNetV3(nn.Module):
+class Custom_MobileNetV3(nn.Module):
 
 
     # Special methods.
@@ -284,16 +284,18 @@ class MobileNetV3(nn.Module):
             InvertedResidual(24, 24, 3, 1, 1, nn.Conv2d, nn.BatchNorm2d, nn.ReLU, 72, 1, False),
             InvertedResidual(24, 40, 5, 2, 1, nn.Conv2d, nn.BatchNorm2d, nn.ReLU, 72, 2, False, True),
             InvertedResidual(40, 40, 5, 1, 1, nn.Conv2d, nn.BatchNorm2d, nn.ReLU, 120, 2, False, True),
-            InvertedResidual(40, 40, 5, 1, 1, nn.Conv2d, nn.BatchNorm2d, nn.ReLU, 120, 2, False, True),
+            InvertedResidual(40, 40, 5, 1, 1, nn.Conv2d, nn.BatchNorm2d, nn.ReLU, 120, 2, False, True)
+        )
+
+        # Features maps.
+        self.features_1 = nn.Sequential(
             InvertedResidual(40, 80, 3, 2, 1, nn.Conv2d, nn.BatchNorm2d, nn.Hardswish, 240, 1, False),
             InvertedResidual(80, 80, 3, 1, 1, nn.Conv2d, nn.BatchNorm2d, nn.Hardswish, 200, 1, False),
             InvertedResidual(80, 80, 3, 1, 1, nn.Conv2d, nn.BatchNorm2d, nn.Hardswish, 184, 1, False),
             InvertedResidual(80, 80, 3, 1, 1, nn.Conv2d, nn.BatchNorm2d, nn.Hardswish, 184, 1, False),
-            InvertedResidual(80, 112, 3, 1, 1, nn.Conv2d, nn.BatchNorm2d, nn.Hardswish, 480, 1, False, True)
+            InvertedResidual(80, 112, 3, 1, 1, nn.Conv2d, nn.BatchNorm2d, nn.Hardswish, 480, 1, False, True),
+            InvertedResidual(112, 112, 3, 1, 1, nn.Conv2d, nn.BatchNorm2d, nn.Hardswish, 672, 1, False, True)
         )
-
-        # Features maps.
-        self.features_1 = InvertedResidual(112, 112, 3, 1, 1, nn.Conv2d, nn.BatchNorm2d, nn.Hardswish, 672, 1, False, True)
         self.features_2 = nn.Sequential(
             InvertedResidual(112, 160, 5, 2, 1, nn.Conv2d, nn.BatchNorm2d, nn.Hardswish, 672, 2, False, True),
             InvertedResidual(160, 160, 5, 1, 1, nn.Conv2d, nn.BatchNorm2d, nn.Hardswish, 960, 2, False, True),
