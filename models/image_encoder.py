@@ -261,7 +261,7 @@ class InvertedResidual(nn.Module):
         return output
 
 
-class Custom_MobileNetV3(nn.Module):
+class MobileNetV3(nn.Module):
 
 
     # Special methods.
@@ -329,3 +329,42 @@ class Custom_MobileNetV3(nn.Module):
         low_res = self.features_3(mid_res)
 
         return MobileNetV3Output(high_resolution_feat=high_res, mid_resolution_feat=mid_res, low_resolution_feat=low_res)
+
+
+
+if __name__ == "__main__":
+
+    # Get arguments.
+    import argparse
+    import os
+
+    from torchsummary import summary
+
+
+    def check_weight_file(path):
+
+        # Check if the file exists.
+        if not os.path.exists(path):
+            raise argparse.ArgumentTypeError("The file '%s' does not exist." % path)
+
+        # Check if it is a file.
+        if not os.path.isfile(path):
+            raise argparse.ArgumentTypeError("The path '%s' is not a file." % path)
+
+        # Check if the file is a PyTorch model file.
+        if not path.endswith(".pth"):
+            raise argparse.ArgumentTypeError("The file '%s' is not a valid PyTorch model file." % path)
+
+        return path
+
+    parser = argparse.ArgumentParser(prog="MobileNetV3 model", description=__doc__)
+    parser.add_argument("--weight-path", "-w", type=check_weight_file, required=True, help="The path to the pre-trained weights.")
+
+    args = parser.parse_args()
+
+    # Initialize the MobileNetV3 model and load the pre-trained weights.
+    encoder = MobileNetV3()
+
+    # Load the pre-trained weights.
+    encoder.load_state_dict(state_dict=torch.load(f=args.weight_path, weights_only=True))
+    summary(model=encoder, input_data=(3, 300, 300))
