@@ -560,13 +560,13 @@ class OutputBottleneck(nn.Module):
         return hidden_states
 
 
-class MobileBertOutput(nn.Module):
+class MobileBertOutputBlock(nn.Module):
 
 
     # Special methods.
     def __init__(self, emb_dim = 128, hidden_size = 512):
         """
-        Initializes the MobileBertOutput class that is used to apply the output layer to the 
+        Initializes the MobileBertOutputBlock class that is used to apply the output layer to the 
         input tensor.
 
         Args:
@@ -630,7 +630,7 @@ class MobileBertLayer(nn.Module):
         # Layers.
         self.attention = MobileBertAttention(emb_dim=emb_dim, hidden_size=hidden_size, num_heads=num_heads)
         self.intermediate = MobileBertIntermediate(emb_dim=emb_dim, intermediate_size=intermediate_size)
-        self.output = MobileBertOutput(emb_dim=emb_dim, hidden_size=hidden_size)
+        self.output = MobileBertOutputBlock(emb_dim=emb_dim, hidden_size=hidden_size)
         self.bottleneck = Bottleneck(hidden_size=hidden_size, intra_bottleneck_dim=intra_bottleneck_dim)
         self.ffn = nn.ModuleList([FFNLayer(emb_dim=emb_dim, intermediate_size=intermediate_size) for _ in range(3)])
 
@@ -827,3 +827,41 @@ class MobileBert(nn.Module):
         pooled_output = self.pooler(encoder_output)
 
         return MobileBertOutput(last_hidden_state=encoder_output, pooled_output=pooled_output)
+
+
+if __name__ == "__main__":
+
+    # Get arguments.
+    import argparse
+    import os
+
+    from torchsummary import summary
+
+
+    def check_weight_file(path):
+
+        # Check if the file exists.
+        if not os.path.exists(path):
+            raise argparse.ArgumentTypeError("The file '%s' does not exist." % path)
+
+        # Check if it is a file.
+        if not os.path.isfile(path):
+            raise argparse.ArgumentTypeError("The path '%s' is not a file." % path)
+
+        # Check if the file is a PyTorch model file.
+        if not path.endswith(".pth"):
+            raise argparse.ArgumentTypeError("The file '%s' is not a valid PyTorch model file." % path)
+
+        return path
+
+    parser = argparse.ArgumentParser(prog="MobileBERT model", description=__doc__)
+    parser.add_argument("--weight-path", "-w", type=check_weight_file, required=True, help="The path to the pre-trained weights.")
+
+    args = parser.parse_args()
+
+    # Initialize the MobileBERT model and load the pre-trained weights.
+    encoder = MobileBert()
+
+    # Load the pre-trained weights.
+    encoder.load_state_dict(state_dict=torch.load(f=args.weight_path, weights_only=True))
+    summary(model=encoder, input_data=torch.randint(low=0, high=30522, size=(1, 490)))
