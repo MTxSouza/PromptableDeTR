@@ -144,9 +144,9 @@ class SqueezeExcitation(nn.Module):
         super().__init__()
 
         # Layers.
-        self.avgpool = nn.AdaptiveAvgPool2d(1)
-        self.fc1 = torch.nn.Conv2d(in_channels, squeeze_channels, 1)
-        self.fc2 = torch.nn.Conv2d(squeeze_channels, in_channels, 1)
+        self.avgpool = nn.AdaptiveAvgPool2d(output_size=1)
+        self.fc1 = torch.nn.Conv2d(in_channels=in_channels, out_channels=squeeze_channels, kernel_size=1)
+        self.fc2 = torch.nn.Conv2d(in_channels=squeeze_channels, out_channels=in_channels, kernel_size=1)
         self.activation = act_func()
         self.scale_activation = scale_act()
 
@@ -217,7 +217,11 @@ class InvertedResidual(nn.Module):
         if not expanded_channels is None and expanded_channels != in_channels:
             layers.append(
                 Conv2dNormActivation(
-                    in_channels, expanded_channels, kernel_size=1, norm_layer=norm_layer, act_func=act_func
+                    in_channels=in_channels, 
+                    out_channels=expanded_channels, 
+                    kernel_size=1, 
+                    norm_layer=norm_layer, 
+                    act_func=act_func
                 )
             )
             in_channels = expanded_channels
@@ -225,18 +229,39 @@ class InvertedResidual(nn.Module):
         stride = 1 if dilation > 1 else stride
         layers.append(
             Conv2dNormActivation(
-                in_channels, expanded_channels, kernel_size, stride, dilation, expanded_channels, conv_layer, norm_layer, act_func, padding, bias
+                in_channels=in_channels, 
+                out_channels=expanded_channels, 
+                kernel_size=kernel_size, 
+                stride=stride, 
+                dilation=dilation, 
+                groups=expanded_channels, 
+                conv_layer=conv_layer, 
+                norm_layer=norm_layer, 
+                act_func=act_func, 
+                padding=padding, 
+                bias=bias
             )
         )
 
         # Check if the pool is enabled.
         if pool:
-            squeeze_channels = make_divisible(expanded_channels // 4, 8)
-            layers.append(SqueezeExcitation(expanded_channels, squeeze_channels, nn.ReLU, nn.Hardsigmoid))
+            squeeze_channels = make_divisible(v=expanded_channels // 4, divisor=8)
+            layers.append(
+                SqueezeExcitation(
+                    in_channels=expanded_channels, 
+                    squeeze_channels=squeeze_channels, 
+                    act_func=nn.ReLU, 
+                    scale_act=nn.Hardsigmoid
+                )
+            )
 
         layers.append(
             Conv2dNormActivation(
-                expanded_channels, out_channels, kernel_size=1, norm_layer=norm_layer, act_func=None
+                in_channels=expanded_channels, 
+                out_channels=out_channels, 
+                kernel_size=1, 
+                norm_layer=norm_layer, 
+                act_func=None
             )
         )
 
@@ -309,7 +334,13 @@ class MobileNetV3(nn.Module):
             InvertedResidual(320, 320, 5, 1, 1, nn.Conv2d, nn.BatchNorm2d, nn.Hardswish, 1280, 2, False, True)
         )
 
+        # Project features.
+        self.feat_proj_1 = nn.Conv2d(in_channels=112, out_channels=256, kernel_size=1, stride=1, padding=0)
+        self.feat_proj_2 = nn.Conv2d(in_channels=160, out_channels=256, kernel_size=1, stride=1, padding=0)
+        self.feat_proj_3 = nn.Conv2d(in_channels=320, out_channels=256, kernel_size=1, stride=1, padding=0)
 
+
+    # Methods.
     def forward(self, x):
         """
         Forward method of the MobileNetV3 model.
@@ -328,7 +359,12 @@ class MobileNetV3(nn.Module):
         mid_res = self.features_2(high_res)
         low_res = self.features_3(mid_res)
 
-        return MobileNetV3Output(high_resolution_feat=high_res, mid_resolution_feat=mid_res, low_resolution_feat=low_res)
+        # Project final channels.
+        high_res_proj = self.feat_proj_1(high_res)
+        mid_res_proj = self.feat_proj_2(mid_res)
+        low_res_proj = self.feat_proj_3(low_res)
+
+        return MobileNetV3Output(high_resolution_feat=high_res_proj, mid_resolution_feat=mid_res_proj, low_resolution_feat=low_res_proj)
 
 
 
@@ -367,4 +403,4 @@ if __name__ == "__main__":
 
     # Load the pre-trained weights.
     encoder.load_state_dict(state_dict=torch.load(f=args.weight_path, weights_only=True))
-    summary(model=encoder, input_data=(3, 300, 300))
+    summary(model=encoder, input_data=(3, 640, 640))
