@@ -290,7 +290,7 @@ class MobileNetV3(nn.Module):
 
 
     # Special methods.
-    def __init__(self):
+    def __init__(self, emb_dim = 512):
         """
         Main class used to define the base MobileNetV3 model. It is a the base backbone of 
         MobileNetV3 model without the pooling and fully connected layers. It is used to 
@@ -298,6 +298,9 @@ class MobileNetV3(nn.Module):
 
         At end, it has two new InvertedResidual blocks to process the feature maps in a 
         smaller resolution.
+
+        Args:
+            emb_dim (int): Dimension of the embedding of final features. (Default: 512)
         """
         super().__init__()
 
@@ -335,9 +338,9 @@ class MobileNetV3(nn.Module):
         )
 
         # Project features.
-        self.feat_proj_1 = nn.Conv2d(in_channels=112, out_channels=256, kernel_size=1, stride=1, padding=0)
-        self.feat_proj_2 = nn.Conv2d(in_channels=160, out_channels=256, kernel_size=1, stride=1, padding=0)
-        self.feat_proj_3 = nn.Conv2d(in_channels=320, out_channels=256, kernel_size=1, stride=1, padding=0)
+        self.feat_proj_1 = nn.Conv2d(in_channels=112, out_channels=emb_dim, kernel_size=1, stride=1, padding=0)
+        self.feat_proj_2 = nn.Conv2d(in_channels=160, out_channels=emb_dim, kernel_size=1, stride=1, padding=0)
+        self.feat_proj_3 = nn.Conv2d(in_channels=320, out_channels=emb_dim, kernel_size=1, stride=1, padding=0)
 
 
     # Methods.
