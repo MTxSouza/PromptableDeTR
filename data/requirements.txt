@@ -1,7 +1,0 @@
-# Software and scripts.
-tqdm==4.66.5
-httpx==0.27.2
-
-# Jupyter notebook.
-ipykernel==6.29.5
-matplotlib==3.9.2
