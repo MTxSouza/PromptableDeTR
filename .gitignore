@@ -2,6 +2,9 @@
 __pycache__
 *.pyc
 
+# Logs
+logs/
+
 # Environment
 .venv
 .env

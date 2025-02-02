@@ -1,156 +1,202 @@
 """
-This module contains the main tokenizer class for the project. It uses the BERT 
-Tokenizer from the Hugging Face library, retrived with `torch.hub.load`.
+Main module for the Tokenizer class that is used to encode and decode text data. It uses 
+the MobileBERT vocabulary to encode and decode text data.
 """
-from abc import ABC, abstractmethod
+import os
+import re
+import warnings
+from enum import Enum
 
-import torch
+
+# Enums.
+class SpecialTokens(Enum):
+    """
+    Enum class that contains the special tokens used by the MobileBERT model.
+    """
+    PAD = ("[PAD]", 0)
+    UNK = ("[UNK]", 100)
+    CLS = ("[CLS]", 101)
+    SEP = ("[SEP]", 102)
+    MASK = ("[MASK]", 103)
+
+
+    # Methods.
+    @classmethod
+    def get_special_tokens_identifier(cls):
+        """
+        Get a regex pattern that tries to find if a text already contains special tokens.
+
+        Returns:
+            re.Pattern: Compiled regex pattern that tries to find special tokens in a text.
+        """
+        # Get special tokens.
+        special_tokens = "|".join([token.value[0] for token in cls])
+        special_tokens = special_tokens.replace("[", "\[")
+
+        # Create regex pattern.
+        return re.compile(pattern=r"%s" % special_tokens)
 
 
 # Classes.
-class _BaseTokenizer(ABC):
+class Tokenizer:
 
 
     # Special methods.
-    def __init__(self):
+    def __init__(self, vocab_filepath):
         """
-        Initializes the _BaseTokenizer class. This is an abstract class and 
-        should not be instantiated.
+        Main class used to encode and decode text data based on the MobileBERT vocabulary.
+
+        Args:
+            vocab_filepath (str): Path to the vocabulary file.
         """
-        super(_BaseTokenizer, self).__init__()
+
+        # Check if the vocabulary file exists.
+        if not os.path.exists(path=vocab_filepath):
+            raise FileNotFoundError("Vocabulary file not found.")
+
+        # Check if the vocabulary file is a file.
+        if not os.path.isfile(path=vocab_filepath):
+            raise FileNotFoundError("Vocabulary file is not a file.")
+
+        # Load the vocabulary file.
+        self.token_to_index = self.__load_vocab_file(vocab_filepath=vocab_filepath)
+        self.index_to_token = {index: token for token, index in self.token_to_index.items()}
+
+        self.special_tokens_regex = SpecialTokens.get_special_tokens_identifier() 
+
+
+    # Private methods.
+    def __load_vocab_file(self, vocab_filepath):
+        """
+        Load the vocabulary file and map the tokens to their respective indices.
+
+        Args:
+            vocab_filepath (str): Path to the vocabulary file.
+
+        Returns:
+            dict: Dictionary mapping tokens to their respective indices.
+        """
+        # Load file.
+        with open(file=vocab_filepath, mode="r", encoding="utf-8") as file_buffer:
+            raw_tokens = file_buffer.read().split(sep="\n")
+
+        # Map tokens to indices.
+        token_to_index = {token.strip(): index for index, token in enumerate(iterable=raw_tokens)}
+
+        # Check if special tokens are in the vocabulary
+        # and if they are in the correct index.
+        for special_token in SpecialTokens:
+
+            if not special_token.value[0] in token_to_index:
+                raise ValueError("Special token %s not found in the vocabulary." % special_token.value[0])
+
+            elif token_to_index[special_token.value[0]] != special_token.value[1]:
+                raise ValueError("Special token %s is not in the correct index." % special_token.value[0])
+
+        return token_to_index
 
 
     # Methods.
-    @abstractmethod
-    def tokenize(self, texts):
-        """
-        Tokenizes the input text.
-
-        Args:
-            text (List[str] | str): Text to be tokenized.
-
-        Returns:
-            List[List[str]] | List[str]: The tokenized text.
-        """
-        pass
-
-
-    @abstractmethod
     def encode(self, texts):
         """
-        Encodes the input text.
+        Encode a text into a list of token indices.
 
         Args:
-            text (List[str] | str): Text to be encoded.
+            texts (str|List[str]): Text or list of texts to encode.
 
         Returns:
-            torch.Tensor: The encoded text with dimension (batch_size, seq_len).
+            list: List of token indices.
         """
-        pass
-
-
-class BertTokenizer(_BaseTokenizer):
-
-
-    # Special methods.
-    def __init__(self, model_name):
-        """
-        Initializes the BertTokenizer class.
-
-        Args:
-            model_name (str): The name of the BERT model.
-        """
-        super(BertTokenizer, self).__init__()
-
-        # Load the tokenizer.
-        self.__tokenizer = torch.hub.load(
-            "huggingface/pytorch-transformers", 
-            "tokenizer", 
-            model_name
-        )
-    
-
-    def __len__(self):
-        """
-        Returns the vocabulary size.
-
-        Returns:
-            int: The vocabulary size.
-        """
-        return self.vocab_size
-
-
-    # Methods.
-    def tokenize(self, texts):
-        """
-        Tokenizes the input text.
-
-        Args:
-            text (List[str] | str): Text to be tokenized.
-
-        Returns:
-            List[List[str]] | List[str]: The tokenized text.
-        """
-        # Check if it is a list of texts.
-        if not isinstance(texts, list):
+        # Check if the input is a string.
+        if isinstance(texts, str):
             texts = [texts]
 
-        # Tokenize the text.
-        str_tokens = [self.__tokenizer.tokenize(text=text) for text in texts]
+        # Encode text.
+        indices = []
+        for text in texts:
 
-        if len(str_tokens) == 1:
-            return str_tokens[0]
-        return str_tokens
+            # Remove special tokens.
+            text = text.upper()
+            text = self.special_tokens_regex.sub(repl="", string=text)
+
+            # Normalize text.
+            text = text.lower()
+
+            # Replace `spaces` with `#`.
+            if "#" in text:
+                warnings.warn(message="The character `#` is in the text. Replacing it with `space`.")
+            text = text.replace(" ", "#")
+
+            start_index = 0
+            final_index = len(text)
+            indice = []
+            while start_index < final_index:
+
+                # Check if the token is in the vocabulary.
+                token = text[start_index:final_index]
+                if token in self.token_to_index:
+                    indice.append(self.token_to_index[token])
+
+                    # Update indices.
+                    start_index = final_index
+                    final_index = len(text)
+                    continue
+
+                # Update final index.
+                final_index -= 1
+
+                # Check `start_index` and `final_index` are the same.
+                if start_index == final_index:
+                    indice.append(SpecialTokens.UNK.value[1])
+                    start_index += 1
+                    final_index = len(text)
+
+            # Append special tokens.
+            indice = [SpecialTokens.CLS.value[1]] + indice + [SpecialTokens.SEP.value[1]]
+
+            # Append indice.
+            indices.append(indice)
+
+        return indices
 
 
-    def encode(self, texts):
+    def decode(self, indices):
         """
-        Encodes the input text.
+        Decode a list of token indices into text.
 
         Args:
-            text (List[str] | str): Text to be encoded.
+            indices (List[int]|List[List[int]]): List or list of lists of token indices.
 
         Returns:
-            torch.Tensor: The encoded text with dimension (batch_size, seq_len).
+            list: List of texts.
         """
-        return self.__tokenizer(
-            texts,
-            add_special_tokens=False,
-            padding="max_length",
-            truncation=True, 
-            return_tensors="pt"
-        )
+        # Check if the input is a list of integers.
+        if isinstance(indices, list) and all(isinstance(index, int) for index in indices):
+            indices = [indices]
 
+        # Decode indices.
+        texts = []
+        for indice in indices:
 
-    # Properties.
-    @property
-    def vocab_size(self):
-        """
-        Returns the vocabulary size.
+            text = ""
+            for index in indice:
 
-        Returns:
-            int: The vocabulary size.
-        """
-        return self.__tokenizer.vocab_size
+                # Get current token.
+                token = self.index_to_token.get(index, SpecialTokens.UNK.name[0])
 
+                # Check if the token is a special token.
+                if token == "[PAD]":
+                    continue
 
-    @property
-    def pad_token(self):
-        """
-        Returns the padding token.
+                text += token
 
-        Returns:
-            str: The padding token.
-        """
-        return self.__tokenizer.pad_token
+            # Replace `#` with `spaces`.
+            text = text.replace("#", " ")
 
+            # Remove special tokens.
+            text = self.special_tokens_regex.sub(repl="", string=text)
 
-    @property
-    def pad_token_id(self):
-        """
-        Returns the padding token id.
+            # Append text.
+            texts.append(text)
 
-        Returns:
-            int: The padding token id.
-        """
-        return self.__tokenizer.pad_token_id
+        return texts
