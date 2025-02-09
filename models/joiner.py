@@ -5,6 +5,11 @@ to be feed into the transformer model.
 import torch
 import torch.nn as nn
 
+from logger import Logger
+
+# Logger.
+logger = Logger(name="model")
+
 
 # Classes.
 class PositionalEncoding(nn.Module):
@@ -43,15 +48,21 @@ class PositionalEncoding(nn.Module):
         Returns:
             torch.Tensor: Encoded image feature tensor.
         """
+        logger.debug(msg="Calling `PositionalEncoding` forward method.")
+        logger.debug(msg="Input shape: %s" % (image_feature.shape,))
+
         # Get shape of the image feature tensor.
         if not len(image_feature.size()) == 4:
+            logger.error(msg="Image feature tensor must be 4D.")
             raise ValueError("Image feature tensor must be 4D.")
         
         # Flatten image feature tensor.
         image_flatten = image_feature.flatten(2).permute(0, 2, 1)
+        logger.debug(msg="Flattened image feature shape: %s" % (image_flatten.shape,))
 
         # Compute positional encoding.
         pe = self.pe(self.indices).unsqueeze(0)
+        logger.debug(msg="Positional encoding shape: %s" % (pe.shape,))
         image_flatten = image_flatten + pe
 
         return image_flatten
@@ -90,20 +101,30 @@ class Attention(nn.Module):
         Returns:
             torch.Tensor: Attended value tensor.
         """
+        logger.debug(msg="Calling `Attention` forward method.")
+        logger.debug(msg="Query shape: %s" % (query.shape,))
+        logger.debug(msg="Key shape: %s" % (key.shape,))
+        logger.debug(msg="Value shape: %s" % (value.shape,))
+
         # Project query, key and value tensors.
         query = self.query(query)
+        logger.debug(msg="Projected query shape: %s" % (query.shape,))
         key = self.key(key)
+        logger.debug(msg="Projected key shape: %s" % (key.shape,))
         value = self.value(value)
+        logger.debug(msg="Projected value shape: %s" % (value.shape,))
 
         # Compute attention scores.
         attention_scores = query @ key.transpose(-2, -1)
         attention_scores = attention_scores / (key.size(-1) ** 0.5)
+        logger.debug(msg="Attention scores shape: %s" % (attention_scores.shape,))
 
         # Compute attention weights.
         attention_weights = torch.softmax(input=attention_scores, dim=-1)
 
         # Compute attended value.
         attended_value = attention_weights @ value
+        logger.debug(msg="Attended value shape: %s" % (attended_value.shape,))
 
         return attended_value
 
@@ -148,14 +169,21 @@ class MultiHeadAttention(nn.Module):
         Returns:
             torch.Tensor: Multi-head attended value tensor.
         """
+        logger.debug(msg="Calling `MultiHeadAttention` forward method.")
+        logger.debug(msg="Query shape: %s" % (query.shape,))
+        logger.debug(msg="Key shape: %s" % (key.shape,))
+        logger.debug(msg="Value shape: %s" % (value.shape,))
+
         # Compute attention heads.
         attention_heads = [
             attention_head(query, key, value) for attention_head in self.attention_heads
         ]
         attention_heads = torch.cat(tensors=attention_heads, dim=-1)
+        logger.debug(msg="Attention heads shape: %s" % (attention_heads.shape,))
 
         # Project attention heads.
         projected_attention_heads = self.projection(attention_heads)
+        logger.debug(msg="Projected attention heads shape: %s" % (projected_attention_heads.shape,))
 
         return projected_attention_heads
 
@@ -193,6 +221,9 @@ class FeedForward(nn.Module):
         Returns:
             torch.Tensor: Output tensor.
         """
+        logger.debug(msg="Calling `FeedForward` forward method.")
+        logger.debug(msg="Input shape: %s" % (x.shape,))
+
         return self.ff(x)
 
 
@@ -232,13 +263,19 @@ class JoinerBlock(nn.Module):
         Returns:
             torch.Tensor: Output tensor.
         """
+        logger.debug(msg="Calling `JoinerBlock` forward method.")
+        logger.debug(msg="Text embedding shape: %s" % (text_embedding.shape,))
+        logger.debug(msg="Image embedding shape: %s" % (image_embedding.shape,))
+
         # Compute multi-head attention.
         attention_output = self.multi_head_attention(text_embedding, image_embedding, image_embedding)
         attention_output = self.norm1(text_embedding + attention_output)
+        logger.debug(msg="Attention output shape: %s" % (attention_output.shape,))
 
         # Compute feed-forward layer.
         feed_forward_output = self.feed_forward(attention_output)
         feed_forward_output = self.norm2(attention_output + feed_forward_output)
+        logger.debug(msg="Feed-forward output shape: %s" % (feed_forward_output.shape,))
 
         return feed_forward_output
 
@@ -275,27 +312,43 @@ class Joiner(nn.Module):
         Returns:
             torch.Tensor: Joined embedding tensor.
         """
+        logger.debug(msg="Calling `Joiner` forward method.")
+
+        text_embedding = text_embedding.pooled_output
+        image_features = [
+            image_features.high_resolution_feat, 
+            image_features.mid_resolution_feat, 
+            image_features.low_resolution_feat
+        ]
+
+        logger.debug(msg="Text embedding shape: %s" % (text_embedding.shape,))
+
         # Apply level embedding to the image features.
         processed_image_features = []
         for level, image_feature in enumerate(iterable=image_features):
 
+            logger.debug(msg="Image feature shape: %s" % (image_feature.shape,))
+
             # Compute positional encoding.
             image_pe = self.img_pe[level](image_feature)
+            logger.debug(msg="Positional encoded image feature shape: %s" % (image_pe.shape,))
 
             # Compute level embedding.
             level_emb = self.level_emb[level].view(1, 1, -1)
+            logger.debug(msg="Level embedding shape: %s" % (level_emb.shape,))
 
             # Add level embedding to the feature map.
             feature = image_pe + level_emb
 
-            print(feature.size())
             processed_image_features.append(feature)
 
         # Project image embeddings.
         processed_image_features = torch.cat(processed_image_features, dim=1)
+        logger.debug(msg="Processed image features shape: %s" % (processed_image_features.shape,))
 
         # Join text and image embeddings.
         for joiner_block in self.joiner_blocks:
             text_embedding = joiner_block(text_embedding, processed_image_features)
+            logger.debug(msg="Text embedding shape: %s" % (text_embedding.shape,))
 
         return text_embedding
