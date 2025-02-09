@@ -11,6 +11,22 @@ parser.add_argument(
     default=1,
     help="The verbosity level of the model architecture."
 )
+parser.add_argument(
+    "--image-encoder-weights",
+    "--image-weights",
+    "-imgw",
+    type=str,
+    default=None,
+    help="Path to the image encoder weights."
+)
+parser.add_argument(
+    "--text-encoder-weights",
+    "--text-weights",
+    "-txtw",
+    type=str,
+    default=None,
+    help="Path to the text encoder weights."
+)
 
 # Parse the arguments.
 args = parser.parse_args()
@@ -18,6 +34,7 @@ args = parser.parse_args()
 
 # Display the model architecture.
 if __name__=="__main__":
+
     # Imports.
     import os
     import sys
@@ -43,6 +60,10 @@ if __name__=="__main__":
 
     # Create the model object.
     model = BasePromptableDeTR(image_tokens=[1600, 400, 100])
+    model.load_base_weights(
+        image_encoder_weights=args.image_encoder_weights, 
+        text_encoder_weights=args.text_encoder_weights
+    )
     model.to(device=device)
 
     # Display the model architecture.
