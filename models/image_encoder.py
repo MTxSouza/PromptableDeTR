@@ -12,6 +12,11 @@ from typing import Sequence
 import torch
 import torch.nn as nn
 
+from logger import Logger
+
+# Logger.
+logger = Logger(name="model")
+
 
 # Structures.
 @dataclass
@@ -162,13 +167,28 @@ class SqueezeExcitation(nn.Module):
         Returns:
             torch.Tensor: Output tensor processed by the block. (shape: (batch_size, in_channels, height, width))
         """
+        logger.info(msg="Calling `SqueezeExcitation` forward method.")
+        logger.debug(msg="- Input shape: %s" % (x.shape,))
+
+        logger.debug(msg="- Calling `avgpool` layer to be applied over the tensor %s." % (x.shape,))
         scale = self.avgpool(x)
+        logger.debug(msg="- Result of the `avgpool` layer: %s" % (scale.shape,))
+
+        logger.debug(msg="- Calling `fc1` layer to be applied over the tensor %s." % (scale.shape,))
         scale = self.fc1(scale)
         scale = self.activation(scale)
+        logger.debug(msg="- Result of the `fc1` + `activation` layers: %s" % (scale.shape,))
+
+        logger.debug(msg="- Calling `fc2` layer to be applied over the tensor %s." % (scale.shape,))
         scale = self.fc2(scale)
         scale = self.scale_activation(scale)
+        logger.debug(msg="- Result of the `fc2` + `scale_activation` layer: %s" % (scale.shape,))
 
-        return scale * x
+        logger.debug(msg="- Multiplying the input tensor %s by the scale tensor %s." % (x.shape, scale.shape))
+        scale = scale * x
+
+        logger.info(msg="- Final result of `SqueezeExcitation` block: %s" % (scale.shape,))
+        return scale
 
 
 class InvertedResidual(nn.Module):
@@ -279,10 +299,18 @@ class InvertedResidual(nn.Module):
         Returns:
             torch.Tensor: Output tensor processed by the block. (shape: (batch_size, out_channels, height, width))
         """
+        logger.info(msg="Calling `InvertedResidual` forward method.")
+        logger.debug(msg="- Input shape: %s" % (x.shape,))
+
+        logger.debug(msg="- Processing the input tensor %s through all blocks." % (x.shape,))
         output = self.block(x)
+        logger.debug(msg="- Result of the `block`: %s" % (output.shape,))
+
         if self.use_res_connect:
+            logger.debug(msg="Applying residual connection between input tensor %s and output tensor %s." % (x.shape, output.shape))
             output += x
 
+        logger.info(msg="- Final result of `InvertedResidual` block: %s" % (output.shape,))
         return output
 
 
@@ -354,19 +382,45 @@ class MobileNetV3(nn.Module):
         Returns:
             MobileNetV3Output: Output of the MobileNetV3 model with three feature maps with different resolutions.
         """
+        logger.info(msg="Calling `MobileNetV3` forward method.")
+        logger.debug(msg="- Input shape: %s" % (x.shape,))
+
         # Forward pass on the backbone.
+        logger.debug(msg="- Forward pass on the `backbone` through the input tensor %s." % (x.shape,))
         backbone_out = self.backbone(x)
+        logger.debug(msg="- Result of the `backbone` block: %s" % (backbone_out.shape,))
 
         # Extra multi-resolution features.
+        logger.debug(msg="- Forward pass on the `features_1` through the input tensor %s." % (backbone_out.shape,))
         high_res = self.features_1(backbone_out)
+        logger.debug(msg="- Result of the `features_1` block: %s" % (high_res.shape,))
+
+        logger.debug(msg="- Forward pass on the `features_2` through the input tensor %s." % (high_res.shape,))
         mid_res = self.features_2(high_res)
+        logger.debug(msg="- Result of the `features_2` block: %s" % (mid_res.shape,))
+
+        logger.debug(msg="- Forward pass on the `features_3` through the input tensor %s." % (mid_res.shape,))
         low_res = self.features_3(mid_res)
+        logger.debug(msg="- Result of the `features_3` block: %s" % (low_res.shape,))
 
         # Project final channels.
+        logger.debug(msg="- Projecting the features maps to the embedding dimension.")
+        logger.debug(msg="- Projecting the high resolution features %s." % (high_res.shape,))
         high_res_proj = self.feat_proj_1(high_res)
-        mid_res_proj = self.feat_proj_2(mid_res)
-        low_res_proj = self.feat_proj_3(low_res)
+        logger.debug(msg="- Result of the high resolution projection: %s" % (high_res_proj.shape,))
 
+        logger.debug(msg="- Projecting the mid resolution features %s." % (mid_res.shape,))
+        mid_res_proj = self.feat_proj_2(mid_res)
+        logger.debug(msg="- Result of the mid resolution projection: %s" % (mid_res_proj.shape,))
+
+        logger.debug(msg="- Projecting the low resolution features %s." % (low_res.shape,))
+        low_res_proj = self.feat_proj_3(low_res)
+        logger.debug(msg="- Result of the low resolution projection: %s" % (low_res_proj.shape,))
+
+        logger.info(msg="- Returning the final output of the `MobileNetV3` model with three feature maps stored in `MobileNetV3Output` structure.")
+        logger.debug(msg="- High resolution features: %s" % (high_res_proj.shape,))
+        logger.debug(msg="- Mid resolution features: %s" % (mid_res_proj.shape,))
+        logger.debug(msg="- Low resolution features: %s" % (low_res_proj.shape,))
         return MobileNetV3Output(high_resolution_feat=high_res_proj, mid_resolution_feat=mid_res_proj, low_resolution_feat=low_res_proj)
 
 
