@@ -187,7 +187,7 @@ class SqueezeExcitation(nn.Module):
         logger.debug(msg="- Multiplying the input tensor %s by the scale tensor %s." % (x.shape, scale.shape))
         scale = scale * x
 
-        logger.info(msg="- Final result of `SqueezeExcitation` block: %s" % (scale.shape,))
+        logger.info(msg="Final result of `SqueezeExcitation` block: %s" % (scale.shape,))
         return scale
 
 
@@ -310,7 +310,7 @@ class InvertedResidual(nn.Module):
             logger.debug(msg="Applying residual connection between input tensor %s and output tensor %s." % (x.shape, output.shape))
             output += x
 
-        logger.info(msg="- Final result of `InvertedResidual` block: %s" % (output.shape,))
+        logger.info(msg="Final result of `InvertedResidual` block: %s" % (output.shape,))
         return output
 
 
@@ -417,7 +417,7 @@ class MobileNetV3(nn.Module):
         low_res_proj = self.feat_proj_3(low_res)
         logger.debug(msg="- Result of the low resolution projection: %s" % (low_res_proj.shape,))
 
-        logger.info(msg="- Returning the final output of the `MobileNetV3` model with three feature maps stored in `MobileNetV3Output` structure.")
+        logger.info(msg="Returning the final output of the `MobileNetV3` model with three feature maps stored in `MobileNetV3Output` structure.")
         logger.debug(msg="- High resolution features: %s" % (high_res_proj.shape,))
         logger.debug(msg="- Mid resolution features: %s" % (mid_res_proj.shape,))
         logger.debug(msg="- Low resolution features: %s" % (low_res_proj.shape,))
