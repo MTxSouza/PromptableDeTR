@@ -10,6 +10,11 @@ from dataclasses import dataclass
 import torch
 import torch.nn as nn
 
+from logger import Logger
+
+# Logger.
+logger = Logger(name="model")
+
 
 # Structures.
 @dataclass
@@ -56,7 +61,15 @@ class NoNorm(nn.Module):
         Returns:
             torch.Tensor: The output tensor. (shape: (batch_size, seq_length, hidden_size))
         """
-        return input_tensor * self.weight + self.bias
+        logger.info(msg="Calling `NoNorm` layer to the input tensor.")
+        logger.debug(msg="- Input shape: %s" % (input_tensor.shape,))
+
+        logger.debug(msg="- Multiplying the input tensor by the weight and adding the bias.")
+        output = input_tensor * self.weight + self.bias
+        logger.debug(msg="- Output shape: %s" % (output.shape,))
+
+        logger.info(msg="Final result of the `NoNorm` block: %s." % (output.shape,))
+        return output
 
 
 class MobileBertEmbedding(nn.Module):
@@ -128,20 +141,36 @@ class MobileBertEmbedding(nn.Module):
         Returns:
             torch.Tensor: The embeddings of the input tokens. (shape: (batch_size, seq_length, hidden_size))
         """
+        logger.info(msg="Calling `MobileBertEmbedding` layer to the input tokens.")
+        logger.debug(msg="- Input tokens shape: %s" % (input_ids.shape,))
+        logger.debug(msg="- Token type ids shape: %s" % (token_type_ids.shape,))
+        logger.debug(msg="- Positional ids shape: %s" % (position_ids.shape if position_ids is not None else None))
 
         # Define positional indices.
         if position_ids is None:
+            logger.warning(msg="No positions indices, using the default positional indices.")
             seq_length = input_ids.size(1)
             position_ids = self.position_ids[:, :seq_length]
 
         # Word embeddings.
+        logger.debug(msg="- Applying the `nn.Embedding` layer to the input tokens %s." % (input_ids.shape,))
         word_embeddings = self.word_embeddings(input_ids)
+        logger.debug(msg="- Result of the `nn.Embedding` layer: %s." % (word_embeddings.shape,))
+
+        # Positional embeddings.
+        logger.debug(msg="- Applying the `nn.Embedding` layer to the positional indices %s." % (position_ids.shape,))
         position_embeddings = self.position_embeddings(position_ids)
+        logger.debug(msg="- Result of the `nn.Embedding` layer: %s." % (position_embeddings.shape,))
+
+        # Token type embeddings.
+        logger.debug(msg="- Applying the `nn.Embedding` layer to the token type ids %s." % (token_type_ids.shape,))
         token_type_embeddings = self.token_type_embeddings(token_type_ids)
+        logger.debug(msg="- Result of the `nn.Embedding` layer: %s." % (token_type_embeddings.shape,))
 
         # Apply transformation to the word embeddings.
         # Implementation from Hugging Face:
         # https://github.com/huggingface/transformers/blob/241c04d36867259cdf11dbb4e9d9a60f9cb65ebc/src/transformers/models/mobilebert/modeling_mobilebert.py#L226
+        logger.debug(msg="- Applying pad transformation to the word embeddings.")
         word_embeddings = torch.cat(
             tensors=[
                 nn.functional.pad(input=word_embeddings[:, 1:], pad=[0, 0, 0, 1, 0, 0], value=0.0),
@@ -150,13 +179,23 @@ class MobileBertEmbedding(nn.Module):
             ],
             dim=2,
         )
+        logger.debug(msg="- Result of the pad transformation: %s." % (word_embeddings.shape,))
+
+        logger.debug(msg="- Applying the `nn.Linear` layer to the word embeddings %s." % (word_embeddings.shape,))
         word_embeddings = self.embedding_transformation(word_embeddings)
+        logger.debug(msg="- Result of the `nn.Linear` layer: %s." % (word_embeddings.shape,))
 
         # Sum the embeddings.
+        logger.debug(msg="- Summing the embeddings.")
         embeddings = word_embeddings + position_embeddings + token_type_embeddings
+
+        # Apply LayerNorm and dropout.
+        logger.debug(msg="- Applying `NoNorm` layer to the embeddings %s." % (embeddings.shape,))
         embeddings = self.LayerNorm(embeddings)
         embeddings = self.dropout(embeddings)
+        logger.debug(msg="- Result of the `NoNorm` layer: %s." % (embeddings.shape,))
 
+        logger.info(msg="Final result of the `MobileBertEmbedding` block: %s." % (embeddings.shape,))
         return embeddings
 
 
@@ -191,9 +230,18 @@ class BottleneckLayer(nn.Module):
         Returns:
             torch.Tensor: The output tensor. (shape: (batch_size, seq_length, intra_bottleneck_dim))
         """
-        hidden_states = self.dense(input_tensor)
-        hidden_states = self.LayerNorm(hidden_states)
+        logger.info(msg="Calling `BottleneckLayer` layer to the input tensor.")
+        logger.debug(msg="- Input tensor shape: %s" % (input_tensor.shape,))
 
+        logger.debug(msg="- Applying the `nn.Linear` layer to the tensor %s." % (input_tensor.shape,))
+        hidden_states = self.dense(input_tensor)
+        logger.debug(msg="- Result of the `nn.Linear` layer: %s." % (hidden_states.shape,))
+
+        logger.debug(msg="- Applying `NoNorm` layer to the tensor %s." % (hidden_states.shape,))
+        hidden_states = self.LayerNorm(hidden_states)
+        logger.debug(msg="- Result of the `NoNorm` layer: %s." % (hidden_states.shape,))
+
+        logger.info(msg="Final result of the `BottleneckLayer` block: %s." % (hidden_states.shape,))
         return hidden_states
 
 
@@ -227,9 +275,18 @@ class Bottleneck(nn.Module):
         Returns:
             torch.Tensor: The output tensor. (shape: (batch_size, seq_length, intra_bottleneck_dim))
         """
-        bottlenecked_hidden_states = self.input(input_tensor)
-        shared_attention = self.attention(input_tensor)
+        logger.info(msg="Calling `Bottleneck` layer to the input tensor.")
+        logger.debug(msg="- Input tensor shape: %s" % (input_tensor.shape,))
 
+        logger.debug(msg="- Applying the `BottleneckLayer` layer to the input tensor %s." % (input_tensor.shape,))
+        bottlenecked_hidden_states = self.input(input_tensor)
+        logger.debug(msg="- Result of the `BottleneckLayer` layer: %s." % (bottlenecked_hidden_states.shape,))
+
+        logger.debug(msg="- Applying the `BottleneckLayer` layer to the input tensor %s." % (input_tensor.shape,))
+        shared_attention = self.attention(input_tensor)
+        logger.debug(msg="- Result of the `BottleneckLayer` layer: %s." % (shared_attention.shape,))
+
+        logger.info(msg="Final result of the `Bottleneck` block: %s." % (shared_attention.shape,))
         return shared_attention, shared_attention, input_tensor, bottlenecked_hidden_states
 
 
@@ -295,30 +352,63 @@ class MobileBertSelfAttention(nn.Module):
         Returns:
             torch.Tensor: The output tensor. (shape: (batch_size, seq_length, hidden_size))
         """
+        logger.info(msg="Calling `MobileBertSelfAttention` layer to the input tensors.")
+        logger.debug(msg="- Query tensor shape: %s" % (query_input.shape,))
+        logger.debug(msg="- Key tensor shape: %s" % (key_input.shape,))
+        logger.debug(msg="- Value tensor shape: %s" % (value_input.shape,))
+
         # Compute query, key and value tensors.
+        logger.debug(msg="- Applying the `nn.Linear` layer to the query tensor %s." % (query_input.shape,))
         query = self.query(query_input)
+        logger.debug(msg="- Result of the `nn.Linear` layer: %s." % (query.shape,))
+
+        logger.debug(msg="- Applying the `nn.Linear` layer to the key tensor %s." % (key_input.shape,))
         key = self.key(key_input)
+        logger.debug(msg="- Result of the `nn.Linear` layer: %s." % (key.shape,))
+
+        logger.debug(msg="- Applying the `nn.Linear` layer to the value tensor %s." % (value_input.shape,))
         value = self.value(value_input)
+        logger.debug(msg="- Result of the `nn.Linear` layer: %s." % (value.shape,))
 
         # Transpose the tensors.
+        logger.debug(msg="- Transposing the query, key and value tensors.")
         query_layer = self.transpose_for_scores(query)
+        logger.debug(msg="- Transposed query tensor shape: %s" % (query_layer.shape,))
+
         key_layer = self.transpose_for_scores(key)
+        logger.debug(msg="- Transposed key tensor shape: %s" % (key_layer.shape,))
+
         value_layer = self.transpose_for_scores(value)
+        logger.debug(msg="- Transposed value tensor shape: %s" % (value_layer.shape,))
 
         # Compute attention scores.
+        logger.debug(msg="- Computing attention scores.")
         attention_scores = query_layer @ key_layer.transpose(-1, -2)
+        logger.debug(msg="- Attention scores shape: %s" % (attention_scores.shape,))
         attention_scores = attention_scores / (self.attention_head_size ** 0.5)
+
+        # Apply attention mask.
+        logger.debug(msg="- Applying attention mask to the attention scores.")
         attention_scores = attention_scores + attention_mask
         attention_scores = nn.functional.softmax(attention_scores, dim=-1)
 
         attention_probs = self.dropout(attention_scores)
 
         # Compute final embeddings representations.
+        logger.debug(msg="- Computing the final embeddings representations.")
         context_layer = attention_probs @ value_layer
+        logger.debug(msg="- Context layer shape: %s" % (context_layer.shape,))
+
+        logger.debug(msg="- Transposing the context layer.")
         context_layer = context_layer.permute(0, 2, 1, 3).contiguous()
+        logger.debug(msg="- Transposed context layer shape: %s" % (context_layer.shape,))
+
+        logger.debug(msg="- Summing the context layer along the last dimension and reshaping it.")
         new_context_layer_shape = context_layer.size()[:-2] + (self.all_head_size,)
         context_layer = context_layer.view(new_context_layer_shape)
+        logger.debug(msg="- Reshaped context layer shape: %s" % (context_layer.shape,))
 
+        logger.info(msg="Final result of the `MobileBertSelfAttention` block: %s." % (context_layer.shape,))
         return context_layer
 
 
@@ -357,10 +447,27 @@ class MobileBertSelfOutput(nn.Module):
         Returns:
             torch.Tensor: The output tensor. (shape: (batch_size, seq_length, hidden_size))
         """
-        hidden_states = self.dense(hidden_states)
-        hidden_states = hidden_states + residual_tensor
-        hidden_states = self.LayerNorm(hidden_states)
+        logger.info(msg="Calling `MobileBertSelfOutput` layer to the input tensors.")
+        logger.debug(msg="- Hidden states shape: %s" % (hidden_states.shape,))
+        logger.debug(msg="- Residual tensor shape: %s" % (residual_tensor.shape,))
 
+        logger.debug(msg="- Applying the `nn.Linear` layer to the tensor %s." % (hidden_states.shape,))
+        hidden_states = self.dense(hidden_states)
+        logger.debug(msg="- Result of the `nn.Linear` layer: %s." % (hidden_states.shape,))
+        
+        logger.debug(msg="- Applying `NoNorm` layer to the tensor %s." % (hidden_states.shape,))
+        hidden_states = self.LayerNorm(hidden_states)
+        logger.debug(msg="- Result of the `NoNorm` layer: %s." % (hidden_states.shape,))
+        
+        logger.debug(msg="- Applying residual connection to the tensor %s with %s" % (hidden_states.shape, residual_tensor.shape))
+        hidden_states = hidden_states + residual_tensor
+        logger.debug(msg="- Result of the residual connection: %s." % (hidden_states.shape,))
+
+        logger.debug(msg="- Applying `NoNorm` layer to the tensor %s." % (hidden_states.shape,))
+        hidden_states = self.LayerNorm(hidden_states)
+        logger.debug(msg="- Result of the `NoNorm` layer: %s." % (hidden_states.shape,))
+
+        logger.info(msg="Final result of the `MobileBertSelfOutput` block: %s." % (hidden_states.shape,))
         return hidden_states
 
 
@@ -400,11 +507,24 @@ class MobileBertAttention(nn.Module):
         Returns:
             torch.Tensor: The output tensor. (shape: (batch_size, seq_length, hidden_size))
         """
+        logger.info(msg="Calling `MobileBertAttention` layer to the input tensors.")
+        logger.debug(msg="- Query tensor shape: %s" % (query_input.shape,))
+        logger.debug(msg="- Key tensor shape: %s" % (key_input.shape,))
+        logger.debug(msg="- Value tensor shape: %s" % (value_input.shape,))
+        logger.debug(msg="- Input tensor shape: %s" % (input_tensor.shape,))
+        logger.debug(msg="- Attention mask shape: %s" % (attention_mask.shape,))
+
         # Applies self attention.
+        logger.debug(msg="- Applying the `MobileBertSelfAttention` layer to the tensors %s, %s, %s, %s" % (query_input.shape, key_input.shape, value_input.shape, attention_mask.shape))
         self_output = self.self(query_input, key_input, value_input, attention_mask)
+        logger.debug(msg="- Result of the `MobileBertSelfAttention` layer: %s." % (self_output.shape,))
 
+        # Applies the self output layer.
+        logger.debug(msg="- Applying the `MobileBertSelfOutput` layer to the tensors %s, %s" % (self_output.shape, input_tensor.shape))
         attention_output = self.output(self_output, input_tensor)
+        logger.debug(msg="- Result of the `MobileBertSelfOutput` layer: %s." % (attention_output.shape,))
 
+        logger.info(msg="Final result of the `MobileBertAttention` block: %s." % (attention_output.shape,))
         return attention_output
 
 
@@ -439,9 +559,15 @@ class MobileBertIntermediate(nn.Module):
         Returns:
             torch.Tensor: The output tensor. (shape: (batch_size, seq_length, intermediate_size))
         """
+        logger.info(msg="Calling `MobileBertIntermediate` layer to the input tensor.")
+        logger.debug(msg="- Input tensor shape: %s" % (hidden_states.shape,))
+
+        logger.debug(msg="- Applying the `nn.Linear` layer to the tensor %s." % (hidden_states.shape,))
         hidden_states = self.dense(hidden_states)
         hidden_states = self.intermediate_act_fn(hidden_states)
+        logger.debug(msg="- Result of the `nn.Linear` + `nn.ReLU` layers: %s." % (hidden_states.shape,))
 
+        logger.info(msg="Final result of the `MobileBertIntermediate` block: %s." % (hidden_states.shape,))
         return hidden_states
 
 
@@ -475,10 +601,23 @@ class FFNOutput(nn.Module):
         Returns:
             torch.Tensor: The output tensor. (shape: (batch_size, seq_length, emb_dim))
         """
-        hidden_states = self.dense(hidden_states)
-        hidden_states = hidden_states + residual_tensor
-        hidden_states = self.LayerNorm(hidden_states)
+        logger.info(msg="Calling `FFNOutput` layer to the input tensors.")
+        logger.debug(msg="- Hidden states shape: %s" % (hidden_states.shape,))
+        logger.debug(msg="- Residual tensor shape: %s" % (residual_tensor.shape,))
 
+        logger.debug(msg="- Applying the `nn.Linear` layer to the tensor %s." % (hidden_states.shape,))
+        hidden_states = self.dense(hidden_states)
+        logger.debug(msg="- Result of the `nn.Linear` layer: %s." % (hidden_states.shape,))
+
+        logger.debug(msg="- Applying residual connection to the tensor %s with %s" % (hidden_states.shape, residual_tensor.shape))
+        hidden_states = hidden_states + residual_tensor
+        logger.debug(msg="- Result of the residual connection: %s." % (hidden_states.shape,))
+
+        logger.debug(msg="- Applying the `NoNorm` layer to the tensor %s." % (hidden_states.shape,))
+        hidden_states = self.LayerNorm(hidden_states)
+        logger.debug(msg="- Result of the `NoNorm` layer: %s." % (hidden_states.shape,))
+
+        logger.info(msg="Final result of the `FFNOutput` block: %s." % (hidden_states.shape,))
         return hidden_states
 
 
@@ -512,9 +651,18 @@ class FFNLayer(nn.Module):
         Returns:
             torch.Tensor: The output tensor. (shape: (batch_size, seq_length, emb_dim))
         """
-        intermediate_output = self.intermediate(hidden_states)
-        layer_output = self.output(intermediate_output, hidden_states)
+        logger.info(msg="Calling `FFNLayer` layer to the input tensor.")
+        logger.debug(msg="- Input tensor shape: %s" % (hidden_states.shape,))
 
+        logger.debug(msg="- Applying the `MobileBertIntermediate` layer to the tensor %s." % (hidden_states.shape,))
+        intermediate_output = self.intermediate(hidden_states)
+        logger.debug(msg="- Result of the `MobileBertIntermediate` layer: %s." % (intermediate_output.shape,))
+
+        logger.debug(msg="- Applying the `FFNOutput` layer to the tensor %s." % (intermediate_output.shape,))
+        layer_output = self.output(intermediate_output, hidden_states)
+        logger.debug(msg="- Result of the `FFNOutput` layer: %s." % (layer_output.shape,))
+
+        logger.info(msg="Final result of the `FFNLayer` block: %s." % (layer_output.shape,))
         return layer_output
 
 
@@ -552,11 +700,24 @@ class OutputBottleneck(nn.Module):
         Returns:
             torch.Tensor: The output tensor. (shape: (batch_size, seq_length, hidden_size))
         """
+        logger.info(msg="Calling `OutputBottleneck` layer to the input tensors.")
+        logger.debug(msg="- Hidden states shape: %s" % (hidden_states.shape,))
+        logger.debug(msg="- Residual tensor shape: %s" % (residual_tensor.shape,))
+
+        logger.debug(msg="- Applying the `nn.Linear` layer to the tensor %s." % (hidden_states.shape,))
         hidden_states = self.dense(hidden_states)
         hidden_states = self.dropout(hidden_states)
+        logger.debug(msg="- Result of the `nn.Linear` + `nn.Dropout` layer: %s." % (hidden_states.shape,))
+        
+        logger.debug(msg="- Applying residual connection to the tensor %s with %s" % (hidden_states.shape, residual_tensor.shape))
         hidden_states = hidden_states + residual_tensor
-        hidden_states = self.LayerNorm(hidden_states)
+        logger.debug(msg="- Result of the residual connection: %s." % (hidden_states.shape,))
 
+        logger.debug(msg="- Applying the `NoNorm` layer to the tensor %s." % (hidden_states.shape,))
+        hidden_states = self.LayerNorm(hidden_states)
+        logger.debug(msg="- Result of the `NoNorm` layer: %s." % (hidden_states.shape,))
+
+        logger.info(msg="Final result of the `OutputBottleneck` block: %s." % (hidden_states.shape,))
         return hidden_states
 
 
@@ -594,11 +755,28 @@ class MobileBertOutputBlock(nn.Module):
         Returns:
             torch.Tensor: The output tensor. (shape: (batch_size, seq_length, emb_dim))
         """
-        hidden_states = self.dense(hidden_states)
-        hidden_states = hidden_states + residual_tensor_1
-        hidden_states = self.LayerNorm(hidden_states)
-        hidden_states = self.bottleneck(hidden_states, residual_tensor_2)
+        logger.info(msg="Calling `MobileBertOutputBlock` layer to the input tensors.")
+        logger.debug(msg="- Hidden states shape: %s" % (hidden_states.shape,))
+        logger.debug(msg="- Residual tensor 1 shape: %s" % (residual_tensor_1.shape,))
+        logger.debug(msg="- Residual tensor 2 shape: %s" % (residual_tensor_2.shape,))
 
+        logger.debug(msg="- Applying the `nn.Linear` layer to the tensor %s." % (hidden_states.shape,))
+        hidden_states = self.dense(hidden_states)
+        logger.debug(msg="- Result of the `nn.Linear` layer: %s." % (hidden_states.shape,))
+
+        logger.debug(msg="- Applying residual connection to the tensor %s with %s" % (hidden_states.shape, residual_tensor_1.shape))
+        hidden_states = hidden_states + residual_tensor_1
+        logger.debug(msg="- Result of the residual connection: %s." % (hidden_states.shape,))
+        
+        logger.debug(msg="- Applying the `NoNorm` layer to the tensor %s." % (hidden_states.shape,))
+        hidden_states = self.LayerNorm(hidden_states)
+        logger.debug(msg="- Result of the `NoNorm` layer: %s." % (hidden_states.shape,))
+
+        logger.debug(msg="- Applying the `OutputBottleneck` layer to the tensor %s with %s." % (hidden_states.shape, residual_tensor_2.shape))
+        hidden_states = self.bottleneck(hidden_states, residual_tensor_2)
+        logger.debug(msg="- Result of the `OutputBottleneck` layer: %s." % (hidden_states.shape,))
+
+        logger.info(msg="Final result of the `MobileBertOutputBlock` block: %s." % (hidden_states.shape,))
         return hidden_states
 
 
@@ -647,24 +825,39 @@ class MobileBertLayer(nn.Module):
         Returns:
             torch.Tensor: The output tensor. (shape: (batch_size, seq_length, hidden_size))
         """
+        logger.info(msg="Calling `MobileBertLayer` layer to the input tensor.")
+        logger.debug(msg="- Input tensor shape: %s" % (input_tensor.shape,))
+        logger.debug(msg="- Attention mask shape: %s" % (input_mask.shape,))
 
         # Reduce the dimensionality of the hidden states.
+        logger.debug(msg="- Applying the `Bottleneck` layer to the tensor %s." % (input_tensor.shape,))
         bnk_out_1, bnk_out_2, bnk_out_3, bnk_out_4 = self.bottleneck(input_tensor)
+        logger.debug(msg="- Result of the `Bottleneck` layer: %s, %s, %s, %s." % (bnk_out_1.shape, bnk_out_2.shape, bnk_out_3.shape, bnk_out_4.shape))
 
         # Apply the attention mechanism.
+        logger.debug(msg="- Applying the `MobileBertAttention` layer to the tensors %s, %s, %s, %s." % (bnk_out_1.shape, bnk_out_2.shape, bnk_out_3.shape, bnk_out_4.shape))
         att_out = self.attention(bnk_out_1, bnk_out_2, bnk_out_3, bnk_out_4, input_mask)
+        logger.debug(msg="- Result of the `MobileBertAttention` layer: %s." % (att_out.shape,))
 
         # Apply the feed-forward network (FFN) layer.
+        logger.debug(msg="- Applying the `FFNLayer` layers to the tensor %s." % (att_out.shape,))
         ffn_out = att_out
-        for ff in self.ffn:
+        for idx, ff in enumerate(iterable=self.ffn):
+            logger.debug(msg="- Calling the %dº `FFNLayer` layer with the tensor %s." % (idx, ffn_out.shape))
             ffn_out = ff(ffn_out)
+            logger.debug(msg="- Result of the %dº `FFNLayer` layer: %s." % (idx, ffn_out.shape))
 
         # Expand the dimensionality of the hidden states.
+        logger.debug(msg="- Applying the `Bottleneck` layer to the tensor %s." % (ffn_out.shape,))
         itr_out = self.intermediate(ffn_out)
+        logger.debug(msg="- Result of the `Bottleneck` layer: %s." % (itr_out.shape,))
 
         # Apply the output layer.
+        logger.debug(msg="- Applying the `MobileBertOutputBlock` layer to the tensors %s, %s, %s." % (itr_out.shape, input_tensor.shape, ffn_out.shape))
         out_out = self.output(itr_out, ffn_out, input_tensor)
+        logger.debug(msg="- Result of the `MobileBertOutputBlock` layer: %s." % (out_out.shape,))
 
+        logger.info(msg="Final result of the `MobileBertLayer` block: %s." % (out_out.shape,))
         return out_out
 
 
@@ -684,6 +877,7 @@ class MobileBertEncoder(nn.Module):
         super().__init__()
 
         # Layers.
+        self.num_layers = num_layers
         self.layer = nn.ModuleList([
             MobileBertLayer(
                 emb_dim=emb_dim, 
@@ -708,9 +902,17 @@ class MobileBertEncoder(nn.Module):
         Returns:
             torch.Tensor: The output tensor. (shape: (batch_size, seq_length, hidden_size))
         """
-        for layer_module in self.layer:
-            hidden_states = layer_module(hidden_states, attention_mask)
+        logger.info(msg="Calling `MobileBertEncoder` layer to the input tensor.")
+        logger.debug(msg="- Input tensor shape: %s" % (hidden_states.shape,))
+        logger.debug(msg="- Attention mask shape: %s" % (attention_mask.shape,))
 
+        logger.debug(msg="- Applying %d `MobileBertLayer` layers to the input tensor." % (self.num_layers))
+        for idx, layer_module in enumerate(iterable=self.layer):
+            logger.debug(msg="- Calling %dº `MobileBertLayer` layer with the `hidden_states` %s and `attention_mask` %s" % (idx, hidden_states.shape, attention_mask.shape))
+            hidden_states = layer_module(hidden_states, attention_mask)
+            logger.debug(msg="- Result of the %dº `MobileBertLayer` layer: %s" % (idx, hidden_states.shape))
+
+        logger.info(msg="Final result of the `MobileBertEncoder` block: %s." % (hidden_states.shape,))
         return hidden_states
 
 
@@ -743,12 +945,19 @@ class MobileBertPooler(nn.Module):
         Returns:
             torch.Tensor: The pooled output tensor. (shape: (batch_size, hidden_size))
         """
+        logger.info(msg="Calling `MobileBertPooler` layer to the input tensor.")
+        logger.debug(msg="- Hidden states shape: %s" % (hidden_states.shape,))
+
         # Get the first token tensor.
         first_token_tensor = hidden_states[:, 0]
+        logger.debug(msg="- First token tensor shape: %s" % (first_token_tensor.shape,))
 
+        logger.debug(msg="- Applying the `nn.Linear` layer to the first token tensor.")
         pooled_output = self.dense(first_token_tensor)
         pooled_output = torch.tanh(pooled_output)
+        logger.debug(msg="- Result of the `nn.Linear` + `torch.tanh` layers: %s." % (pooled_output.shape,))
 
+        logger.info(msg="Final result of the `MobileBertPooler` block: %s." % (pooled_output.shape,))
         return pooled_output
 
 
@@ -794,38 +1003,76 @@ class MobileBert(nn.Module):
 
 
     # Methods.
+    def get_extended_attention_mask(self, attention_mask):
+        """
+        Extends the attention mask tensor to match the shape of the attention scores tensor.
+
+        Args:
+            attention_mask (torch.Tensor): The attention mask tensor. (shape: (batch_size, seq_length))
+
+        Returns:
+            torch.Tensor: The extended attention mask tensor. (shape: (batch_size, 1, 1, seq_length))
+        """
+        if attention_mask.dim() == 3:
+            extended_attention_mask = attention_mask[:, None, :, :]
+        elif attention_mask.dim() == 2:
+            extended_attention_mask = attention_mask[:, None, None, :]
+        
+        extended_attention_mask = (1.0 - extended_attention_mask) * torch.finfo(torch.float32).min
+        return extended_attention_mask
+
+
     def forward(self, input_ids, token_type_ids = None, attention_mask = None):
         """
         Applies the MobileBERT model to the input tokens.
 
         Args:
             input_ids (torch.Tensor): The input tokens. (shape: (batch_size, seq_length))
-            token_type_ids (torch.Tensor): The token type ids. (shape: (batch_size, seq_length))
-            attention_mask (torch.Tensor): The attention mask tensor. (shape: (batch_size, 1, 1, seq_length))
+            token_type_ids (torch.Tensor): The token type ids. (shape: (batch_size, seq_length)) (Default: None)
+            attention_mask (torch.Tensor): The attention mask tensor. (shape: (batch_size, 1, 1, seq_length)) (Default: None)
 
         Returns:
             MobileBertOutput: The output of the MobileBERT model.
         """
+        logger.info(msg="Calling `MobileBert` model to the input tensors.")
+        logger.debug(msg="- Input tensor shape: %s" % (input_ids.shape,))
+        logger.debug(msg="- Token type ids shape: %s" % (token_type_ids.shape,) if token_type_ids is not None else None)
+        logger.debug(msg="- Attention mask shape: %s" % (attention_mask.shape,) if attention_mask is not None else None)
+
         # Get the input shape.
         input_shape = input_ids.size()
 
         # Define the attention mask.
         if attention_mask is None:
+            logger.warning(msg="No attention mask tensor, using the default attention mask.")
             attention_mask = torch.ones(input_shape, dtype=torch.long, device=input_ids.device)
+            attention_mask = self.get_extended_attention_mask(attention_mask)
+        logger.debug(msg="- Attention mask shape: %s" % (attention_mask.shape,))
 
         # Define the token type ids.
         if token_type_ids is None:
+            logger.warning(msg="No token type ids tensor, using the default token type ids.")
             token_type_ids = torch.zeros(input_shape, dtype=torch.long, device=input_ids.device)
+        logger.debug(msg="- Token type ids shape: %s" % (token_type_ids.shape,))
 
         # Compute the embeddings.
+        logger.debug(msg="- Calling `MobileBertEmbedding` layer to be applied over the tensor %s." % (input_ids.shape,))
         embedding_output = self.embeddings(input_ids, token_type_ids)
+        logger.debug(msg="- Result of the `MobileBertEmbedding` layer: %s." % (embedding_output.shape,))
 
         # Compute the encoder output.
+        logger.debug(msg="- Calling `MobileBertEncoder` layer to be applied over the tensor %s." % (embedding_output.shape,))
         encoder_output = self.encoder(embedding_output, attention_mask)
+        logger.debug(msg="- Result of the `MobileBertEncoder` layer: %s." % (encoder_output.shape,))
 
         # Compute the pooled output.
+        logger.debug(msg="- Calling `MobileBertPooler` layer to be applied over the tensor %s." % (encoder_output.shape,))
         pooled_output = self.pooler(encoder_output)
+        logger.debug(msg="- Result of the `MobileBertPooler` layer: %s." % (pooled_output.shape,))
 
+        logger.info(msg="Returning the final output of the `MobileBert` model with two tensors.")
+        logger.debug(msg="- The `encoder_output` tensor: %s." % (encoder_output.shape,))
+        logger.debug(msg="- The `pooled_output` tensor: %s." % (pooled_output.shape,))
         return MobileBertOutput(last_hidden_state=encoder_output, pooled_output=pooled_output)
 
 

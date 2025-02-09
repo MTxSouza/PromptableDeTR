@@ -21,6 +21,11 @@ if __name__=="__main__":
     # Imports.
     import os
     import sys
+    import time
+    from warnings import warn
+
+    import torch
+    from torchsummary import summary
 
     # Get `models/__init__.py` path.
     app_path = os.path.join(os.path.abspath(path=os.path.dirname(p=__file__)), "__init__.py")
@@ -29,13 +34,7 @@ if __name__=="__main__":
     # Append the path to the system.
     sys.path.append(os.path.abspath(path=os.path.dirname(p=__file__.split(sep=os.sep)[-1])))
 
-    # Imports.
-    from warnings import warn
-
-    import torch
-    from torchinfo import summary
-
-    from models import PromptVisionTrainer
+    from models import BasePromptableDeTR
 
     # Check current device.
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -43,27 +42,62 @@ if __name__=="__main__":
         warn("The model is being run on the CPU. This will be slow.")
 
     # Create the model object.
-    model = PromptVisionTrainer(
-        num_text_encoder_layers=4, 
-        num_image_encoder_layers=6, 
-        text_encoder_hidden_dim=1024, 
-        image_encoder_hidden_dim=2048, 
-        num_heads=8, 
-        embedding_dim=768, 
-        context_length=196, 
-        image_size=224, 
-        num_patches=14, 
-        num_points=8, 
-        padding_idx=0
-    )
+    model = BasePromptableDeTR(image_tokens=[1600, 400, 100])
     model.to(device=device)
 
     # Display the model architecture.
-    image_tensor = torch.randn(1, 3, 224, 224)
-    tokenized_text_tensor = torch.randint(0, 100, (1, 196))
+    image_size = (1, 3, 640, 640)
+    text_size = (1, 64)
     summary(
         model=model, 
-        input_data=(tokenized_text_tensor, image_tensor), 
-        device=device,
+        input_size=(image_size, text_size), 
+        device=device, 
         verbose=args.verbose
     )
+
+    # Compute inference time.
+    @torch.no_grad()
+    def infer(image, text):
+        model(image=image, prompt=text)
+
+    def compute_inference_time(image_size, text_size):
+
+        base_image = torch.randn(size=image_size).to(device=device)
+        base_text = torch.randint(low=0, high=30522, size=text_size).to(device=device)
+
+        if device.type == "cuda":
+            torch.cuda.synchronize()
+        start_time = time.time()
+        infer(image=base_image, text=base_text)
+        if device.type == "cuda":
+            torch.cuda.synchronize()
+        end_time = time.time()
+
+        inference_time = end_time - start_time
+
+        if device.type == "cuda":
+            torch.cuda.empty_cache()
+        
+        return inference_time
+
+    print("Warm-up the model...")
+    compute_inference_time(image_size=image_size, text_size=text_size)
+    time.sleep(1)
+    print("Warm-up completed.\n")
+
+    print("Computing single inference time...")
+    infer_time = compute_inference_time(image_size=image_size, text_size=text_size)
+    print(f"Single inference time: {infer_time:.4f} seconds.\n")
+
+    print("Compute batch inference time...")
+    for batch_size in [1, 2, 4, 8, 16, 32, 64]:
+        image_size = (batch_size, 3, 640, 640)
+        text_size = (batch_size, 64)
+        print(f"Batch size: {batch_size}")
+        try:
+            infer_time = compute_inference_time(image_size=image_size, text_size=text_size)
+        except torch.OutOfMemoryError:
+            print("Could not compute the inference time due to memory error.\n")
+            break
+        else:
+            print(f"Batch inference time: {infer_time:.4f} seconds\n")

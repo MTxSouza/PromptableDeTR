@@ -1,81 +1,169 @@
 """
-Main module that contains the PromptVision model class.
+Main module that contains the PromptableDeTR model class.
 """
+from dataclasses import dataclass
+
 import torch
 import torch.nn as nn
 
-from models.embedding import ImageEmbedding, TextEmbedding
-from models.encoder import ImageEncoder, TextEncoder
+from logger import Logger
+from models.image_encoder import MobileNetV3
+from models.joiner import Joiner
+from models.text_encoder import MobileBert
+
+# Logger.
+logger = Logger(name="model")
 
 
-# Classes.
-class PromptVisionTrainer(nn.Module):
+# Structure.
+@dataclass
+class PromptableDeTROutput:
+    """
+    Dataclass to hold the output of the PromptableDeTR model.
+
+    Attributes:
+        bbox (torch.Tensor): Bounding box predictions.
+        presence (torch.Tensor): Presence predictions.
+    """
+    bbox: torch.Tensor
+    presence: torch.Tensor
+
+
+# Class.
+class Detector(nn.Module):
+
+
+    # Special methods.
+    def __init__(self, proj_dim = 512):
+        """
+        Initializes the Detector class used to predict bounding boxes and presence 
+        of objects in the image.
+
+        Args:
+            proj_dim (int): The projection dimension of the image and text embeddings. (Default: 512)
+        """
+        super().__init__()
+
+        # Layers.
+        self.detector = nn.Sequential(
+            nn.Linear(in_features=proj_dim, out_features=proj_dim * 4),
+            nn.ReLU(),
+            nn.Linear(in_features=proj_dim * 4, out_features=proj_dim * 2),
+            nn.ReLU()
+        )
+        self.bbox_predictor = nn.Linear(in_features=proj_dim * 2, out_features=4)
+        self.presence_predictor = nn.Linear(in_features=proj_dim * 2, out_features=1)
+
+
+    # Methods.
+    def forward(self, joint_emb):
+        """
+        Forward pass of the detector.
+
+        Args:
+            joint_emb (torch.Tensor): Joint image and text embeddings.
+
+        Returns:
+            Tuple[torch.Tensor, torch.Tensor]: Bounding box and presence predictions.
+        """
+        logger.info(msg="Calling  `Detector` forward method.")
+        logger.debug(msg="- Input shape: %s" % (joint_emb.shape,))
+
+        # Detect objects.
+        logger.debug(msg="- Calling the `nn.Sequential` block to the tensor %s." % (joint_emb.shape,))
+        detection_emb = self.detector(joint_emb)
+        logger.debug(msg="- Result of the `nn.Sequential` block: %s." % (detection_emb.shape,))
+
+        # Predict bounding box and presence.
+        logger.debug(msg="- Calling the `nn.Linear` block to the tensor %s." % (detection_emb.shape,))
+        bbox = self.bbox_predictor(detection_emb)
+        logger.debug(msg="- Result of the `nn.Linear` block: %s." % (bbox.shape,))
+        
+        logger.debug(msg="- Calling the `nn.Linear` block to the tensor %s." % (detection_emb.shape,))
+        presence = self.presence_predictor(detection_emb)
+        logger.debug(msg="- Result of the `nn.Linear` block: %s." % (presence.shape,))
+
+        logger.info(msg="Final output of the `Detector` block: %s and %s." % (bbox.shape, presence.shape))
+        return bbox, presence
+
+
+class BasePromptableDeTR(nn.Module):
 
 
     # Special methods.
     def __init__(
             self, 
-            num_text_encoder_layers, 
-            num_image_encoder_layers, 
-            text_encoder_hidden_dim, 
-            image_encoder_hidden_dim, 
-            num_heads, 
-            embedding_dim, 
-            context_length, 
-            image_size, 
-            num_patches, 
-            num_points, 
-            padding_idx = 0
+            image_tokens, 
+            vocab_size = 30522, 
+            num_queries = 64, 
+            emb_dim = 128, 
+            proj_dim = 512, 
+            num_heads = 8, 
+            ff_dim = 2048, 
+            emb_dropout_rate = 0.1, 
+            num_joiner_layers = 3
         ):
         super().__init__()
 
-        # Embedding layers.
-        self.__text_embedding = TextEmbedding(
-            context_size=context_length, 
-            embedding_dim=embedding_dim, 
-            padding_idx=padding_idx
-        )
-        self.__image_embedding = ImageEmbedding(
-            image_size=image_size,
-            num_patches=num_patches, 
-            padding_idx=padding_idx
+        # Encoders.
+        self.image_encoder = MobileNetV3(emb_dim=proj_dim)
+        self.text_encoder = MobileBert(
+            vocab_size=vocab_size, 
+            emb_dim=emb_dim, 
+            hidden_size=proj_dim, 
+            max_positional_emb=num_queries, 
+            emb_dropout_rate=emb_dropout_rate, 
+            intermediate_size=proj_dim, 
+            intra_bottleneck_dim=emb_dim
         )
 
-        # Encoder layers.
-        self.__text_encoder = TextEncoder(
-            num_layers=num_text_encoder_layers, 
-            emb_dim=embedding_dim, 
+        # Joiner.
+        self.joiner = Joiner(
+            image_tokens=image_tokens, 
+            emb_dim=proj_dim, 
             num_heads=num_heads, 
-            hidden_dim=text_encoder_hidden_dim
+            ff_dim=ff_dim, 
+            num_joins=num_joiner_layers
         )
-        self.__image_encoder = ImageEncoder(
-            num_layers=num_image_encoder_layers, 
-            emb_dim=embedding_dim, 
-            num_heads=num_heads, 
-            hidden_dim=image_encoder_hidden_dim, 
-            num_points=num_points, 
-            patch_size=num_patches
-        )
+
+        # Detection head.
+        self.detector = Detector(proj_dim=proj_dim)
 
 
     # Methods.
-    def forward(self, text, image):
+    def forward(self, image, prompt):
         """
-        Performs a forward pass through the model.
+        Forward pass of the PromptableDeTR model.
 
         Args:
-            text (torch.Tensor): The input text tensor.
-            image (torch.Tensor): The input image tensor.
+            image (torch.Tensor): Image tensor.
+            prompt (torch.Tensor): Prompt tensor.
 
         Returns:
-            torch.Tensor: The output tensor.
+            PromptableDeTROutput: Bounding box and presence predictions.
         """
-        # Embedding layers.
-        text_emb = self.__text_embedding(text)
-        image_emb = self.__image_embedding(image)
+        logger.info(msg="Calling `BasePromptableDeTR` forward method.")
+        logger.debug(msg="- Image shape: %s" % (image.shape,))
+        logger.debug(msg="- Prompt shape: %s" % (prompt.shape,))
 
-        # Encoder layers.
-        text_enc = self.__text_encoder(text_emb)
-        image_enc = self.__image_encoder(text_enc, image_emb)
+        # Encode images and text.
+        logger.debug(msg="- Calling `MobileNetV3` block to the tensor %s." % (image.shape,))
+        image_emb = self.image_encoder(image)
 
-        return image_enc
+        logger.debug(msg="- Calling `MobileBert` block to the tensor %s." % (prompt.shape,))
+        text_emb = self.text_encoder(prompt)
+
+        # Join image and text embeddings.
+        logger.debug(msg="- Calling `Joiner` block to the image and text tensors.")
+        joint_emb = self.joiner(image_emb, text_emb)
+        logger.debug(msg="- Result of the `Joiner` block: %s." % (joint_emb.shape,))
+
+        # Detect objects.
+        logger.debug(msg="- Calling `Detector` block to the tensor %s." % (joint_emb.shape,))
+        bbox, presence = self.detector(joint_emb)
+        logger.debug(msg="- Result of the `Detector` block: %s and %s." % (bbox.shape, presence.shape))
+
+        logger.info(msg="Returning the final output of the `BasePromptableDeTR` model with two tensors.")
+        logger.debug(msg="- Bounding box shape: %s" % (bbox.shape,))
+        logger.debug(msg="- Presence shape: %s" % (presence.shape,))
+        return PromptableDeTROutput(bbox=bbox, presence=presence)
