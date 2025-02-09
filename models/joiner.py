@@ -60,6 +60,7 @@ class PositionalEncoding(nn.Module):
 class Attention(nn.Module):
 
 
+    # Special methods.
     def __init__(self, emb_proj, emb_dim = 512):
         """
         Attention layer used to compute attention scores and weights.
@@ -76,6 +77,7 @@ class Attention(nn.Module):
         self.value = nn.Linear(in_features=emb_dim, out_features=emb_proj)
 
 
+    # Methods.
     def forward(self, query, key, value):
         """
         Forward pass of the attention layer.
@@ -109,6 +111,7 @@ class Attention(nn.Module):
 class MultiHeadAttention(nn.Module):
 
 
+    # Special methods.
     def __init__(self, num_heads = 8, emb_dim = 512):
         """
         Multi-head attention layer used to compute multiple attention heads.
@@ -132,6 +135,7 @@ class MultiHeadAttention(nn.Module):
         self.projection = nn.Linear(in_features=emb_dim, out_features=emb_dim)
 
 
+    # Methods.
     def forward(self, query, key, value):
         """
         Forward pass of the multi-head attention layer.
@@ -159,6 +163,7 @@ class MultiHeadAttention(nn.Module):
 class FeedForward(nn.Module):
 
 
+    # Special methods.
     def __init__(self, emb_dim = 512, ff_dim = 2048):
         """
         Feed-forward layer used to merge text and image embeddings.
@@ -177,6 +182,7 @@ class FeedForward(nn.Module):
         )
 
 
+    # Methods.
     def forward(self, x):
         """
         Forward pass of the feed-forward layer.
