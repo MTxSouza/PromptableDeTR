@@ -95,7 +95,6 @@ class BasePromptableDeTR(nn.Module):
             self, 
             image_tokens, 
             vocab_size = 30522, 
-            num_queries = 64, 
             emb_dim = 128, 
             proj_dim = 512, 
             num_heads = 8, 
@@ -111,7 +110,6 @@ class BasePromptableDeTR(nn.Module):
             vocab_size=vocab_size, 
             emb_dim=emb_dim, 
             hidden_size=proj_dim, 
-            max_positional_emb=num_queries, 
             emb_dropout_rate=emb_dropout_rate, 
             intermediate_size=proj_dim, 
             intra_bottleneck_dim=emb_dim
@@ -131,6 +129,28 @@ class BasePromptableDeTR(nn.Module):
 
 
     # Methods.
+    def load_base_weights(self, image_encoder_weights = None, text_encoder_weights = None):
+        """
+        Load the weights of the image and text encoders.
+
+        Args:
+            image_encoder_weights (str): Path to the image encoder weights. (Default: None)
+            text_encoder_weights (str): Path to the text encoder weights. (Default: None)
+        """
+        logger.info(msg="Loading the weights of the image and text encoders.")
+        logger.debug(msg="- Image encoder weights: %s" % image_encoder_weights)
+        logger.debug(msg="- Text encoder weights: %s" % text_encoder_weights)
+
+        # Load weights.
+        if image_encoder_weights is not None:
+            logger.debug(msg="- Loading the image encoder weights.")
+            self.image_encoder.load_state_dict(torch.load(f=image_encoder_weights, weights_only=True))
+
+        if text_encoder_weights is not None:
+            logger.debug(msg="- Loading the text encoder weights.")
+            self.text_encoder.load_state_dict(torch.load(f=text_encoder_weights, weights_only=True))
+
+
     def forward(self, image, prompt):
         """
         Forward pass of the PromptableDeTR model.
