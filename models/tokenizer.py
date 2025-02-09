@@ -2,10 +2,38 @@
 Main module for the Tokenizer class that is used to encode and decode text data. It uses 
 the MobileBERT vocabulary to encode and decode text data.
 """
+import argparse
 import os
 import re
 import warnings
 from enum import Enum
+
+
+# Functions.
+def get_args():
+    """
+    Get the arguments passed to the script.
+
+    Returns:
+        argparse.Namespace: The parsed arguments.
+    """
+    # Define arguments.
+    parser = argparse.ArgumentParser(description="Encode and decode text data.")
+    parser.add_argument(
+        "--vocab",
+        type=str,
+        required=True,
+        help="Path to the vocabulary file."
+    )
+    parser.add_argument(
+        "--text",
+        type=str,
+        default="Hello, World!",
+        help="Text data to encode."
+    )
+
+    # Parse arguments.
+    return parser.parse_args()
 
 
 # Enums.
@@ -31,7 +59,7 @@ class SpecialTokens(Enum):
         """
         # Get special tokens.
         special_tokens = "|".join([token.value[0] for token in cls])
-        special_tokens = special_tokens.replace("[", "\[")
+        special_tokens = special_tokens.replace("[", r"\[").replace("]", r"\]")
 
         # Create regex pattern.
         return re.compile(pattern=r"%s" % special_tokens)
@@ -62,7 +90,17 @@ class Tokenizer:
         self.token_to_index = self.__load_vocab_file(vocab_filepath=vocab_filepath)
         self.index_to_token = {index: token for token, index in self.token_to_index.items()}
 
-        self.special_tokens_regex = SpecialTokens.get_special_tokens_identifier() 
+        self.special_tokens_regex = SpecialTokens.get_special_tokens_identifier()
+
+
+    def __len__(self):
+        """
+        Get the number of tokens in the vocabulary.
+
+        Returns:
+            int: Number of tokens in the vocabulary.
+        """
+        return len(self.token_to_index)
 
 
     # Private methods.
@@ -200,3 +238,22 @@ class Tokenizer:
             texts.append(text)
 
         return texts
+
+
+if __name__=="__main__":
+
+    # Get arguments.
+    args = get_args()
+
+    # Create the tokenizer object.
+    tokenizer = Tokenizer(vocab_filepath=args.vocab)
+    print("Tokenizer has been created with a vocabulary of %d tokens." % len(tokenizer))
+
+    # Encode text.
+    print("Encoding text: %s" % args.text)
+    tokens = tokenizer.encode(texts=args.text)
+    print("Encoded tokens: %s" % tokens)
+
+    # Decode tokens.
+    decoded_text = tokenizer.decode(indices=tokens)
+    print("Decoded text: %s" % decoded_text)
