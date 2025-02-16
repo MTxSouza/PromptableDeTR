@@ -10,7 +10,6 @@ class Sample:
     """
     Sample structure.
     """
-    sample_id: str
     image_path: str
     caption: str
     bbox: list
