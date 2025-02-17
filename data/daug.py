@@ -31,9 +31,9 @@ class BaseTransform(ABC):
         pass
 
 
-    # Private methods.
+    # Methods.
     @abstractmethod
-    def __transform(self, sample):
+    def transform(self, sample):
         """
         Method to transform the samples.
 
@@ -46,7 +46,6 @@ class BaseTransform(ABC):
         pass
 
 
-    # Methods.
     def validate_samples(self, samples):
         """
         Validate the samples.
@@ -92,13 +91,13 @@ class PrepareRawSample(BaseTransform):
         samples = self.validate_samples(samples=samples)
 
         # Prepare the samples.
-        samples = [self.__transform(sample=sample) for sample in samples]
+        samples = [self.transform(sample=sample) for sample in samples]
 
         return samples
 
 
     # Private methods.
-    def __transform(self, sample):
+    def transform(self, sample):
         
         # Load the image.
         with Image.open(fp=sample.image_path, mode="r") as pil_img:
