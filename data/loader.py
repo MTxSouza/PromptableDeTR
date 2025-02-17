@@ -109,6 +109,7 @@ class PromptableDeTRDataLoader:
         self.sample_file_paths = sample_file_paths
         self.batch_size = batch_size
         self.shuffle = shuffle
+        self.transformations = transformations
 
 
     def __len__(self):
