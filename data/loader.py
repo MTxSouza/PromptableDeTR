@@ -67,7 +67,15 @@ class PromptableDeTRDataLoader:
 
 
     # Special methods.
-    def __init__(self, sample_file_paths, batch_size, transformations = None, shuffle = True, seed = 42):
+    def __init__(
+            self, 
+            sample_file_paths, 
+            batch_size, 
+            transformations = None, 
+            vocab_file = None, 
+            shuffle = True, 
+            seed = 42
+        ):
         """
         Initialize the data loader class.
 
@@ -75,6 +83,7 @@ class PromptableDeTRDataLoader:
             sample_file_paths (list): The list of sample file paths.
             batch_size (int): The batch size.
             transformations (List[BaseTransform]): The transforms to apply to the data. (Default: None)
+            vocab_file (str): The vocabulary file path. (Default: None)
             shuffle (bool): Whether to shuffle the samples. (Default: True)
             seed (int): The seed for the random number generator. (Default: 42)
         """
@@ -84,7 +93,9 @@ class PromptableDeTRDataLoader:
 
         # Check transformations.
         if transformations is None:
-            transformations = [PrepareRawSample(vocab_file=transformations)]
+            if vocab_file is None:
+                raise ValueError("If transformations is None, then vocab_file must be provided.")
+            transformations = [PrepareRawSample(vocab_file=vocab_file)]
         elif PrepareRawSample not in transformations or not isinstance(transformations[0], PrepareRawSample):
             raise ValueError("Transformations must be a list containing the PrepareRawSample class.")
 
