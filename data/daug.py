@@ -105,7 +105,7 @@ class PrepareRawSample(BaseTransform):
         sample.image = torch.from_numpy(np_img).permute(2, 0, 1)
 
         # Tokenize the caption.
-        sample.caption_tokens = self.tokenizer.encode(text=sample.caption)[0]
+        sample.caption_tokens = self.tokenizer.encode(texts=sample.caption)[0]
 
         # Transform the bounding box.
         bbox = sample.bbox
