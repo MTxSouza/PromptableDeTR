@@ -83,7 +83,7 @@ class PromptableDeTRDataLoader:
         self.num_batches = len(sample_file_paths) // batch_size + (len(sample_file_paths) % batch_size)
 
         # Check transformations.
-        if transformations is not None:
+        if transformations is None:
             transformations = [PrepareRawSample(vocab_file=transformations)]
         elif PrepareRawSample not in transformations or not isinstance(transformations[0], PrepareRawSample):
             raise ValueError("Transformations must be a list containing the PrepareRawSample class.")
