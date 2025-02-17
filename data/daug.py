@@ -102,7 +102,7 @@ class PrepareRawSample(BaseTransform):
         # Load the image.
         with Image.open(fp=sample.image_path, mode="r") as pil_img:
             np_img = np.asarray(a=pil_img, dtype=np.float32)
-        sample.image = torch.from_numpy(ndarray=np_img).permute(2, 0, 1)
+        sample.image = torch.from_numpy(np_img).permute(2, 0, 1)
 
         # Tokenize the caption.
         sample.caption_tokens = self.tokenizer.encode(text=sample.caption)[0]
