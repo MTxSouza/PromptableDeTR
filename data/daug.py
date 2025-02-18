@@ -105,6 +105,10 @@ class PrepareRawSample(BaseTransform):
             np_img = np.asarray(a=pil_img, dtype=np.float32)
         sample.image = torch.from_numpy(np_img).permute(2, 0, 1)
 
+        # Normalize the image.
+        if sample.image.max() > 1:
+            sample.image /= 255
+
         # Tokenize the caption.
         sample.caption_tokens = self.tokenizer.encode(texts=sample.caption)[0]
 
