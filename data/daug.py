@@ -6,6 +6,7 @@ from abc import ABC, abstractmethod
 
 import numpy as np
 import torch
+import torch.nn.functional as F
 from PIL import Image
 
 from data.schemas import Sample
@@ -96,7 +97,7 @@ class PrepareRawSample(BaseTransform):
         return samples
 
 
-    # Private methods.
+    # Methods.
     def transform(self, sample):
         
         # Load the image.
@@ -115,5 +116,52 @@ class PrepareRawSample(BaseTransform):
         bbox[:, 0::2] /= w
         bbox[:, 1::2] /= h
         sample.bbox_tensor = bbox
+
+        return sample
+
+
+class ReshapeImage(BaseTransform):
+
+
+    # Special methods.
+    def __init__(self, image_size):
+        """
+        This class reshapes the image to the desired size.
+
+        Args:
+            image_size (Tuple[int, int] | int): The size of the image.
+        """
+        # Check if the image size is an integer.
+        if isinstance(image_size, int):
+            image_size = (image_size, image_size)
+
+        self.image_size = image_size
+
+
+    def __call__(self, samples):
+        
+        # Validate the samples.
+        samples = self.validate_samples(samples=samples)
+
+        # Prepare the samples.
+        samples = [self.transform(sample=sample) for sample in samples]
+
+        return samples
+
+
+    # Methods.
+    def transform(self, sample):
+
+        # Check if the image has three dimensions.
+        if len(sample.image.shape) == 3:
+            sample.image = sample.image.unsqueeze(0)
+
+        # Resize the image.
+        sample.image = F.interpolate(
+            input=sample.image, 
+            size=self.image_size, 
+            mode="bilinear", 
+            align_corners=False
+        ).squeeze(0)
 
         return sample
