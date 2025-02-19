@@ -144,9 +144,12 @@ class Encoder(nn.Module):
         logger.debug(msg="- Calling `MobileBert` block to the tensor %s." % (prompt.shape,))
         text_emb = self.text_encoder(prompt)
 
-        logger.info(msg="Returning the final output of the `Encoder` model with two tensors.")
-        logger.debug(msg="- Image embedding shape: %s" % (image_emb.shape,))
-        logger.debug(msg="- Text embedding shape: %s" % (text_emb.shape,))
+        logger.info(msg="Returning the final output of the `Encoder` model with five tensors.")
+        logger.debug(msg="- High resolution image shape: %s" % (image_emb.high_resolution_feat.shape,))
+        logger.debug(msg="- Medium resolution image shape: %s" % (image_emb.mid_resolution_feat.shape,))
+        logger.debug(msg="- Low resolution image shape: %s" % (image_emb.low_resolution_feat.shape,))
+        logger.debug(msg="- Last hidden state shape: %s" % (text_emb.last_hidden_state.shape,))
+        logger.debug(msg="- Pooled output shape: %s" % (text_emb.pooled_output.shape,))
         return image_emb, text_emb
 
 
