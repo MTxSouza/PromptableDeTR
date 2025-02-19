@@ -87,7 +87,119 @@ class Detector(nn.Module):
         return bbox, presence
 
 
-class BasePromptableDeTR(nn.Module):
+class Encoder(nn.Module):
+
+
+    # Special methods.
+    def __init__(
+            self, 
+            vocab_size = 30522, 
+            emb_dim = 128, 
+            proj_dim = 512, 
+            emb_dropout_rate = 0.1
+        ):
+        """
+        Initializes the Encoder class used to encode images and text.
+
+        Args:
+            vocab_size (int): The size of the vocabulary. (Default: 30522)
+            emb_dim (int): The embedding dimension. (Default: 128)
+            proj_dim (int): The projection dimension. (Default: 512)
+            emb_dropout_rate (float): The embedding dropout rate. (Default: 0.1)
+        """
+        super().__init__()
+
+        # Encoders.
+        self.image_encoder = MobileNetV3(emb_dim=proj_dim)
+        self.text_encoder = MobileBert(
+            vocab_size=vocab_size,
+            emb_dim=emb_dim,
+            hidden_size=proj_dim,
+            emb_dropout_rate=emb_dropout_rate,
+            intermediate_size=proj_dim,
+            intra_bottleneck_dim=emb_dim
+        )
+    
+
+    # Methods.
+    def forward(self, image, prompt):
+        """
+        Forward pass of the encoder.
+
+        Args:
+            image (torch.Tensor): Image tensor.
+            prompt (torch.Tensor): Prompt tensor.
+
+        Returns:
+            Tuple[torch.Tensor, torch.Tensor]: Encoded image and text tensors.
+        """
+        logger.info(msg="Calling `Encoder` forward method.")
+        logger.debug(msg="- Image shape: %s" % (image.shape,))
+        logger.debug(msg="- Prompt shape: %s" % (prompt.shape,))
+
+        # Encode images and text.
+        logger.debug(msg="- Calling `MobileNetV3` block to the tensor %s." % (image.shape,))
+        image_emb = self.image_encoder(image)
+
+        logger.debug(msg="- Calling `MobileBert` block to the tensor %s." % (prompt.shape,))
+        text_emb = self.text_encoder(prompt)
+
+        logger.info(msg="Returning the final output of the `Encoder` model with two tensors.")
+        logger.debug(msg="- Image embedding shape: %s" % (image_emb.shape,))
+        logger.debug(msg="- Text embedding shape: %s" % (text_emb.shape,))
+        return image_emb, text_emb
+
+
+class Aligner(Encoder):
+
+
+    # Special methods.
+    def __init__(
+            self, 
+            vocab_size = 30522, 
+            emb_dim = 128, 
+            proj_dim = 512, 
+            emb_dropout_rate = 0.1
+        ):
+        super().__init__(vocab_size=vocab_size, emb_dim=emb_dim, proj_dim=proj_dim, emb_dropout_rate=emb_dropout_rate)
+
+        # Aligner.
+        self.aligner = nn.Sequential(
+            nn.LayerNorm(normalized_shape=proj_dim),
+            nn.Linear(in_features=proj_dim, out_features=vocab_size)
+        )
+    
+
+    # Methods.
+    def forward(self, image, prompt):
+        """
+        Forward pass of the aligner.
+
+        Args:
+            image (torch.Tensor): Image tensor.
+            prompt (torch.Tensor): Prompt tensor.
+
+        Returns:
+            Tuple[torch.Tensor, torch.Tensor, torch.Tensor]: Encoded image and text tensors and alignment tensor.
+        """
+        logger.info(msg="Calling `Aligner` forward method.")
+        logger.debug(msg="- Image shape: %s" % (image.shape,))
+        logger.debug(msg="- Prompt shape: %s" % (prompt.shape,))
+
+        # Encode images and text.
+        image_emb, text_emb = super().forward(image=image, prompt=prompt)
+
+        # Align image and text embeddings.
+        logger.debug(msg="- Calling the `nn.Sequential` block to the tensor %s." % (image_emb.shape,))
+        alignment = self.aligner(image_emb)
+        logger.debug(msg="- Result of the `nn.Sequential` block: %s." % (alignment.shape,))
+
+        logger.info(msg="Returning the final output of the `Aligner` model with one tensor.")
+        logger.debug(msg="- Alignment shape: %s" % (alignment.shape,))
+        return alignment
+
+
+class BasePromptableDeTR(Encoder):
 
 
     # Special methods.
@@ -102,18 +214,7 @@ class BasePromptableDeTR(nn.Module):
             emb_dropout_rate = 0.1, 
             num_joiner_layers = 3
         ):
-        super().__init__()
-
-        # Encoders.
-        self.image_encoder = MobileNetV3(emb_dim=proj_dim)
-        self.text_encoder = MobileBert(
-            vocab_size=vocab_size, 
-            emb_dim=emb_dim, 
-            hidden_size=proj_dim, 
-            emb_dropout_rate=emb_dropout_rate, 
-            intermediate_size=proj_dim, 
-            intra_bottleneck_dim=emb_dim
-        )
+        super().__init__(vocab_size=vocab_size, emb_dim=emb_dim, proj_dim=proj_dim, emb_dropout_rate=emb_dropout_rate)
 
         # Joiner.
         self.joiner = Joiner(
@@ -167,11 +268,7 @@ class BasePromptableDeTR(nn.Module):
         logger.debug(msg="- Prompt shape: %s" % (prompt.shape,))
 
         # Encode images and text.
-        logger.debug(msg="- Calling `MobileNetV3` block to the tensor %s." % (image.shape,))
-        image_emb = self.image_encoder(image)
-
-        logger.debug(msg="- Calling `MobileBert` block to the tensor %s." % (prompt.shape,))
-        text_emb = self.text_encoder(prompt)
+        image_emb, text_emb = super().forward(image=image, prompt=prompt)
 
         # Join image and text embeddings.
         logger.debug(msg="- Calling `Joiner` block to the image and text tensors.")
