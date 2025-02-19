@@ -164,6 +164,15 @@ class Aligner(Encoder):
             proj_dim = 512, 
             emb_dropout_rate = 0.1
         ):
+        """
+        Initializes the Aligner class used to align images and text informations.
+
+        Args:
+            vocab_size (int): The size of the vocabulary. (Default: 30522)
+            emb_dim (int): The embedding dimension. (Default: 128)
+            proj_dim (int): The projection dimension. (Default: 512)
+            emb_dropout_rate (float): The embedding dropout rate. (Default: 0.1)
+        """
         super().__init__(vocab_size=vocab_size, emb_dim=emb_dim, proj_dim=proj_dim, emb_dropout_rate=emb_dropout_rate)
 
         # Aligner.
