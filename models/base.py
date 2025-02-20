@@ -6,7 +6,6 @@ import torch
 import torch.nn as nn
 
 from logger import Logger
-from models import Encoder
 from models.image_encoder import MobileNetV3
 from models.joiner import Joiner
 from models.text_encoder import MobileBert
