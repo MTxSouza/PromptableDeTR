@@ -6,15 +6,14 @@ before training the whole model for detection.
 import torch.nn as nn
 
 from logger import Logger
-from models import Encoder
-from models.joiner import Joiner
+from models.base import BasePromptableDeTR
 
 # Logger.
 logger = Logger(name="model")
 
 
 # Classes.
-class Aligner(Encoder):
+class Aligner(BasePromptableDeTR):
 
 
     # Special methods.
@@ -60,11 +59,13 @@ class Aligner(Encoder):
         logger.debug(msg="- Prompt shape: %s" % (prompt.shape,))
 
         # Encode images and text.
-        image_emb, text_emb = super().forward(image=image, prompt=prompt)
+        logger.debug(msg="- Calling `BasePromptableDeTR` block to the tensors %s and %s." % (image.shape, prompt.shape))
+        joiner_emb = super().forward(image=image, prompt=prompt)
+        logger.debug(msg="- Result of the `BasePromptableDeTR` block: %s." % (joiner_emb.shape,))
 
         # Align image and text embeddings.
-        logger.debug(msg="- Calling the `nn.Sequential` block to the tensor %s." % (image_emb.shape,))
-        alignment = self.aligner(image_emb)
+        logger.debug(msg="- Calling the `nn.Sequential` block to the tensor %s." % (joiner_emb.shape,))
+        alignment = self.aligner(joiner_emb)
         logger.debug(msg="- Result of the `nn.Sequential` block: %s." % (alignment.shape,))
 
         logger.info(msg="Returning the final output of the `Aligner` model with one tensor.")
