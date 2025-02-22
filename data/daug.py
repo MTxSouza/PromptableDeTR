@@ -69,21 +69,126 @@ class BaseTransform(ABC):
         return samples
 
 
+class PrepareImage(BaseTransform):
+    """
+    This class prepares the image for training.
+    """
 
-class PrepareRawSample(BaseTransform):
+
+    # Special methods.
+    def __call__(self, samples):
+
+        # Validate the samples.
+        samples = self.validate_samples(samples=samples)
+
+        # Prepare the samples.
+        samples = [self.transform(sample=sample) for sample in samples]
+
+        return samples
+
+
+    # Methods.
+    def transform(self, sample):
+
+        # Load the image.
+        with Image.open(fp=sample.image_path, mode="r") as pil_img:
+            np_img = np.asarray(a=pil_img, dtype=np.float32)
+        sample.image = torch.from_numpy(np_img).permute(2, 0, 1)
+
+        # Normalize the image.
+        if sample.image.max() > 1:
+            sample.image /= 255
+
+        return sample
+
+
+class PrepareCaption(BaseTransform):
+    """
+    This class prepares the caption for training.
+    """
+
+
+    # Special methods.
+    def __init__(self, vocab_file):
+        """
+        Initialize the class.
+
+        Args:
+            vocab_file (str): The path to the vocabulary file.
+        """
+        # Load the tokenizer.
+        self.tokenizer = Tokenizer(vocab_filepath=vocab_file)
+
+
+    def __call__(self, samples):
+
+        # Validate the samples.
+        samples = self.validate_samples(samples=samples)
+
+        # Prepare the samples.
+        samples = [self.transform(sample=sample) for sample in samples]
+
+        return samples
+
+
+    # Methods.
+    def transform(self, sample):
+
+        # Tokenize the caption.
+        sample.caption_tokens = self.tokenizer.encode(texts=sample.caption)[0]
+
+        return sample
+
+
+class PrepareBBox(BaseTransform):
+    """
+    This class prepares the bounding box for training.
+    """
+
+
+    # Special methods.
+    def __call__(self, samples):
+
+        # Validate the samples.
+        samples = self.validate_samples(samples=samples)
+
+        # Prepare the samples.
+        samples = [self.transform(sample=sample) for sample in samples]
+
+        return samples
+
+
+    # Methods.
+    def transform(self, sample):
+
+        # Transform the bounding box.
+        bbox = sample.bbox
+        bbox = torch.tensor(data=bbox, dtype=torch.float32)
+
+        _, h, w = sample.image.shape
+        bbox[:, 0::2] /= w
+        bbox[:, 1::2] /= h
+        sample.bbox_tensor = bbox
+
+        return sample
+
+
+class PrepareAlignerSample(BaseTransform):
 
 
     # Special methods.
     def __init__(self, vocab_file):
         """
         This class prepares the raw sample for training loading the 
-        image and transforming the caption and bounding box.
+        image and transforming the caption.
 
         Args:
             vocab (Vocab): File path to the vocabulary of the model.
         """
-        # Load the tokenizer.
-        self.tokenizer = Tokenizer(vocab_filepath=vocab_file)
+        
+        # Define the transformations.
+        self.image_transform = PrepareImage()
+        self.caption_transform = PrepareCaption(vocab_file=vocab_file)
 
 
     def __call__(self, samples):
@@ -100,26 +205,37 @@ class PrepareRawSample(BaseTransform):
     # Methods.
     def transform(self, sample):
         
-        # Load the image.
-        with Image.open(fp=sample.image_path, mode="r") as pil_img:
-            np_img = np.asarray(a=pil_img, dtype=np.float32)
-        sample.image = torch.from_numpy(np_img).permute(2, 0, 1)
+        # Prepare the image.
+        sample = self.image_transform.transform(sample=sample)
 
-        # Normalize the image.
-        if sample.image.max() > 1:
-            sample.image /= 255
+        # Prepare the caption.
+        sample = self.caption_transform.transform(sample=sample)
 
-        # Tokenize the caption.
-        sample.caption_tokens = self.tokenizer.encode(texts=sample.caption)[0]
+        return sample
 
-        # Transform the bounding box.
-        bbox = sample.bbox
-        bbox = torch.tensor(data=bbox, dtype=torch.float32)
+
+class PrepareDetectionSample(PrepareAlignerSample):
+
+
+    # Special methods.
+    def __init__(self):
+        """
+        This class prepares the raw sample for training loading the
+        image, transforming the caption, and preparing the bounding box.
+        """
+
+        # Define the transformations.
+        self.bbox_transform = PrepareBBox()
+
+
+    # Methods.
+    def transform(self, sample):
         
-        _, h, w = sample.image.shape
-        bbox[:, 0::2] /= w
-        bbox[:, 1::2] /= h
-        sample.bbox_tensor = bbox
+        # Prepare the image and caption.
+        sample = super().transform(sample=sample)
+
+        # Prepare the bounding box.
+        sample = self.bbox_transform.transform(sample=sample)
 
         return sample
 
