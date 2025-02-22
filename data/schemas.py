@@ -52,3 +52,4 @@ class AlignerSample:
 
     image: Optional[torch.FloatTensor | np.ndarray] = None
     caption_tokens: Optional[torch.IntTensor | np.ndarray] = None
+    masked_caption_tokens: Optional[torch.IntTensor | np.ndarray] = None
