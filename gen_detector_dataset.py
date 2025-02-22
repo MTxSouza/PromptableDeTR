@@ -1,6 +1,6 @@
 """
 This script creates the .JSON files with the input text and their corresponding bounding boxes 
-for an image.
+for an image. This dataset is used to train the object detection model in the second training.
 """
 import argparse
 import json
@@ -9,7 +9,7 @@ import shutil
 import uuid
 import xml.etree.ElementTree as ET
 
-from data.schemas import Sample
+from data.schemas import DetectorSample
 
 
 # Arguments.
@@ -195,7 +195,7 @@ if __name__=="__main__":
                 if not boxes:
                     continue
 
-                samples.append(Sample(
+                samples.append(DetectorSample(
                     image_path=os.path.join(args.image_folder, img_file),
                     caption=cap.strip().lower(),
                     bbox=boxes

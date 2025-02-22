@@ -7,8 +7,8 @@ import os
 
 import numpy as np
 
-from data.daug import PrepareRawSample
-from data.schemas import Sample
+from data.daug import PrepareAlignerSample, PrepareDetectionSample
+from data.schemas import AlignerSample, DetectorSample, Sample
 
 
 # Classes.
@@ -45,6 +45,7 @@ class PromptableDeTRDataLoader:
             sample_file = os.path.join(sample_directory, file)
             with open(file=sample_file, mode="r") as f:
                 raw_sample = json.load(fp=f)
+                raw_sample["image_path"] = raw_sample.pop("image_name")
 
             # Check if the samples are valid.
             Sample(**raw_sample)
@@ -70,10 +71,11 @@ class PromptableDeTRDataLoader:
     def __init__(
             self, 
             sample_file_paths, 
+            image_directory,
             batch_size, 
             transformations = None, 
-            vocab_file = None, 
             shuffle = True, 
+            aligner = False, 
             seed = 42
         ):
         """
@@ -81,10 +83,11 @@ class PromptableDeTRDataLoader:
 
         Args:
             sample_file_paths (list): The list of sample file paths.
+            image_directory (str): The path to the image directory where the images are stored.
             batch_size (int): The batch size.
             transformations (List[BaseTransform]): The transforms to apply to the data. (Default: None)
-            vocab_file (str): The vocabulary file path. (Default: None)
             shuffle (bool): Whether to shuffle the samples. (Default: True)
+            aligner (bool): Whether to use the aligner model. (Default: False)
             seed (int): The seed for the random number generator. (Default: 42)
         """
 
@@ -93,12 +96,13 @@ class PromptableDeTRDataLoader:
 
         # Check transformations.
         if transformations is None:
-            if vocab_file is None:
-                raise ValueError("If transformations is None, then vocab_file must be provided.")
-            transformations = [PrepareRawSample(vocab_file=vocab_file)]
-        elif PrepareRawSample not in transformations or not isinstance(transformations[0], PrepareRawSample):
-            raise ValueError("Transformations must be a list containing the PrepareRawSample class.")
+            raise ValueError("Transformations must be specified.")
 
+        if aligner:
+            if not isinstance(transformations[0], PrepareAlignerSample):
+                raise ValueError("Transformations must be a list containing the PrepareAlignerSample class.")
+        elif not isinstance(transformations[0], PrepareDetectionSample):
+            raise ValueError("Transformations must be a list containing the PrepareDetectionSample class.")
 
         # Shuffle the samples.
         if shuffle:
@@ -107,9 +111,12 @@ class PromptableDeTRDataLoader:
 
         # Attributes.
         self.sample_file_paths = sample_file_paths
+        self.image_directory = image_directory
         self.batch_size = batch_size
         self.shuffle = shuffle
         self.transformations = transformations
+        self.aligner = aligner
+        self.seed = seed
 
 
     def __len__(self):
@@ -132,9 +139,34 @@ class PromptableDeTRDataLoader:
                 # Load the samples.
                 with open(file=file, mode="r") as f:
                     raw_sample = json.load(fp=f)
+                    raw_sample["image_path"] = os.path.join(self.image_directory, raw_sample.pop("image_name"))
+
+                # Load the samples for a specific model.
+                if self.aligner:
+                    # Get random caption.
+                    n_caps = len(raw_sample["captions"])
+                    curr_cap = raw_sample["captions"][np.random.randint(0, n_caps)]
+                    raw_sample["caption"] = curr_cap
+                    del raw_sample["objects"], raw_sample["captions"]
+
+                    # Define sample.
+                    sample = AlignerSample(**raw_sample)
+
+                else:
+                    # Get random object.
+                    n_objs = len(raw_sample["objects"])
+                    curr_obj = raw_sample["objects"][np.random.randint(0, n_objs)]
+
+                    # Get current caption.
+                    raw_sample["caption"] = curr_obj["text"]
+                    raw_sample["bbox"] = curr_obj["bbox"]
+                    del raw_sample["objects"], raw_sample["captions"]
+
+                    # Define sample.
+                    sample = DetectorSample(**raw_sample)
 
                 # Append the samples.
-                curr_samples.append(Sample(**raw_sample))
+                curr_samples.append(sample)
             
             # Apply transformations.
             for transform in self.transformations:
