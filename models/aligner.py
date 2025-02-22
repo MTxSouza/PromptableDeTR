@@ -7,6 +7,7 @@ import os
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 from logger import Logger
 from models.base import BasePromptableDeTR
@@ -94,3 +95,30 @@ class Aligner(BasePromptableDeTR):
 
         torch.save(obj=self.joiner.state_dict(), f=ckpt_fp)
         logger.info(msg="Joiner weights saved successfully.")
+
+
+    def compute_aligner_loss(self, y_pred, y_true):
+        """
+        Compute the loss needed to train the aligner model.
+
+        Args:
+            y_pred (torch.Tensor): The predicted tensor.
+            y_true (torch.Tensor): The true tensor.
+
+        Returns:
+            torch.Tensor: The loss value.
+        """
+        logger.info(msg="Computing the aligner loss.")
+
+        # Compute the loss.
+        B, N, _ = y_pred.shape
+        f_y_pred = y_pred.view(B * N, -1)
+        f_y_true = y_true.view(B * N)
+
+        loss = F.cross_entropy(
+            input=f_y_pred, 
+            target=f_y_true, 
+            reduction="mean"
+        )
+        logger.info(msg="Returning the loss value.")
+        return loss
