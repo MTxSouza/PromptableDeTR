@@ -218,11 +218,15 @@ class PrepareDetectionSample(PrepareAlignerSample):
 
 
     # Special methods.
-    def __init__(self):
+    def __init__(self, vocab_file):
         """
         This class prepares the raw sample for training loading the
         image, transforming the caption, and preparing the bounding box.
+
+        Args:
+            vocab_file (str): The path to the vocabulary file
         """
+        super().__init__(vocab_file=vocab_file)
 
         # Define the transformations.
         self.bbox_transform = PrepareBBox()
