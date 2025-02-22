@@ -98,10 +98,9 @@ class PromptableDeTRDataLoader:
         if transformations is None:
             raise ValueError("Transformations must be specified.")
 
-        elif aligner:
+        if aligner:
             if PrepareAlignerSample not in transformations or not isinstance(transformations[0], PrepareAlignerSample):
                 raise ValueError("Transformations must be a list containing the PrepareAlignerSample class.")
-
         elif PrepareDetectionSample not in transformations or not isinstance(transformations[0], PrepareDetectionSample):
             raise ValueError("Transformations must be a list containing the PrepareDetectionSample class.")
 
