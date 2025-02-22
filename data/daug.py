@@ -297,12 +297,13 @@ class MaskCaption(BaseTransform):
         caption_size = sample.caption_tokens.size(0) - 2
 
         # Create the mask.
-        mask = torch.rand(size=(caption_size,), dtype=torch.float32)
-        mask = F.pad(input=mask, pad=(1, 1), mode="constant", value=1)
-        mask = ~(mask > self.mask_ratio)
+        masked_tokens = int(caption_size * self.mask_ratio)
+        indices = torch.arange(start=1, end=caption_size + 1, dtype=torch.int64)
+        masked_indices = np.random.choice(indices, size=masked_tokens, replace=False)
+        masked_indices = torch.tensor(data=masked_indices, dtype=torch.int64)
 
         # Mask the caption.
-        sample.masked_caption_tokens[mask] = self.mask_token
+        sample.masked_caption_tokens[masked_indices] = self.mask_token
 
         return sample
 
