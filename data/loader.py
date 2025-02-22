@@ -20,13 +20,12 @@ class PromptableDeTRDataLoader:
 
     # Class methods.
     @classmethod
-    def get_train_val_split(cls, sample_directory, image_directory, val_split = 0.2, shuffle_samples = True, seed = 42):
+    def get_train_val_split(cls, sample_directory, val_split = 0.2, shuffle_samples = True, seed = 42):
         """
         Get the train and validation split from the sample directory.
 
         Args:
             sample_directory (str): The path to the sample directory.
-            image_directory (str): The path to the image directory where the images are stored.
             val_split (float): The validation split. (Default: 0.2)
             shuffle_samples (bool): Whether to shuffle the samples. (Default: True)
             seed (int): The seed for the random number generator. (Default: 42)
@@ -46,7 +45,7 @@ class PromptableDeTRDataLoader:
             sample_file = os.path.join(sample_directory, file)
             with open(file=sample_file, mode="r") as f:
                 raw_sample = json.load(fp=f)
-                raw_sample["image_path"] = os.path.join(image_directory, raw_sample.pop("image_name"))
+                raw_sample["image_path"] = raw_sample.pop("image_name")
 
             # Check if the samples are valid.
             Sample(**raw_sample)
