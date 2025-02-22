@@ -10,7 +10,7 @@ import torch
 
 # Structures.
 @dataclass
-class Sample:
+class DetectorSample:
     """
     Sample structure.
     """

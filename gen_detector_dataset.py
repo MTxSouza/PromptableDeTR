@@ -9,7 +9,7 @@ import shutil
 import uuid
 import xml.etree.ElementTree as ET
 
-from data.schemas import Sample
+from data.schemas import DetectorSample
 
 
 # Arguments.
@@ -195,7 +195,7 @@ if __name__=="__main__":
                 if not boxes:
                     continue
 
-                samples.append(Sample(
+                samples.append(DetectorSample(
                     image_path=os.path.join(args.image_folder, img_file),
                     caption=cap.strip().lower(),
                     bbox=boxes
