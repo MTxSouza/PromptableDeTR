@@ -210,11 +210,12 @@ class PrepareAlignerSample(BaseTransform):
 
         # Prepare the caption.
         sample = self.caption_transform.transform(sample=sample)
+        sample.masked_caption_tokens = sample.caption_tokens.clone()
 
         return sample
 
 
-class PrepareDetectionSample(PrepareAlignerSample):
+class PrepareDetectionSample(BaseTransform):
 
 
     # Special methods.
@@ -232,11 +233,25 @@ class PrepareDetectionSample(PrepareAlignerSample):
         self.bbox_transform = PrepareBBox()
 
 
+    def __call__(self, samples):
+        
+        # Validate the samples.
+        samples = self.validate_samples(samples=samples)
+
+        # Prepare the samples.
+        samples = [self.transform(sample=sample) for sample in samples]
+
+        return samples
+
+
     # Methods.
     def transform(self, sample):
         
-        # Prepare the image and caption.
-        sample = super().transform(sample=sample)
+        # Prepare the image.
+        sample = self.image_transform.transform(sample=sample)
+
+        # Prepare the caption.
+        sample = self.caption_transform.transform(sample=sample)
 
         # Prepare the bounding box.
         sample = self.bbox_transform.transform(sample=sample)
