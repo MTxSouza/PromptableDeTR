@@ -51,7 +51,7 @@ if __name__=="__main__":
     # Append the path to the system.
     sys.path.append(os.path.abspath(path=os.path.dirname(p=__file__.split(sep=os.sep)[-1])))
 
-    from models import BasePromptableDeTR
+    from models import PromptableDeTR
 
     # Check current device.
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -59,7 +59,7 @@ if __name__=="__main__":
         warn("The model is being run on the CPU. This will be slow.")
 
     # Create the model object.
-    model = BasePromptableDeTR(image_tokens=[1600, 400, 100])
+    model = PromptableDeTR(image_tokens=[1600, 400, 100])
     model.load_base_weights(
         image_encoder_weights=args.image_encoder_weights, 
         text_encoder_weights=args.text_encoder_weights
