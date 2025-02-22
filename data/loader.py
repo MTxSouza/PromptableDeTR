@@ -4,7 +4,6 @@ to be used in the training process.
 """
 import json
 import os
-import warnings
 
 import numpy as np
 
