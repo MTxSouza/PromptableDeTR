@@ -9,7 +9,7 @@ import torch
 import torch.nn.functional as F
 from PIL import Image
 
-from data.schemas import Sample
+from data.schemas import AlignerSample, DetectorSample
 from models.tokenizer import Tokenizer
 
 
@@ -63,8 +63,8 @@ class BaseTransform(ABC):
 
         # Check if all objects are samples.
         for sample in samples:
-            if not isinstance(sample, Sample):
-                raise ValueError("All objects in the list must be of type Sample.")
+            if not isinstance(sample, (AlignerSample, DetectorSample)):
+                raise ValueError("All objects in the list must be either AlignerSample or DetectorSample.")
 
         return samples
 
