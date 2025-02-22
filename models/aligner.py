@@ -3,6 +3,9 @@ This module contains the Aligner model class used to train the Joiner block only
 aims to train the model first to model the relationship between the text and the image 
 before training the whole model for detection.
 """
+import os
+
+import torch
 import torch.nn as nn
 
 from logger import Logger
@@ -71,3 +74,23 @@ class Aligner(BasePromptableDeTR):
         logger.info(msg="Returning the final output of the `Aligner` model with one tensor.")
         logger.debug(msg="- Alignment shape: %s" % (alignment.shape,))
         return alignment
+
+
+    def save_joiner_weights(self, dir_path, ckpt_step = None):
+        """
+        Save the joiner weights.
+
+        Args:
+            dir_path (str): The path to the directory where the weights will be saved.
+            ckpt_step (int): The checkpoint step. (Default: None)
+        """
+        logger.info(msg="Saving the joiner weights.")
+
+        # Define the checkpoint path.
+        ckpt_name = "joiner.pth"
+        if ckpt_step is not None:
+            ckpt_name = "joiner-ckpt-%d.pth" % ckpt_step
+        ckpt_fp = os.path.join(dir_path, ckpt_name)
+
+        torch.save(obj=self.joiner.state_dict(), f=ckpt_fp)
+        logger.info(msg="Joiner weights saved successfully.")
