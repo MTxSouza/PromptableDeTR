@@ -15,7 +15,7 @@ class ObjectAnnotation:
     Object structure that stores all annotation of a specific object.
     """
     caption: LiteralString
-    bbox: List[List[int, int, int, int]]
+    bbox: List[List[int]]
 
 
 @dataclass
