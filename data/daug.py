@@ -137,6 +137,9 @@ class PrepareCaption(BaseTransform):
         # Tokenize the caption.
         sample.caption_tokens = self.tokenizer.encode(texts=sample.caption)[0]
 
+        # Convert the tokens to tensor.
+        sample.caption_tokens = torch.tensor(data=sample.caption_tokens, dtype=torch.int64)
+
         return sample
 
 
@@ -256,6 +259,46 @@ class PrepareDetectionSample(BaseTransform):
 
         # Prepare the bounding box.
         sample = self.bbox_transform.transform(sample=sample)
+
+        return sample
+
+
+class MaskCaption(BaseTransform):
+
+
+    # Special methods.
+    def __init__(self, mask_token, mask_ratio):
+        """
+        This class masks the caption.
+
+        Args:
+            mask_token (int): The token to use for masking.
+            mask_ratio (float): The ratio of the caption to mask.
+        """
+        self.mask_token = mask_token
+        self.mask_ratio = mask_ratio
+
+
+    def __call__(self, samples):
+        
+        # Validate the samples.
+        samples = self.validate_samples(samples=samples)
+
+        # Prepare the samples.
+        samples = [self.transform(sample=sample) for sample in samples]
+
+        return samples
+
+
+    # Methods.
+    def transform(self, sample):
+
+        # Create the mask.
+        mask = torch.rand(size=sample.caption_tokens.size(), dtype=torch.float32)
+        mask = ~(mask > self.mask_ratio)
+
+        # Mask the caption.
+        sample.masked_caption_tokens[mask] = self.mask_token
 
         return sample
 
