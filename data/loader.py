@@ -144,7 +144,7 @@ class PromptableDeTRDataLoader:
                 # Load the samples for a specific model.
                 if self.aligner:
                     # Get all captions.
-                    raw_sample["caption_list"] = raw_sample.pop("caption")
+                    raw_sample["caption_list"] = raw_sample.pop("captions")
                     del raw_sample["objects"]
 
                     # Define sample.
