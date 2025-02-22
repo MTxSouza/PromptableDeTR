@@ -48,7 +48,7 @@ class AlignerSample:
     Sample structure.
     """
     image_path: str
-    caption_list: str
+    caption: str
 
     image: Optional[torch.FloatTensor | np.ndarray] = None
     caption_tokens: Optional[torch.IntTensor | np.ndarray] = None

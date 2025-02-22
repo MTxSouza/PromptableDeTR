@@ -143,9 +143,11 @@ class PromptableDeTRDataLoader:
 
                 # Load the samples for a specific model.
                 if self.aligner:
-                    # Get all captions.
-                    raw_sample["caption_list"] = raw_sample.pop("captions")
-                    del raw_sample["objects"]
+                    # Get random caption.
+                    n_caps = len(raw_sample["captions"])
+                    curr_cap = raw_sample["captions"][np.random.randint(0, n_caps)]
+                    raw_sample["caption"] = curr_cap
+                    del raw_sample["objects"], raw_sample["captions"]
 
                     # Define sample.
                     sample = AlignerSample(**raw_sample)
