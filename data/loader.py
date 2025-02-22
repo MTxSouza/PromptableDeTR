@@ -8,7 +8,7 @@ import warnings
 
 import numpy as np
 
-from data.daug import PrepareRawSample
+from data.daug import PrepareAlignerSample, PrepareDetectionSample
 from data.schemas import AlignerSample, DetectorSample, Sample
 
 
@@ -76,7 +76,6 @@ class PromptableDeTRDataLoader:
             image_directory,
             batch_size, 
             transformations = None, 
-            vocab_file = None, 
             shuffle = True, 
             aligner = False, 
             seed = 42
@@ -89,7 +88,6 @@ class PromptableDeTRDataLoader:
             image_directory (str): The path to the image directory where the images are stored.
             batch_size (int): The batch size.
             transformations (List[BaseTransform]): The transforms to apply to the data. (Default: None)
-            vocab_file (str): The vocabulary file path. (Default: None)
             shuffle (bool): Whether to shuffle the samples. (Default: True)
             aligner (bool): Whether to use the aligner model. (Default: False)
             seed (int): The seed for the random number generator. (Default: 42)
@@ -100,16 +98,14 @@ class PromptableDeTRDataLoader:
 
         # Check transformations.
         if transformations is None:
-            if vocab_file is None:
-                raise ValueError("If transformations is None, then vocab_file must be provided.")
-            transformations = [PrepareRawSample(vocab_file=vocab_file)]
-        elif PrepareRawSample not in transformations or not isinstance(transformations[0], PrepareRawSample):
-            raise ValueError("Transformations must be a list containing the PrepareRawSample class.")
+            raise ValueError("Transformations must be specified.")
 
-        # Check what model to use.
-        if aligner and len(transformations) > 1:
-            warnings.warn("Aligner model is being used. The transformations list will be ignored.")
-            transformations = [PrepareRawSample(vocab_file=vocab_file)]
+        elif aligner:
+            if PrepareAlignerSample not in transformations or not isinstance(transformations[0], PrepareAlignerSample):
+                raise ValueError("Transformations must be a list containing the PrepareAlignerSample class.")
+
+        elif PrepareDetectionSample not in transformations or not isinstance(transformations[0], PrepareDetectionSample):
+            raise ValueError("Transformations must be a list containing the PrepareDetectionSample class.")
 
         # Shuffle the samples.
         if shuffle:
