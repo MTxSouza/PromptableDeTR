@@ -99,9 +99,9 @@ class PromptableDeTRDataLoader:
             raise ValueError("Transformations must be specified.")
 
         if aligner:
-            if PrepareAlignerSample not in transformations or not isinstance(transformations[0], PrepareAlignerSample):
+            if not isinstance(transformations[0], PrepareAlignerSample):
                 raise ValueError("Transformations must be a list containing the PrepareAlignerSample class.")
-        elif PrepareDetectionSample not in transformations or not isinstance(transformations[0], PrepareDetectionSample):
+        elif not isinstance(transformations[0], PrepareDetectionSample):
             raise ValueError("Transformations must be a list containing the PrepareDetectionSample class.")
 
         # Shuffle the samples.
