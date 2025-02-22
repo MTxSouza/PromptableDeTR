@@ -158,7 +158,7 @@ class PromptableDeTRDataLoader:
                     # Get current caption.
                     raw_sample["caption"] = curr_obj["text"]
                     raw_sample["bbox"] = curr_obj["bbox"]
-                    del raw_sample["objects"]
+                    del raw_sample["objects"], raw_sample["captions"]
 
                     # Define sample.
                     sample = DetectorSample(**raw_sample)
