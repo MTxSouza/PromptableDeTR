@@ -297,7 +297,7 @@ class MaskCaption(BaseTransform):
         caption_size = sample.caption_tokens.size(0) - 2
 
         # Create the mask.
-        mask = torch.rand(size=caption_size, dtype=torch.float32)
+        mask = torch.rand(size=(caption_size,), dtype=torch.float32)
         mask = F.pad(input=mask, pad=(1, 1), mode="constant", value=1)
         mask = ~(mask > self.mask_ratio)
 
