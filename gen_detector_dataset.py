@@ -1,6 +1,6 @@
 """
 This script creates the .JSON files with the input text and their corresponding bounding boxes 
-for an image.
+for an image. This dataset is used to train the object detection model in the second training.
 """
 import argparse
 import json
