@@ -227,9 +227,10 @@ class PrepareDetectionSample(BaseTransform):
         Args:
             vocab_file (str): The path to the vocabulary file
         """
-        super().__init__(vocab_file=vocab_file)
 
         # Define the transformations.
+        self.image_transform = PrepareImage()
+        self.caption_transform = PrepareCaption(vocab_file=vocab_file)
         self.bbox_transform = PrepareBBox()
 
 
