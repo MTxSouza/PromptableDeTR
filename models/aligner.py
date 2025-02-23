@@ -3,7 +3,11 @@ This module contains the Aligner model class used to train the Joiner block only
 aims to train the model first to model the relationship between the text and the image 
 before training the whole model for detection.
 """
+import os
+
+import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 from logger import Logger
 from models.base import BasePromptableDeTR
@@ -73,3 +77,50 @@ class Aligner(BasePromptableDeTR):
         logger.info(msg="Returning the final output of the `Aligner` model with one tensor.")
         logger.debug(msg="- Alignment shape: %s" % (alignment.shape,))
         return alignment
+
+
+    def save_joiner_weights(self, dir_path, ckpt_step = None):
+        """
+        Save the joiner weights.
+
+        Args:
+            dir_path (str): The path to the directory where the weights will be saved.
+            ckpt_step (int): The checkpoint step. (Default: None)
+        """
+        logger.info(msg="Saving the joiner weights.")
+
+        # Define the checkpoint path.
+        ckpt_name = "joiner.pth"
+        if ckpt_step is not None:
+            ckpt_name = "joiner-ckpt-%d.pth" % ckpt_step
+        ckpt_fp = os.path.join(dir_path, ckpt_name)
+
+        torch.save(obj=self.joiner.state_dict(), f=ckpt_fp)
+        logger.info(msg="Joiner weights saved successfully.")
+
+
+    def compute_aligner_loss(self, y_pred, y_true):
+        """
+        Compute the loss needed to train the aligner model.
+
+        Args:
+            y_pred (torch.Tensor): The predicted tensor.
+            y_true (torch.Tensor): The true tensor.
+
+        Returns:
+            torch.Tensor: The loss value.
+        """
+        logger.info(msg="Computing the aligner loss.")
+
+        # Compute the loss.
+        B, N, _ = y_pred.shape
+        f_y_pred = y_pred.view(B * N, -1)
+        f_y_true = y_true.view(B * N)
+
+        loss = F.cross_entropy(
+            input=f_y_pred, 
+            target=f_y_true, 
+            reduction="mean"
+        )
+        logger.info(msg="Returning the loss value.")
+        return loss

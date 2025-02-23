@@ -5,6 +5,12 @@ that is designed to be more efficient in terms of computational resources and me
 
 Paper: https://arxiv.org/abs/2004.02984
 """
+import os
+import sys
+
+# Append the path to the system.
+sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
+
 from dataclasses import dataclass
 
 import torch
@@ -1046,7 +1052,7 @@ class MobileBert(nn.Module):
         if attention_mask is None:
             logger.warning(msg="No attention mask tensor, using the default attention mask.")
             attention_mask = torch.ones(input_shape, dtype=torch.long, device=input_ids.device)
-            attention_mask = self.get_extended_attention_mask(attention_mask)
+        attention_mask = self.get_extended_attention_mask(attention_mask)
         logger.debug(msg="- Attention mask shape: %s" % (attention_mask.shape,))
 
         # Define the token type ids.
