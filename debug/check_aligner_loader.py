@@ -44,7 +44,7 @@ if __name__=="__main__":
         transformations=[
             PrepareAlignerSample(vocab_file=args.vocab_file),
             ReshapeImage(image_size=args.image_size),
-            MaskCaption(mask_token=103, mask_ratio=args.mask_ratio),
+            MaskCaption(vocab_file=args.vocab_file, mask_token=103, mask_ratio=args.mask_ratio),
         ],
         aligner=True,
     )
@@ -85,8 +85,11 @@ if __name__=="__main__":
         caption_tokens = batch.caption_tokens.unsqueeze(dim=0).to(device=device)
         masked_caption_tokens = batch.masked_caption_tokens.unsqueeze(dim=0).to(device=device)
 
+        mask = caption_tokens.clone()
+        mask[masked_caption_tokens == 0] = 103 # Mask token.
+
         caption = batch.caption
-        masked_caption = tokenizer.decode(indices=masked_caption_tokens.squeeze(dim=0).cpu().tolist())
+        masked_caption = tokenizer.decode(indices=mask.squeeze(dim=0).cpu().tolist())
 
         print("Image shape:", image.size())
         print("Input tokens:", caption_tokens.size(), caption_tokens)
