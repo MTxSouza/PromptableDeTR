@@ -95,6 +95,14 @@ def get_args():
         help="Path to the joiner weights."
     )
     model_parser.add_argument(
+        "--image-tokens",
+        "--img-tk",
+        type=int,
+        nargs="+",
+        default=[1600, 400, 100],
+        help="The image tokens."
+    )
+    model_parser.add_argument(
         "--heads",
         type=int,
         default=8,
