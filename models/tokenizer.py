@@ -257,7 +257,7 @@ class Tokenizer:
         str_tokens = []
         for indice in indices:
             indice = [indice]
-            str_tokens.append(self.decode(indices=indice))
+            str_tokens.append(self.decode(indices=indice)[0])
         
         return str_tokens
 
