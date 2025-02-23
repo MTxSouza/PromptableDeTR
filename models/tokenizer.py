@@ -251,7 +251,7 @@ class Tokenizer:
             list: List of string tokens.
         """
         # Encode text.
-        indices = self.encode(texts=text)
+        indices = self.encode(texts=text)[0]
 
         # Decode indices.
         str_tokens = []
@@ -275,6 +275,7 @@ if __name__=="__main__":
     print("Encoding text: %s" % args.text)
     tokens = tokenizer.encode(texts=args.text)
     print("Encoded tokens: %s" % tokens)
+    print("String tokens: %s" % tokenizer.encode_str(text=args.text))
 
     # Decode tokens.
     decoded_text = tokenizer.decode(indices=tokens)
