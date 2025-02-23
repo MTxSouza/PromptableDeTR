@@ -251,7 +251,6 @@ class Tokenizer:
                     text += token + " "
 
             # Replace `##` with `space`.
-            print(text)
             text = text.replace("##", "")
 
             # Remove special tokens.
