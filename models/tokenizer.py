@@ -240,6 +240,28 @@ class Tokenizer:
         return texts
 
 
+    def encode_str(self, text):
+        """
+        Encode a text into a list string tokens.
+
+        Args:
+            text (str): Text to encode.
+
+        Returns:
+            list: List of string tokens.
+        """
+        # Encode text.
+        indices = self.encode(texts=text)
+
+        # Decode indices.
+        str_tokens = []
+        for indice in indices:
+            indice = [indice]
+            str_tokens.append(self.decode(indices=indice))
+        
+        return str_tokens
+
+
 if __name__=="__main__":
 
     # Get arguments.
