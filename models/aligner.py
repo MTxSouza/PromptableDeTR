@@ -19,6 +19,7 @@ class Aligner(BasePromptableDeTR):
     # Special methods.
     def __init__(
             self, 
+            image_tokens, 
             vocab_size = 30522, 
             emb_dim = 128, 
             proj_dim = 512, 
@@ -28,12 +29,13 @@ class Aligner(BasePromptableDeTR):
         Initializes the Aligner class used to align images and text informations.
 
         Args:
+            image_tokens (List[int]): The image tokens for each level.
             vocab_size (int): The size of the vocabulary. (Default: 30522)
             emb_dim (int): The embedding dimension. (Default: 128)
             proj_dim (int): The projection dimension. (Default: 512)
             emb_dropout_rate (float): The embedding dropout rate. (Default: 0.1)
         """
-        super().__init__(vocab_size=vocab_size, emb_dim=emb_dim, proj_dim=proj_dim, emb_dropout_rate=emb_dropout_rate)
+        super().__init__(image_tokens=image_tokens, vocab_size=vocab_size, emb_dim=emb_dim, proj_dim=proj_dim, emb_dropout_rate=emb_dropout_rate)
 
         # Aligner.
         self.aligner = nn.Sequential(

@@ -314,7 +314,7 @@ class Joiner(nn.Module):
         """
         logger.debug(msg="Calling `Joiner` forward method.")
 
-        text_embedding = text_embedding.pooled_output
+        text_embedding = text_embedding.last_hidden_state
         image_features = [
             image_features.high_resolution_feat, 
             image_features.mid_resolution_feat, 
