@@ -96,7 +96,6 @@ def get_args():
     )
     model_parser.add_argument(
         "--heads",
-        "-h",
         type=int,
         default=8,
         help="The number of attention heads."
