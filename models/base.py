@@ -50,13 +50,14 @@ class Encoder(nn.Module):
     
 
     # Methods.
-    def forward(self, image, prompt):
+    def forward(self, image, prompt, prompt_mask = None):
         """
         Forward pass of the encoder.
 
         Args:
             image (torch.Tensor): Image tensor.
             prompt (torch.Tensor): Prompt tensor.
+            prompt_mask (torch.Tensor): Prompt mask tensor. (Default: None)
 
         Returns:
             Tuple[torch.Tensor, torch.Tensor]: Encoded image and text tensors.
@@ -64,13 +65,15 @@ class Encoder(nn.Module):
         logger.info(msg="Calling `Encoder` forward method.")
         logger.debug(msg="- Image shape: %s" % (image.shape,))
         logger.debug(msg="- Prompt shape: %s" % (prompt.shape,))
+        logger.debug(msg="- Prompt mask shape: %s" % (prompt_mask.shape if prompt_mask is not None else None))
 
         # Encode images and text.
         logger.debug(msg="- Calling `MobileNetV3` block to the tensor %s." % (image.shape,))
         image_emb = self.image_encoder(image)
 
         logger.debug(msg="- Calling `MobileBert` block to the tensor %s." % (prompt.shape,))
-        text_emb = self.text_encoder(prompt)
+        logger.debug(msg="- Using the prompt mask: %s." % (prompt_mask is not None))
+        text_emb = self.text_encoder(prompt, attention_mask=prompt_mask)
 
         logger.info(msg="Returning the final output of the `Encoder` model with five tensors.")
         logger.debug(msg="- High resolution image shape: %s" % (image_emb.high_resolution_feat.shape,))
