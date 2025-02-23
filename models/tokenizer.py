@@ -6,6 +6,7 @@ import argparse
 import os
 import re
 import string
+import unicodedata
 import warnings
 from enum import Enum
 
@@ -135,6 +136,19 @@ class Tokenizer:
         return token_to_index
 
 
+    def __remove_accents(self, text):
+        """
+        Remove accents from a text.
+
+        Args:
+            text (str): Text to remove accents from.
+
+        Returns:
+            str: Text without accents.
+        """
+        return "".join(char for char in unicodedata.normalize("NFD", text) if unicodedata.category(char) != "Mn")
+
+
     # Methods.
     def encode(self, texts):
         """
@@ -166,6 +180,7 @@ class Tokenizer:
 
             # Normalize text.
             text = text.lower()
+            text = self.__remove_accents(text=text)
 
             start_index = 0
             final_index = len(text)
