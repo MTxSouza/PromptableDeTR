@@ -95,12 +95,37 @@ def get_args():
         help="Path to the joiner weights."
     )
     model_parser.add_argument(
+        "--image-size",
+        "--img-size",
+        type=int,
+        default=640,
+        help="The image size."
+    )
+    model_parser.add_argument(
         "--image-tokens",
         "--img-tk",
         type=int,
         nargs="+",
         default=[1600, 400, 100],
         help="The image tokens."
+    )
+    model_parser.add_argument(
+        "--emb-dim",
+        type=int,
+        default=128,
+        help="The embedding dimension for MobileBERT."
+    )
+    model_parser.add_argument(
+        "--proj-dim",
+        type=int,
+        default=512,
+        help="The projection dimension for MobileBERT."
+    )
+    model_parser.add_argument(
+        "--emb-dropout-rate",
+        type=float,
+        default=0.1,
+        help="The dropout rate for the embeddings."
     )
     model_parser.add_argument(
         "--heads",
