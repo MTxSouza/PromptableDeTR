@@ -2,8 +2,10 @@
 This module contains all data transformations and augmentations to be used in 
 the training process.
 """
+import random
 from abc import ABC, abstractmethod
 
+import nltk
 import numpy as np
 import torch
 import torch.nn.functional as F
@@ -267,15 +269,17 @@ class MaskCaption(BaseTransform):
 
 
     # Special methods.
-    def __init__(self, mask_token, mask_ratio):
+    def __init__(self, vocab_file, mask_ratio):
         """
         This class masks the caption.
 
         Args:
-            mask_token (int): The token to use for masking.
+            vocab_file (str): The path to the vocabulary file
             mask_ratio (float): The ratio of the caption to mask.
         """
-        self.mask_token = mask_token
+        # Load the tokenizer.
+        self.tokenizer = Tokenizer(vocab_filepath=vocab_file)
+
         self.mask_ratio = mask_ratio
 
 
@@ -290,20 +294,73 @@ class MaskCaption(BaseTransform):
         return samples
 
 
+    # Private methods.
+    def __get_tokens_to_mask(self, sample):
+        """
+        This method finds all nouns and verbs in the caption to randomly 
+        mask them.
+
+        Args:
+            sample (AlignerSample): The sample to mask.
+
+        Returns:
+            List[List[int]]: The indices of the tokens to mask.
+        """
+        # Tokenize the caption.
+        caption = sample.caption
+        str_tokens = self.tokenizer.encode_str(text=caption)
+        nltk_tokens = nltk.word_tokenize(text=caption)
+        nltk_tokens = nltk.pos_tag(tokens=nltk_tokens)
+
+        # Get nouns and verbs.
+        tgt_words = set()
+        for token, tag in nltk_tokens:
+            if tag in ["NN", "NNS", "NNP", "NNPS", "VB", "VBD", "VBG", "VBN", "VBP", "VBZ"]:
+                tgt_words.add(token)
+        
+        # Get the indices of the tokens to mask.
+        mask_indices = []
+        max_size = sample.caption_tokens.size(0) - 1
+        start_index = 1
+        end_index = max_size
+        while start_index < max_size:
+
+            token = "".join(str_tokens[start_index:end_index])
+            if token in tgt_words:
+                mask_indices.append(sample.caption_tokens[start_index:end_index].tolist())
+                start_index = end_index
+                end_index = max_size
+                continue
+
+            else:
+                end_index -= 1
+
+            if end_index == start_index:
+                start_index += 1
+                end_index = max_size
+
+        return mask_indices
+
+
     # Methods.
     def transform(self, sample):
 
-        # Get caption size without the special tokens.
-        caption_size = sample.caption_tokens.size(0) - 2
+        # Get the tokens to mask.
+        mask_indices = self.__get_tokens_to_mask(sample=sample)
 
-        # Create the mask.
-        masked_tokens = int(caption_size * self.mask_ratio)
-        indices = torch.arange(start=1, end=caption_size + 1, dtype=torch.int64)
-        masked_indices = np.random.choice(indices, size=masked_tokens, replace=False)
-        masked_indices = torch.tensor(data=masked_indices, dtype=torch.int64)
+        # Get the number of tokens to mask.
+        num_tokens = int(self.mask_ratio * len(mask_indices))
+        random_tokens = random.choices(population=mask_indices, k=num_tokens)
 
         # Mask the caption.
-        sample.masked_caption_tokens[masked_indices] = self.mask_token
+        masked_caption = torch.ones_like(input=sample.masked_caption_tokens)
+        for tokens in random_tokens:
+            if isinstance(tokens, int):
+                tokens = [tokens]
+            for token in tokens:
+                mask_filter = sample.masked_caption_tokens == token
+                masked_caption[mask_filter] = 0
+        sample.masked_caption_tokens = masked_caption
 
         return sample
 

@@ -5,6 +5,8 @@ the MobileBERT vocabulary to encode and decode text data.
 import argparse
 import os
 import re
+import string
+import unicodedata
 import warnings
 from enum import Enum
 
@@ -134,6 +136,19 @@ class Tokenizer:
         return token_to_index
 
 
+    def __remove_accents(self, text):
+        """
+        Remove accents from a text.
+
+        Args:
+            text (str): Text to remove accents from.
+
+        Returns:
+            str: Text without accents.
+        """
+        return "".join(char for char in unicodedata.normalize("NFD", text) if unicodedata.category(char) != "Mn")
+
+
     # Methods.
     def encode(self, texts):
         """
@@ -153,31 +168,44 @@ class Tokenizer:
         indices = []
         for text in texts:
 
+            # Replace `#` with `spaces`.
+            if "#" in text:
+                warnings.warn(message="The character `#` is in the text. Replacing it with `space`.")
+            text = text.replace("#", " ")
+            text = text.strip()
+
             # Remove special tokens.
             text = text.upper()
             text = self.special_tokens_regex.sub(repl="", string=text)
 
             # Normalize text.
             text = text.lower()
-
-            # Replace `spaces` with `#`.
-            if "#" in text:
-                warnings.warn(message="The character `#` is in the text. Replacing it with `space`.")
-            text = text.replace(" ", "#")
+            text = self.__remove_accents(text=text)
 
             start_index = 0
             final_index = len(text)
             indice = []
+            add_double_hash = False
             while start_index < final_index:
 
-                # Check if the token is in the vocabulary.
                 token = text[start_index:final_index]
+                if add_double_hash:
+                    token = "##" + token
+
+                # Check if the token is in the vocabulary.
                 if token in self.token_to_index:
                     indice.append(self.token_to_index[token])
 
                     # Update indices.
                     start_index = final_index
                     final_index = len(text)
+
+                    # Check if the word was split.
+                    if start_index < final_index and text[start_index] in string.ascii_lowercase + string.digits and token not in string.punctuation:
+                        add_double_hash = True
+                    else:
+                        add_double_hash = False
+
                     continue
 
                 # Update final index.
@@ -194,8 +222,14 @@ class Tokenizer:
 
             # Append indice.
             indices.append(indice)
+        
+        # Remove unknown tokens.
+        clean_indices = []
+        for indice in indices:
+            clean_indice = list(filter(lambda token: token != SpecialTokens.UNK.value[1], indice))
+            clean_indices.append(clean_indice)
 
-        return indices
+        return clean_indices
 
 
     def decode(self, indices):
@@ -225,19 +259,45 @@ class Tokenizer:
                 # Check if the token is a special token.
                 if token == "[PAD]":
                     continue
+                
+                if token.startswith("##") or token in string.punctuation:
+                    text = text.strip() + token + " "
+                else:
+                    text += token + " "
 
-                text += token
-
-            # Replace `#` with `spaces`.
-            text = text.replace("#", " ")
+            # Replace `##` with `space`.
+            text = text.replace("##", "")
 
             # Remove special tokens.
             text = self.special_tokens_regex.sub(repl="", string=text)
+            text = text.strip()
 
             # Append text.
             texts.append(text)
 
         return texts
+
+
+    def encode_str(self, text):
+        """
+        Encode a text into a list string tokens.
+
+        Args:
+            text (str): Text to encode.
+
+        Returns:
+            list: List of string tokens.
+        """
+        # Encode text.
+        indices = self.encode(texts=text)[0]
+
+        # Decode indices.
+        str_tokens = []
+        for indice in indices:
+            indice = [indice]
+            str_tokens.append(self.decode(indices=indice)[0])
+        
+        return str_tokens
 
 
 if __name__=="__main__":
@@ -253,6 +313,7 @@ if __name__=="__main__":
     print("Encoding text: %s" % args.text)
     tokens = tokenizer.encode(texts=args.text)
     print("Encoded tokens: %s" % tokens)
+    print("String tokens: %s" % tokenizer.encode_str(text=args.text))
 
     # Decode tokens.
     decoded_text = tokenizer.decode(indices=tokens)

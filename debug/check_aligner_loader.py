@@ -27,7 +27,6 @@ if __name__=="__main__":
     args = get_args()
 
     # Prepare datasets.
-    print("Creating train and validation splits.")
     train_files, valid_files = PromptableDeTRDataLoader.get_train_val_split(
         sample_directory=args.dataset_dir,
         val_split=args.valid_split,
@@ -36,7 +35,6 @@ if __name__=="__main__":
     )
 
     # Instantiate the data loader.
-    print("Creating the data loader for the training set.")
     dataset = PromptableDeTRDataLoader(
         sample_file_paths=train_files,
         image_directory=args.image_dir,
@@ -44,13 +42,12 @@ if __name__=="__main__":
         transformations=[
             PrepareAlignerSample(vocab_file=args.vocab_file),
             ReshapeImage(image_size=args.image_size),
-            MaskCaption(mask_token=103, mask_ratio=args.mask_ratio),
+            MaskCaption(vocab_file=args.vocab_file, mask_ratio=args.mask_ratio),
         ],
         aligner=True,
     )
 
     # Instantiate the model.
-    print("Creating the model.")
     model = Aligner(
         image_tokens=args.image_tokens,
         vocab_size=30522,
@@ -63,40 +60,45 @@ if __name__=="__main__":
     tokenizer = Tokenizer(vocab_filepath=args.vocab_file)
 
     # Load the model weights.
-    print("Loading the model weights.")
     model.load_base_weights(
         image_encoder_weights=args.image_encoder_weights,
         text_encoder_weights=args.text_encoder_weights,
     )
 
     # Get the first batch.
-    print("Getting the first batch.")
     for batch in dataset:
-        if isinstance(batch, (list, tuple)):
-            batch = batch[1]
+        if not isinstance(batch, (list, tuple)):
+            batch = [batch]
         break
 
     # Perform a forward pass.
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.to(device=device)
-    with torch.no_grad():
 
-        image = batch.image.unsqueeze(dim=0).to(device=device)
-        caption_tokens = batch.caption_tokens.unsqueeze(dim=0).to(device=device)
-        masked_caption_tokens = batch.masked_caption_tokens.unsqueeze(dim=0).to(device=device)
+    for idx, sample in enumerate(iterable=batch):
 
-        caption = batch.caption
-        masked_caption = tokenizer.decode(indices=masked_caption_tokens.squeeze(dim=0).cpu().tolist())
+        print("Sample %d:" % (idx + 1))
+        with torch.no_grad():
 
-        print("Image shape:", image.size())
-        print("Input tokens:", caption_tokens.size(), caption_tokens)
-        print("Masked tokens:", masked_caption_tokens.size(), masked_caption_tokens)
-        print("Input text:", caption)
-        print("Masked text:", masked_caption)
+            image = sample.image.unsqueeze(dim=0).to(device=device)
+            caption_tokens = sample.caption_tokens.unsqueeze(dim=0).to(device=device)
+            masked_caption_tokens = sample.masked_caption_tokens.unsqueeze(dim=0).to(device=device)
 
-        out = model(image=image, prompt=masked_caption_tokens)
-        print("Output tokens:", out.size())
+            mask = caption_tokens.clone()
+            mask[masked_caption_tokens == 0] = 103
 
-        out_caption = out.argmax(dim=-1)
-        out_caption = tokenizer.decode(indices=out_caption.squeeze(dim=0).cpu().tolist())
-        print("Output text:", out_caption)
+            caption = sample.caption
+            masked_caption = tokenizer.decode(indices=mask.squeeze(dim=0).cpu().tolist())[0]
+
+            print("\tImage shape:", image.size())
+            print("\tInput tokens:", caption_tokens.size(), ":", caption_tokens.tolist())
+            print("\tMasked tokens:", masked_caption_tokens.size(), ":", masked_caption_tokens.tolist())
+            print("\tInput text:", caption)
+            print("\tMasked text:", masked_caption)
+
+            out = model(image=image, prompt=masked_caption_tokens)
+            print("\tOutput tokens:", out.size())
+
+            out_caption = out.argmax(dim=-1)
+            out_caption = tokenizer.decode(indices=out_caption.squeeze(dim=0).cpu().tolist())[0]
+            print("\tOutput text:", out_caption)
