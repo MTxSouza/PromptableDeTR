@@ -311,7 +311,6 @@ class MaskCaption(BaseTransform):
         # Tokenize the caption.
         caption = sample.caption
         str_tokens = self.tokenizer.encode_str(text=caption)
-        str_tokens = list(filter(len, str_tokens))
         nltk_tokens = nltk.word_tokenize(text=caption)
         nltk_tokens = nltk.pos_tag(tokens=nltk_tokens)
 
@@ -323,14 +322,13 @@ class MaskCaption(BaseTransform):
         
         # Get the indices of the tokens to mask.
         mask_indices = []
-        max_size = sample.caption_tokens.size(0)
-        start_index = 0
+        max_size = sample.caption_tokens.size(0) - 1
+        start_index = 1
         end_index = max_size
         while start_index < max_size:
 
             token = "".join(str_tokens[start_index:end_index])
             if token in tgt_words:
-
                 mask_indices.append(sample.caption_tokens[start_index:end_index].tolist())
                 start_index = end_index
                 end_index = max_size
