@@ -67,34 +67,38 @@ if __name__=="__main__":
 
     # Get the first batch.
     for batch in dataset:
-        if isinstance(batch, (list, tuple)):
-            batch = batch[1]
+        if not isinstance(batch, (list, tuple)):
+            batch = [batch]
         break
 
     # Perform a forward pass.
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.to(device=device)
-    with torch.no_grad():
 
-        image = batch.image.unsqueeze(dim=0).to(device=device)
-        caption_tokens = batch.caption_tokens.unsqueeze(dim=0).to(device=device)
-        masked_caption_tokens = batch.masked_caption_tokens.unsqueeze(dim=0).to(device=device)
+    for idx, sample in enumerate(iterable=batch):
 
-        mask = caption_tokens.clone()
-        mask[masked_caption_tokens == 0] = 103
+        print("Sample %d:" % (idx + 1))
+        with torch.no_grad():
 
-        caption = batch.caption
-        masked_caption = tokenizer.decode(indices=mask.squeeze(dim=0).cpu().tolist())[0]
+            image = sample.image.unsqueeze(dim=0).to(device=device)
+            caption_tokens = sample.caption_tokens.unsqueeze(dim=0).to(device=device)
+            masked_caption_tokens = sample.masked_caption_tokens.unsqueeze(dim=0).to(device=device)
 
-        print("Image shape:", image.size())
-        print("Input tokens:", caption_tokens.size(), ":", caption_tokens.tolist())
-        print("Masked tokens:", masked_caption_tokens.size(), ":", masked_caption_tokens.tolist())
-        print("Input text:", caption)
-        print("Masked text:", masked_caption)
+            mask = caption_tokens.clone()
+            mask[masked_caption_tokens == 0] = 103
 
-        out = model(image=image, prompt=masked_caption_tokens)
-        print("Output tokens:", out.size())
+            caption = sample.caption
+            masked_caption = tokenizer.decode(indices=mask.squeeze(dim=0).cpu().tolist())[0]
 
-        out_caption = out.argmax(dim=-1)
-        out_caption = tokenizer.decode(indices=out_caption.squeeze(dim=0).cpu().tolist())[0]
-        print("Output text:", out_caption)
+            print("\tImage shape:", image.size())
+            print("\tInput tokens:", caption_tokens.size(), ":", caption_tokens.tolist())
+            print("\tMasked tokens:", masked_caption_tokens.size(), ":", masked_caption_tokens.tolist())
+            print("\tInput text:", caption)
+            print("\tMasked text:", masked_caption)
+
+            out = model(image=image, prompt=masked_caption_tokens)
+            print("\tOutput tokens:", out.size())
+
+            out_caption = out.argmax(dim=-1)
+            out_caption = tokenizer.decode(indices=out_caption.squeeze(dim=0).cpu().tolist())[0]
+            print("\tOutput text:", out_caption)
