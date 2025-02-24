@@ -355,12 +355,14 @@ class MaskCaption(BaseTransform):
         random_tokens = random.choices(population=mask_indices, k=num_tokens)
 
         # Mask the caption.
+        masked_caption = torch.ones_like(input=sample.masked_caption_tokens)
         for tokens in random_tokens:
             if isinstance(tokens, int):
                 tokens = [tokens]
             for token in tokens:
                 mask_filter = sample.masked_caption_tokens == token
-                sample.masked_caption_tokens[mask_filter] = self.mask_token
+                masked_caption[mask_filter] = 0
+        sample.masked_caption_tokens = masked_caption
 
         return sample
 
