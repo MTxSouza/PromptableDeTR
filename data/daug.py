@@ -269,19 +269,17 @@ class MaskCaption(BaseTransform):
 
 
     # Special methods.
-    def __init__(self, vocab_file, mask_token, mask_ratio):
+    def __init__(self, vocab_file, mask_ratio):
         """
         This class masks the caption.
 
         Args:
             vocab_file (str): The path to the vocabulary file
-            mask_token (int): The token to use for masking.
             mask_ratio (float): The ratio of the caption to mask.
         """
         # Load the tokenizer.
         self.tokenizer = Tokenizer(vocab_filepath=vocab_file)
 
-        self.mask_token = mask_token
         self.mask_ratio = mask_ratio
 
 

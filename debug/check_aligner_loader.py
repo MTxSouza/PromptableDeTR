@@ -42,7 +42,7 @@ if __name__=="__main__":
         transformations=[
             PrepareAlignerSample(vocab_file=args.vocab_file),
             ReshapeImage(image_size=args.image_size),
-            MaskCaption(vocab_file=args.vocab_file, mask_token=103, mask_ratio=args.mask_ratio),
+            MaskCaption(vocab_file=args.vocab_file, mask_ratio=args.mask_ratio),
         ],
         aligner=True,
     )
