@@ -2,6 +2,7 @@
 This module contains all data transformations and augmentations to be used in 
 the training process.
 """
+import random
 from abc import ABC, abstractmethod
 
 import nltk
@@ -305,11 +306,12 @@ class MaskCaption(BaseTransform):
             sample (AlignerSample): The sample to mask.
 
         Returns:
-            List[int]: The indices of the tokens to mask.
+            List[List[int]]: The indices of the tokens to mask.
         """
         # Tokenize the caption.
         caption = sample.caption
         str_tokens = self.tokenizer.encode_str(text=caption)
+        str_tokens = list(filter(len, str_tokens))
         nltk_tokens = nltk.word_tokenize(text=caption)
         nltk_tokens = nltk.pos_tag(tokens=nltk_tokens)
 
@@ -320,26 +322,26 @@ class MaskCaption(BaseTransform):
                 tgt_words.add(token)
         
         # Get the indices of the tokens to mask.
-        mask_indices = torch.ones_like(input=sample.caption_tokens, dtype=torch.int64)
+        mask_indices = []
+        max_size = sample.caption_tokens.size(0)
         start_index = 0
-        end_index = mask_indices.size(0)
-        while start_index < mask_indices.size(0):
+        end_index = max_size
+        while start_index < max_size:
 
             token = "".join(str_tokens[start_index:end_index])
             if token in tgt_words:
 
-                mask_indices[start_index:end_index] = 0
+                mask_indices.append(sample.caption_tokens[start_index:end_index].tolist())
                 start_index = end_index
-                end_index = mask_indices.size(0)
+                end_index = max_size
                 continue
 
             else:
                 end_index -= 1
 
             if end_index == start_index:
-                mask_indices[start_index] = 1
                 start_index += 1
-                end_index = mask_indices.size(0)
+                end_index = max_size
 
         return mask_indices
 
@@ -351,16 +353,16 @@ class MaskCaption(BaseTransform):
         mask_indices = self.__get_tokens_to_mask(sample=sample)
 
         # Get the number of tokens to mask.
-        to_be_masked = (mask_indices == 0)
-        num_tokens = int(self.mask_ratio * to_be_masked.sum())
-        indices = to_be_masked.nonzero().view(-1)
-        indices = indices[torch.randperm(indices.size(0))[:num_tokens]]
-
-        masked_indices = torch.ones_like(input=mask_indices, dtype=torch.int64)
-        masked_indices[indices] = 0
+        num_tokens = int(self.mask_ratio * len(mask_indices))
+        random_tokens = random.choices(population=mask_indices, k=num_tokens)
 
         # Mask the caption.
-        sample.masked_caption_tokens = masked_indices
+        for tokens in random_tokens:
+            if isinstance(tokens, int):
+                tokens = [tokens]
+            for token in tokens:
+                mask_filter = sample.masked_caption_tokens == token
+                sample.masked_caption_tokens[mask_filter] = self.mask_token
 
         return sample
 
