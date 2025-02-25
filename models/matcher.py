@@ -62,6 +62,7 @@ class HuggarianMatcher(nn.Module):
 
         # Compute matrix loss.
         mtx_loss = self.presence_loss_weight * presence_loss + self.l1_loss_weight * l1_loss
+        mtx_loss = mtx_loss.view(B, N, -1).cpu()
 
         # Compute the best matching.
         n_targets = [scores.shape[1] for _ in range(B)]
