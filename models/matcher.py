@@ -41,7 +41,7 @@ class HuggarianMatcher(nn.Module):
             boxes (torch.Tensor): The ground truth boxes with shape (B, M, 4).
 
         Returns:
-            List[Tuple[numpy.ndarray, numpy.ndarray]]: The best matching between the predicted and ground truth boxes.
+            List[Tuple[torch.Tensor, torch.Tensor]]: The best matching between the predicted and ground truth boxes.
         """
         # Get the batch size and number of predicted objects.
         B, N = predict_scores.size()[:2]
