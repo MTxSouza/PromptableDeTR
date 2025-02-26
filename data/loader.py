@@ -92,11 +92,11 @@ class PromptableDeTRDataLoader:
         for sample in batch:
 
             caption_tokens = sample.caption_tokens
-            if caption_tokens.size(1) == max_len:
+            if caption_tokens.size(0) == max_len:
                 continue
 
             # Pad the caption tokens.
-            pad_len = max_len - caption_tokens.size(1)
+            pad_len = max_len - caption_tokens.size(0)
             pad_tensor = F.pad(input=caption_tokens, pad=(0, pad_len), value=pad_value)
             if tensor_captions is None:
                 tensor_captions = pad_tensor
