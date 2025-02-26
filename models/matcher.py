@@ -55,7 +55,7 @@ class HuggarianMatcher(nn.Module):
         all_boxes = boxes.view(-1, 4)
 
         # Compute presence loss.
-        presence_loss = -flt_predict_scores[torch.arange(N)[:, None], all_scores[None, :]]
+        presence_loss = -flt_predict_scores[torch.arange(B * N)[:, None], all_scores[None, :]]
 
         # Compute L1 loss.
         l1_loss = torch.cdist(flt_predict_boxes, all_boxes, p=1)
