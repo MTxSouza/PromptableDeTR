@@ -84,7 +84,7 @@ class PromptableDeTRDataLoader:
             Tuple[torch.Tensor, torch.Tensor, torch.Tensor]: The image, caption, and mask tensors.
         """
         # Find the maximum length of the captions.
-        max_len = max([len(sample.caption) for sample in batch])
+        max_len = max([sample.caption_tokens.size(0) for sample in batch])
 
         # Standardize the captions length.
         tensor_captions = None
@@ -92,20 +92,25 @@ class PromptableDeTRDataLoader:
         for sample in batch:
 
             caption_tokens = sample.caption_tokens
-            if caption_tokens.size(0) == max_len:
-                continue
+            if caption_tokens.size(0) != max_len:
 
-            # Pad the caption tokens.
-            pad_len = max_len - caption_tokens.size(0)
-            pad_tensor = F.pad(input=caption_tokens, pad=(0, pad_len), value=pad_value)
+                # Pad the caption tokens.
+                pad_len = max_len - caption_tokens.size(0)
+                caption_tokens = F.pad(input=caption_tokens, pad=(0, pad_len), value=pad_value)
+
+            caption_tokens = caption_tokens.unsqueeze(dim=0)
             if tensor_captions is None:
-                tensor_captions = pad_tensor
+                tensor_captions = caption_tokens
             else:
-                tensor_captions = torch.cat(tensors=(tensor_captions, pad_tensor), dim=0)
+                tensor_captions = torch.cat(tensors=(tensor_captions, caption_tokens), dim=0)
             
             # Update mask.
             if aligner:
-                sample.masked_caption_tokens = F.pad(input=sample.masked_caption_tokens, pad=(0, pad_len), value=0)
+
+                if sample.masked_caption_tokens.size(0) != max_len:
+                    sample.masked_caption_tokens = F.pad(input=sample.masked_caption_tokens, pad=(0, pad_len), value=0)
+                sample.masked_caption_tokens = sample.masked_caption_tokens.unsqueeze(dim=0)
+
                 if masked_captions_tensor is None:
                     masked_captions_tensor = sample.masked_caption_tokens
                 else:
