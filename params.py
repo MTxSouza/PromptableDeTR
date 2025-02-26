@@ -62,6 +62,11 @@ def get_args():
         default=0.1,
         help="The ratio of masked tokens."
     )
+    dataset_parser.add_argument(
+        "--shuffle",
+        action="store_true",
+        help="Whether to shuffle the dataset."
+    )
 
     # Model arguments.
     model_parser = parser.add_argument_group(title="Model")
