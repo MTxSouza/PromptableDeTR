@@ -3,6 +3,8 @@ This script trains the Aligner model to optimize the Joiner block of the Prompta
 """
 import os
 
+import torch
+
 from data.daug import MaskCaption, PrepareAlignerSample, ReshapeImage
 from data.loader import PromptableDeTRDataLoader
 from models.aligner import Aligner
@@ -92,6 +94,21 @@ def get_model(args, data_loader):
     return model
 
 
+def run_forward(model, batch, is_training = True):
+    """
+    Run the forward pass of the model.
+
+    Args:
+        model (Aligner): The Aligner model.
+        batch (List[AlignerSample]): The batch of samples.
+        is_training (bool): Whether the model is in training mode. (Default: True)
+
+    Returns:
+        Dict[str, torch.Tensor]: The output of the model.
+    """
+    pass
+
+
 def train(model, train_data_loader, valid_data_loader, args):
     """
     Function that deploy the training loop for the Aligner model.
@@ -102,6 +119,29 @@ def train(model, train_data_loader, valid_data_loader, args):
         valid_data_loader (PromptableDeTRDataLoader): The validation data loader.
         args (argparse.Namespace): The arguments from the command line.
     """
+
+    # Define main training loop.
+    for it in range(args.max_iter):
+        it += 1
+
+        # Check if it is time to validate the model.
+        if it % args.eval_interval == 0:
+
+            # Loop over the validation data loader.
+            model.eval()
+            for validation_batch in valid_data_loader:
+                
+                # Run the forward pass.
+                logits = run_forward(model=model, batch=validation_batch, is_training=False)
+
+            # Validate the model
+
+        # Get training batch.
+        model.train()
+        training_batch = next(train_data_loader)
+
+        # Run the forward pass.
+        logits = run_forward(model=model, batch=training_batch)
 
 
 def main():
