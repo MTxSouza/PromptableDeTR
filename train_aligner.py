@@ -60,6 +60,50 @@ def get_data_loader(args):
     return train_data_loader, valid_data_loader
 
 
+def get_model(args, data_loader):
+    """
+    Create the Aligner model.
+
+    Args:
+        args (argparse.Namespace): The arguments from the command line.
+        data_loader (PromptableDeTRDataLoader): The data loader for the model.
+
+    Returns:
+        Aligner: The Aligner model.
+    """
+    # Get number of tokens in the vocabulary.
+    vocab_size = None
+    for trans in data_loader.transformations:
+        if isinstance(trans, PrepareAlignerSample):
+            vocab_size = len(trans.caption_transform.tokenizer)
+            break
+    if vocab_size is None:
+        raise ValueError("Could not find the tokenizer in the transformations of the data loader.")
+
+    # Get the model.
+    model = Aligner(
+        image_tokens=args.image_tokens,
+        vocab_size=vocab_size,
+        emb_dim=args.emb_dim,
+        proj_dim=args.proj_dim,
+        emb_dropout_rate=args.emb_dropout_rate,
+    )
+
+    return model
+
+
+def train(model, train_data_loader, valid_data_loader, args):
+    """
+    Function that deploy the training loop for the Aligner model.
+
+    Args:
+        model (Aligner): The Aligner model.
+        train_data_loader (PromptableDeTRDataLoader): The training data loader.
+        valid_data_loader (PromptableDeTRDataLoader): The validation data loader.
+        args (argparse.Namespace): The arguments from the command line.
+    """
+
+
 def main():
 
     # Get the arguments.
@@ -67,6 +111,12 @@ def main():
 
     # Prepare the data loader.
     train_data_loader, valid_data_loader = get_data_loader(args=args)
+
+    # Create the model.
+    model = get_model(args=args, data_loader=train_data_loader)
+
+    # Train the model.
+    train(model=model, train_data_loader=train_data_loader, valid_data_loader=valid_data_loader, args=args)
 
 
 if __name__ == "__main__":
