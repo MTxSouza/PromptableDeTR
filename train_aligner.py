@@ -133,25 +133,35 @@ def train(model, train_data_loader, valid_data_loader, args):
     """
 
     # Define main training loop.
-    for it in range(args.max_iter):
-        it += 1
+    it = 0
+    while it < args.max_iter:
 
-        # Check if it is time to validate the model.
-        if it % args.eval_interval == 0:
+        # Loop over the training data loader.
+        for training_batch in train_data_loader:
 
-            # Loop over the validation data loader.
-            for validation_batch in valid_data_loader:
-                
-                # Run the forward pass.
-                logits = run_forward(model=model, batch=validation_batch, is_training=False)
+            # Check if it is time to validate the model.
+            if it % args.eval_interval == 0:
+                print("=" * 100)
+                print("Validating the model...")
 
-            # Validate the model
+                # Loop over the validation data loader.
+                for validation_batch in valid_data_loader:
+                    
+                    # Run the forward pass.
+                    logits = run_forward(model=model, batch=validation_batch, is_training=False)
 
-        # Get training batch.
-        training_batch = next(train_data_loader)
+                # Validate the model
+            
+            else:
+                print("-" * 100)
 
-        # Run the forward pass.
-        logits = run_forward(model=model, batch=training_batch)
+            # Run the forward pass.
+            logits = run_forward(model=model, batch=training_batch)
+
+            # Increment the iteration.
+            it += 1
+            if it >= args.max_iter:
+                break
 
 
 def main():
