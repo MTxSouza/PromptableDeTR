@@ -285,4 +285,10 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        print("Training interrupted by the user.")
+    except Exception as e:
+        print("An error occurred during training.")
+        print(e)
