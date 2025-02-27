@@ -49,13 +49,14 @@ class Aligner(BasePromptableDeTR):
     
 
     # Methods.
-    def forward(self, image, prompt):
+    def forward(self, image, prompt, prompt_mask = None):
         """
         Forward pass of the aligner.
 
         Args:
             image (torch.Tensor): Image tensor.
             prompt (torch.Tensor): Prompt tensor.
+            prompt_mask (torch.Tensor): Prompt mask tensor. (Default: None)
 
         Returns:
             Tuple[torch.Tensor, torch.Tensor, torch.Tensor]: Encoded image and text tensors and alignment tensor.
@@ -66,7 +67,7 @@ class Aligner(BasePromptableDeTR):
 
         # Encode images and text.
         logger.debug(msg="- Calling `BasePromptableDeTR` block to the tensors %s and %s." % (image.shape, prompt.shape))
-        joiner_emb = super().forward(image=image, prompt=prompt)
+        joiner_emb = super().forward(image=image, prompt=prompt, prompt_mask=prompt_mask)
         logger.debug(msg="- Result of the `BasePromptableDeTR` block: %s." % (joiner_emb.shape,))
 
         # Align image and text embeddings.

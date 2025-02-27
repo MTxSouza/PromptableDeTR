@@ -111,10 +111,10 @@ def run_forward(model, batch, is_training = True):
     if not is_training:
         model.eval()
         with torch.no_grad():
-            logits = model(images=images, captions=captions, mask=mask)
+            logits = model(images, captions, mask)
     else:
         model.train()
-        logits = model(images=images, captions=captions, mask=mask)
+        logits = model(images, captions, mask)
 
     return logits, captions
 
