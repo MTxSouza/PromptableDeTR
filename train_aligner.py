@@ -106,7 +106,19 @@ def run_forward(model, batch, is_training = True):
     Returns:
         Dict[str, torch.Tensor]: The output of the model.
     """
-    pass
+    # Get tensors.
+    images, captions, mask = PromptableDeTRDataLoader.convert_batch_into_tensor(batch=batch, aligner=True)
+
+    # Run the forward pass.
+    if not is_training:
+        model.eval()
+        with torch.no_grad():
+            logits = model(images=images, captions=captions, mask=mask)
+    else:
+        model.train()
+        logits = model(images=images, captions=captions, mask=mask)
+
+    return logits
 
 
 def train(model, train_data_loader, valid_data_loader, args):
@@ -128,7 +140,6 @@ def train(model, train_data_loader, valid_data_loader, args):
         if it % args.eval_interval == 0:
 
             # Loop over the validation data loader.
-            model.eval()
             for validation_batch in valid_data_loader:
                 
                 # Run the forward pass.
@@ -137,7 +148,6 @@ def train(model, train_data_loader, valid_data_loader, args):
             # Validate the model
 
         # Get training batch.
-        model.train()
         training_batch = next(train_data_loader)
 
         # Run the forward pass.
