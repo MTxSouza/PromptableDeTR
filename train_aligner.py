@@ -1,7 +1,7 @@
 """
 This script trains the Aligner model to optimize the Joiner block of the PromptableDeTR model.
 """
-import os
+import time
 
 import torch
 import torch.optim as optim
@@ -206,6 +206,7 @@ def train(model, train_data_loader, valid_data_loader, args):
                 # Loop over the validation data loader.
                 total_loss = 0.0
                 samples = []
+                init_time = time.time()
                 for validation_batch in valid_data_loader:
                     
                     # Run the forward pass.
@@ -220,6 +221,8 @@ def train(model, train_data_loader, valid_data_loader, args):
                     samples.append((y_caption, logits_caption))
 
                 total_loss /= len(valid_data_loader)
+                end_time = (time.time() - init_time) / 60.0
+                print("Validation time: %.2f minutes" % end_time)
                 print("Validation loss: %.4f" % total_loss)
 
                 # Print the samples.
