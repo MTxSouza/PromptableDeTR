@@ -92,13 +92,14 @@ def get_model(args, data_loader):
     return model
 
 
-def run_forward(model, batch, is_training = True):
+def run_forward(model, batch, device, is_training = True):
     """
     Run the forward pass of the model.
 
     Args:
         model (Aligner): The Aligner model.
         batch (List[AlignerSample]): The batch of samples.
+        device (torch.device): The device to run the model on.
         is_training (bool): Whether the model is in training mode. (Default: True)
 
     Returns:
@@ -106,6 +107,9 @@ def run_forward(model, batch, is_training = True):
     """
     # Get tensors.
     images, captions, mask = PromptableDeTRDataLoader.convert_batch_into_tensor(batch=batch, aligner=True)
+    images = images.to(device=device)
+    captions = captions.to(device=device)
+    mask = mask.to(device=device)
 
     # Run the forward pass.
     if not is_training:
@@ -175,6 +179,10 @@ def train(model, train_data_loader, valid_data_loader, args):
         valid_data_loader (PromptableDeTRDataLoader): The validation data loader.
         args (argparse.Namespace): The arguments from the command line.
     """
+    # Get the device.
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model.to(device=device)
+
     # Define optimizer.
     opt = optim.Adam(params=model.parameters(), lr=args.lr)
 
@@ -201,7 +209,7 @@ def train(model, train_data_loader, valid_data_loader, args):
                 for validation_batch in valid_data_loader:
                     
                     # Run the forward pass.
-                    logits, y = run_forward(model=model, batch=validation_batch, is_training=False)
+                    logits, y = run_forward(model=model, batch=validation_batch, device=device, is_training=False)
 
                     # Compute the loss.
                     loss = model.compute_aligner_loss(y_pred=logits, y_true=y)
@@ -236,7 +244,7 @@ def train(model, train_data_loader, valid_data_loader, args):
                 print("-" * 100)
 
             # Run the forward pass.
-            logits, y = run_forward(model=model, batch=training_batch)
+            logits, y = run_forward(model=model, batch=training_batch, device=device)
 
             # Compute the loss.
             loss = model.compute_aligner_loss(y_pred=logits, y_true=y)
