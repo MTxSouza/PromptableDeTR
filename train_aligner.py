@@ -271,6 +271,8 @@ def main():
 
     # Get the arguments.
     args = get_args()
+    for name, value in vars(args).items():
+        print("[%s]: %s" % (name, value))
 
     # Prepare the data loader.
     train_data_loader, valid_data_loader = get_data_loader(args=args)
