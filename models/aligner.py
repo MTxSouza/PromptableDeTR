@@ -100,13 +100,14 @@ class Aligner(BasePromptableDeTR):
         logger.info(msg="Joiner weights saved successfully.")
 
 
-    def compute_aligner_loss(self, y_pred, y_true):
+    def compute_aligner_loss(self, y_pred, y_true, padding_idx = 0):
         """
         Compute the loss needed to train the aligner model.
 
         Args:
             y_pred (torch.Tensor): The predicted tensor.
             y_true (torch.Tensor): The true tensor.
+            padding_idx (int): The padding index. (Default: 0)
 
         Returns:
             torch.Tensor: The loss value.
@@ -121,7 +122,8 @@ class Aligner(BasePromptableDeTR):
         loss = F.cross_entropy(
             input=f_y_pred, 
             target=f_y_true, 
-            reduction="mean"
+            reduction="mean",
+            ignore_index=padding_idx
         )
         logger.info(msg="Returning the loss value.")
         return loss
