@@ -188,7 +188,7 @@ def train(model, train_data_loader, valid_data_loader, args):
 
     # Define main training loop.
     tokenizer = train_data_loader.get_tokenizer()
-    it = 0
+    it = 1
     overfit_counter = 0
     is_overfitting = False
     best_loss = float("inf")
