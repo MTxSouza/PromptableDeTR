@@ -235,7 +235,7 @@ def train(model, train_data_loader, valid_data_loader, args):
                     print("Model weights saved successfully.")
                 
                 # Check if it is overfitting.
-                elif (current_train_loss - total_loss).abs() > args.overfit_threshold:
+                elif abs(current_train_loss - total_loss) > args.overfit_threshold:
                     overfit_counter += 1
                     if overfit_counter >= args.overfit_patience:
                         print("Overfitting detected. Stopping training.")
