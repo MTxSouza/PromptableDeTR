@@ -65,7 +65,7 @@ class Encoder(nn.Module):
         logger.info(msg="Calling `Encoder` forward method.")
         logger.debug(msg="- Image shape: %s" % (image.shape,))
         logger.debug(msg="- Prompt shape: %s" % (prompt.shape,))
-        logger.debug(msg="- Prompt mask shape: %s" % (prompt_mask.shape if prompt_mask is not None else None))
+        logger.debug(msg="- Prompt mask shape: %s" % (prompt_mask.shape if prompt_mask is not None else None,))
 
         # Encode images and text.
         logger.debug(msg="- Calling `MobileNetV3` block to the tensor %s." % (image.shape,))
