@@ -279,6 +279,7 @@ def main():
 
     # Create the model.
     model = get_model(args=args, data_loader=train_data_loader)
+    model.load_base_weights(image_encoder_weights=args.image_encoder_weights, text_encoder_weights=args.text_encoder_weights)
 
     # Train the model.
     train(model=model, train_data_loader=train_data_loader, valid_data_loader=valid_data_loader, args=args)
