@@ -174,6 +174,12 @@ def get_args():
         help="The interval for evaluation."
     )
     training_parser.add_argument(
+        "--log-interval",
+        type=int,
+        default=10,
+        help="The interval for logging."
+    )
+    training_parser.add_argument(
         "--exp-dir",
         "--exp",
         "-e",

@@ -138,6 +138,7 @@ def train(model, train_data_loader, valid_data_loader, args):
     # Define main training loop.
     it = 0
     best_loss = float("inf")
+    current_train_loss = 0.0
     while it < args.max_iter:
 
         # Loop over the training data loader.
@@ -181,6 +182,12 @@ def train(model, train_data_loader, valid_data_loader, args):
             opt.zero_grad()
             loss.backward()
             opt.step()
+
+            # Check if it is time to log the loss.
+            if it % args.log_interval == 0:
+                current_train_loss = loss.cpu().detach().numpy().item()
+                print("Iteration [%d/%d]" % (it, args.max_iter))
+                print("Loss: %.4f" % current_train_loss)
 
             # Increment the iteration.
             it += 1
