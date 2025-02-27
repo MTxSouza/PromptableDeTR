@@ -80,6 +80,18 @@ class Aligner(BasePromptableDeTR):
         return alignment
 
 
+    def freeze_encoder(self):
+        """
+        Freeze the encoder weights.
+        """
+        logger.info(msg="Freezing the encoder weights.")
+        for param in self.image_encoder.parameters():
+            param.requires_grad = False
+        for param in self.text_encoder.parameters():
+            param.requires_grad = False
+        logger.info(msg="Encoder weights frozen successfully.")
+
+
     def save_joiner_weights(self, dir_path, ckpt_step = None):
         """
         Save the joiner weights.
