@@ -4,6 +4,7 @@ __pycache__
 
 # Logs
 logs/
+exp/
 
 # Environment
 .venv
