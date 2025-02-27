@@ -75,13 +75,10 @@ def get_model(args, data_loader):
         Aligner: The Aligner model.
     """
     # Get number of tokens in the vocabulary.
-    vocab_size = None
-    for trans in data_loader.transformations:
-        if isinstance(trans, PrepareAlignerSample):
-            vocab_size = len(trans.caption_transform.tokenizer)
-            break
-    if vocab_size is None:
-        raise ValueError("Could not find the tokenizer in the transformations of the data loader.")
+    tokenizer = data_loader.get_tokenizer()
+    if tokenizer is None:
+        raise ValueError("Could not find the tokenizer in the data loader.")
+    vocab_size = len(tokenizer)
 
     # Get the model.
     model = Aligner(
@@ -122,6 +119,52 @@ def run_forward(model, batch, is_training = True):
     return logits, captions
 
 
+def get_random_sample(y, logits, tokenizer):
+    """
+    Get a random sample from the logits and the true captions to 
+    be visualized further.
+
+    Args:
+        y (torch.Tensor): The true captions.
+        logits (torch.Tensor): The logits from the model.
+        tokenizer (Tokenizer): The tokenizer object.
+
+    Returns:
+        Tuple[str, str]: The true and predicted captions.
+    """
+    # Get random bacth index.
+    idx = torch.randint(low=0, high=y.size(0), size=(1,)).item()
+
+    # Retrieve samples.
+    y_sample = y[idx].cpu().detach().numpy().tolist()
+    logits_sample = logits[idx].argmax(dim=1).cpu().detach().numpy().tolist()
+
+    # Decode samples.
+    y_caption = tokenizer.decode(indices=y_sample)
+    logits_caption = tokenizer.decode(indices=logits_sample)
+
+    return y_caption, logits_caption
+
+
+def print_samples(samples):
+    """
+    Print the true and predicted captions.
+
+    Args:
+        samples (List[Tuple[str, str]]): The list of true and predicted captions.
+    """
+    # Loop over the samples.
+    max_samples = len(samples)
+    print("Check results:")
+    for idx, (y_caption, logits_caption) in enumerate(iterable=samples):
+        print("Sample %d:" % (idx + 1))
+        print("\tTrue caption:", y_caption)
+        print("\tPredicted caption:", logits_caption)
+
+        if idx + 1 < max_samples:
+            print("-" * 100)
+
+
 def train(model, train_data_loader, valid_data_loader, args):
     """
     Function that deploy the training loop for the Aligner model.
@@ -136,6 +179,7 @@ def train(model, train_data_loader, valid_data_loader, args):
     opt = optim.Adam(params=model.parameters(), lr=args.lr)
 
     # Define main training loop.
+    tokenizer = train_data_loader.get_tokenizer()
     it = 0
     overfit_counter = 0
     is_overfitting = False
@@ -153,6 +197,7 @@ def train(model, train_data_loader, valid_data_loader, args):
 
                 # Loop over the validation data loader.
                 total_loss = 0.0
+                samples = []
                 for validation_batch in valid_data_loader:
                     
                     # Run the forward pass.
@@ -161,8 +206,16 @@ def train(model, train_data_loader, valid_data_loader, args):
                     # Compute the loss.
                     loss = model.compute_aligner_loss(y_pred=logits, y_true=y)
                     total_loss += loss.cpu().numpy().item()
+
+                    # Get a random sample.
+                    y_caption, logits_caption = get_random_sample(y=y, logits=logits, tokenizer=tokenizer)
+                    samples.append((y_caption, logits_caption))
+
                 total_loss /= len(valid_data_loader)
                 print("Validation loss: %.4f" % total_loss)
+
+                # Print the samples.
+                print_samples(samples=samples)
 
                 # Save the model weights.
                 if best_loss > total_loss:
