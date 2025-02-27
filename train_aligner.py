@@ -4,6 +4,7 @@ This script trains the Aligner model to optimize the Joiner block of the Prompta
 import os
 
 import torch
+import torch.optim as optim
 
 from data.daug import MaskCaption, PrepareAlignerSample, ReshapeImage
 from data.loader import PromptableDeTRDataLoader
@@ -118,7 +119,7 @@ def run_forward(model, batch, is_training = True):
         model.train()
         logits = model(images=images, captions=captions, mask=mask)
 
-    return logits
+    return logits, captions
 
 
 def train(model, train_data_loader, valid_data_loader, args):
@@ -131,9 +132,12 @@ def train(model, train_data_loader, valid_data_loader, args):
         valid_data_loader (PromptableDeTRDataLoader): The validation data loader.
         args (argparse.Namespace): The arguments from the command line.
     """
+    # Define optimizer.
+    opt = optim.Adam(params=model.parameters(), lr=args.lr)
 
     # Define main training loop.
     it = 0
+    best_loss = float("inf")
     while it < args.max_iter:
 
         # Loop over the training data loader.
@@ -145,18 +149,38 @@ def train(model, train_data_loader, valid_data_loader, args):
                 print("Validating the model...")
 
                 # Loop over the validation data loader.
+                total_loss = 0.0
                 for validation_batch in valid_data_loader:
                     
                     # Run the forward pass.
-                    logits = run_forward(model=model, batch=validation_batch, is_training=False)
+                    logits, y = run_forward(model=model, batch=validation_batch, is_training=False)
 
-                # Validate the model
+                    # Compute the loss.
+                    loss = model.compute_aligner_loss(y_pred=logits, y_true=y)
+                    total_loss += loss.cpu().numpy().item()
+                total_loss /= len(valid_data_loader)
+                print("Validation loss: %.4f" % total_loss)
+
+                # Save the model weights.
+                if best_loss > total_loss:
+                    best_loss = total_loss
+                    model.save_joiner_weights(dir_path=args.model_dir, ckpt_step=it)
+                    print("Model weights saved successfully.")
+                print("=" * 100)
             
             else:
                 print("-" * 100)
 
             # Run the forward pass.
-            logits = run_forward(model=model, batch=training_batch)
+            logits, y = run_forward(model=model, batch=training_batch)
+
+            # Compute the loss.
+            loss = model.compute_aligner_loss(y_pred=logits, y_true=y)
+
+            # Backward pass.
+            opt.zero_grad()
+            loss.backward()
+            opt.step()
 
             # Increment the iteration.
             it += 1
