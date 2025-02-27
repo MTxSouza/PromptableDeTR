@@ -242,9 +242,6 @@ def train(model, train_data_loader, valid_data_loader, args):
                         is_overfitting = True
                         break
                 print("=" * 100)
-            
-            else:
-                print("-" * 100)
 
             # Run the forward pass.
             logits, y = run_forward(model=model, batch=training_batch, device=device)
@@ -262,6 +259,7 @@ def train(model, train_data_loader, valid_data_loader, args):
                 current_train_loss = loss.cpu().detach().numpy().item()
                 print("Iteration [%d/%d]" % (it, args.max_iter))
                 print("Loss: %.4f" % current_train_loss)
+                print("-" * 100)
 
             # Increment the iteration.
             it += 1
