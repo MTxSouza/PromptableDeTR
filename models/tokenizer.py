@@ -102,7 +102,7 @@ class Tokenizer:
         Returns:
             int: Number of tokens in the vocabulary.
         """
-        return len(self.token_to_index)
+        return len(self.token_to_index) - 1 # BUG: The number of tokens in vocabulary is 30522, but the length of the tokenizer is 30523.
 
 
     # Private methods.
