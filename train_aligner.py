@@ -137,9 +137,11 @@ def train(model, train_data_loader, valid_data_loader, args):
 
     # Define main training loop.
     it = 0
+    overfit_counter = 0
+    is_overfitting = False
     best_loss = float("inf")
     current_train_loss = 0.0
-    while it < args.max_iter:
+    while it < args.max_iter and not is_overfitting:
 
         # Loop over the training data loader.
         for training_batch in train_data_loader:
@@ -167,6 +169,14 @@ def train(model, train_data_loader, valid_data_loader, args):
                     best_loss = total_loss
                     model.save_joiner_weights(dir_path=args.model_dir, ckpt_step=it)
                     print("Model weights saved successfully.")
+                
+                # Check if it is overfitting.
+                elif (current_train_loss - total_loss).abs() > args.overfit_threshold:
+                    overfit_counter += 1
+                    if overfit_counter >= args.overfit_patience:
+                        print("Overfitting detected. Stopping training.")
+                        is_overfitting = True
+                        break
                 print("=" * 100)
             
             else:

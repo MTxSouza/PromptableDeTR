@@ -180,6 +180,18 @@ def get_args():
         help="The interval for logging."
     )
     training_parser.add_argument(
+        "--overfit-threshold",
+        type=float,
+        default=1e-3,
+        help="The threshold for over fitting."
+    )
+    training_parser.add_argument(
+        "--overfit-patience",
+        type=int,
+        default=5,
+        help="The patience for over fitting."
+    )
+    training_parser.add_argument(
         "--exp-dir",
         "--exp",
         "-e",
