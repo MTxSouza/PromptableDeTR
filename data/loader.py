@@ -6,9 +6,12 @@ import json
 import os
 
 import numpy as np
+import torch
+import torch.nn.functional as F
 
 from data.daug import PrepareAlignerSample, PrepareDetectionSample
 from data.schemas import AlignerSample, DetectorSample, Sample
+from models.tokenizer import Tokenizer
 
 
 # Classes.
@@ -65,6 +68,82 @@ class PromptableDeTRDataLoader:
         train_samples = samples[split_index:]
 
         return train_samples, val_samples
+
+
+    # Static methods.
+    @staticmethod
+    def convert_batch_into_tensor(batch, pad_value = 0, aligner = False):
+        """
+        Convert a list of AlignerSample objects into tensors.
+
+        Args:
+            batch (List[AlignerSample]): The batch of samples.
+            pad_value (int): The padding value. (Default: 0)
+            aligner (bool): Whether to convert the batch for the aligner model. (Default: False)
+
+        Returns:
+            Tuple[torch.Tensor, torch.Tensor, torch.Tensor]: The image, caption, and mask tensors.
+        """
+        # Find the maximum length of the captions.
+        max_len = max([sample.caption_tokens.size(0) for sample in batch])
+
+        # Standardize the captions length.
+        tensor_captions = None
+        masked_captions_tensor = None
+        for sample in batch:
+
+            caption_tokens = sample.caption_tokens
+            if caption_tokens.size(0) != max_len:
+
+                # Pad the caption tokens.
+                pad_len = max_len - caption_tokens.size(0)
+                caption_tokens = F.pad(input=caption_tokens, pad=(0, pad_len), value=pad_value)
+
+            caption_tokens = caption_tokens.unsqueeze(dim=0)
+            if tensor_captions is None:
+                tensor_captions = caption_tokens
+            else:
+                tensor_captions = torch.cat(tensors=(tensor_captions, caption_tokens), dim=0)
+            
+            # Update mask.
+            if aligner:
+
+                if sample.masked_caption_tokens.size(0) != max_len:
+                    sample.masked_caption_tokens = F.pad(input=sample.masked_caption_tokens, pad=(0, pad_len), value=0)
+                sample.masked_caption_tokens = sample.masked_caption_tokens.unsqueeze(dim=0)
+
+                if masked_captions_tensor is None:
+                    masked_captions_tensor = sample.masked_caption_tokens
+                else:
+                    masked_captions_tensor = torch.cat(tensors=(masked_captions_tensor, sample.masked_caption_tokens), dim=0)
+
+        # Concatenate the image tensors.
+        tensor_images = torch.cat(tensors=[sample.image.unsqueeze(dim=0) for sample in batch], dim=0)
+
+        # Concatenate objects.
+        if not aligner:
+
+            # Find the maximum number of objects.
+            max_objs = max([len(sample.objects) for sample in batch])
+
+            # Standardize the objects length.
+            tensor_objects = None
+            for sample in batch:
+                
+                bbox_tensor = sample.bbox_tensor
+                if bbox_tensor.size(0) != max_objs:
+
+                    # Pad the objects.
+                    pad_len = max_objs - bbox_tensor.size(0)
+                    bbox_tensor = F.pad(input=bbox_tensor, pad=(0, 0, 0, pad_len), value=pad_value)
+
+                bbox_tensor = bbox_tensor.unsqueeze(dim=0)
+                if tensor_objects is None:
+                    tensor_objects = bbox_tensor
+                else:
+                    tensor_objects = torch.cat(tensors=(tensor_objects, bbox_tensor), dim=0)
+        
+        return tensor_images, tensor_captions, masked_captions_tensor if aligner else tensor_objects
 
 
     # Special methods.
@@ -173,3 +252,17 @@ class PromptableDeTRDataLoader:
                 curr_samples = transform(samples=curr_samples)
 
             yield curr_samples
+
+
+    # Methods.
+    def get_tokenizer(self):
+        """
+        Tries to get the tokenizer from the transformations.
+
+        Returns:
+            Tokenizer | None: The tokenizer object.
+        """
+        for transform in self.transformations:
+            if isinstance(transform, (PrepareAlignerSample, PrepareDetectionSample)):
+                return transform.caption_transform.tokenizer
+        return None

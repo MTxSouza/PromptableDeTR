@@ -102,3 +102,9 @@ if __name__=="__main__":
             out_caption = out.argmax(dim=-1)
             out_caption = tokenizer.decode(indices=out_caption.squeeze(dim=0).cpu().tolist())[0]
             print("\tOutput text:", out_caption)
+
+    print("Training data format:")
+    images, captions, masked_captions = PromptableDeTRDataLoader.convert_batch_into_tensor(batch=batch, aligner=True)
+    print("\tImages shape:", images.size())
+    print("\tCaptions shape:", captions.size())
+    print("\tMasked captions shape:", masked_captions.size())

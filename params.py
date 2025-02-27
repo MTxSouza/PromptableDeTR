@@ -62,6 +62,11 @@ def get_args():
         default=0.1,
         help="The ratio of masked tokens."
     )
+    dataset_parser.add_argument(
+        "--shuffle",
+        action="store_true",
+        help="Whether to shuffle the dataset."
+    )
 
     # Model arguments.
     model_parser = parser.add_argument_group(title="Model")
@@ -167,6 +172,24 @@ def get_args():
         type=int,
         default=100,
         help="The interval for evaluation."
+    )
+    training_parser.add_argument(
+        "--log-interval",
+        type=int,
+        default=10,
+        help="The interval for logging."
+    )
+    training_parser.add_argument(
+        "--overfit-threshold",
+        type=float,
+        default=1e-3,
+        help="The threshold for over fitting."
+    )
+    training_parser.add_argument(
+        "--overfit-patience",
+        type=int,
+        default=5,
+        help="The patience for over fitting."
     )
     training_parser.add_argument(
         "--exp-dir",
