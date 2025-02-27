@@ -131,16 +131,17 @@ class PromptableDeTRDataLoader:
             for sample in batch:
                 
                 bbox_tensor = sample.bbox_tensor
-                if bbox_tensor.size(0) == max_objs:
-                    continue
+                if bbox_tensor.size(0) != max_objs:
 
-                # Pad the objects.
-                pad_len = max_objs - bbox_tensor.size(0)
-                pad_tensor = F.pad(input=bbox_tensor, pad=(0, 0, 0, pad_len), value=pad_value)
+                    # Pad the objects.
+                    pad_len = max_objs - bbox_tensor.size(0)
+                    bbox_tensor = F.pad(input=bbox_tensor, pad=(0, 0, 0, pad_len), value=pad_value)
+
+                bbox_tensor = bbox_tensor.unsqueeze(dim=0)
                 if tensor_objects is None:
-                    tensor_objects = pad_tensor
+                    tensor_objects = bbox_tensor
                 else:
-                    tensor_objects = torch.cat(tensors=(tensor_objects, pad_tensor), dim=0)
+                    tensor_objects = torch.cat(tensors=(tensor_objects, bbox_tensor), dim=0)
         
         return tensor_images, tensor_captions, masked_captions_tensor if aligner else tensor_objects
 
