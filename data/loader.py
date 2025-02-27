@@ -11,6 +11,7 @@ import torch.nn.functional as F
 
 from data.daug import PrepareAlignerSample, PrepareDetectionSample
 from data.schemas import AlignerSample, DetectorSample, Sample
+from models.tokenizer import Tokenizer
 
 
 # Classes.
@@ -250,3 +251,17 @@ class PromptableDeTRDataLoader:
                 curr_samples = transform(samples=curr_samples)
 
             yield curr_samples
+
+
+    # Methods.
+    def get_tokenizer(self):
+        """
+        Tries to get the tokenizer from the transformations.
+
+        Returns:
+            Tokenizer | None: The tokenizer object.
+        """
+        for transform in self.transformations:
+            if isinstance(transform, (PrepareAlignerSample, PrepareDetectionSample)):
+                return transform.caption_transform.tokenizer
+        return None
