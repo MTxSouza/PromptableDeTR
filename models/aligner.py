@@ -94,6 +94,7 @@ class Aligner(BasePromptableDeTR):
         ckpt_name = "joiner.pth"
         if ckpt_step is not None:
             ckpt_name = "joiner-ckpt-%d.pth" % ckpt_step
+        os.makedirs(name=dir_path, exist_ok=True)
         ckpt_fp = os.path.join(dir_path, ckpt_name)
 
         torch.save(obj=self.joiner.state_dict(), f=ckpt_fp)
