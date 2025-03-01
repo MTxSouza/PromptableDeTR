@@ -60,7 +60,7 @@ class PromptableDeTRDataLoader:
         # Shuffle the samples.
         if shuffle_samples:
             np.random.seed(seed=seed)
-            samples = np.random.permutation(x=samples).tolist()
+            samples = np.random.permutation(samples).tolist()
         
         # Get the split index.
         split_index = int(len(samples) * val_split)
