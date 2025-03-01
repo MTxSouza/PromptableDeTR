@@ -86,10 +86,10 @@ def get_model(args, data_loader):
         vocab_size=vocab_size,
         emb_dim=args.emb_dim,
         proj_dim=args.proj_dim,
-        num_heads=args.num_heads,
+        num_heads=args.heads,
         ff_dim=args.ff_dim,
         emb_dropout_rate=args.emb_dropout_rate,
-        num_joiner_layers=args.num_join
+        num_joiner_layers=args.num_joiner_layers
     )
 
     return model
