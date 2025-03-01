@@ -106,7 +106,7 @@ def run_forward(model, batch, device, is_training = True):
         is_training (bool): Whether the model is in training mode. (Default: True)
 
     Returns:
-        Dict[str, torch.Tensor]: The output of the model.
+        Tuple[torch.Tensor, torch.Tensor]: The logits and the true captions.
     """
     # Get tensors.
     images, captions, mask = PromptableDeTRDataLoader.convert_batch_into_tensor(batch=batch, aligner=True)
@@ -118,10 +118,10 @@ def run_forward(model, batch, device, is_training = True):
     if not is_training:
         model.eval()
         with torch.no_grad():
-            logits = model(images, captions, mask)
+            logits = model(images, mask)
     else:
         model.train()
-        logits = model(images, captions, mask)
+        logits = model(images, mask)
 
     return logits, captions
 
