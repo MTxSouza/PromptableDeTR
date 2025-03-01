@@ -97,7 +97,7 @@ class BasePromptableDeTR(Encoder):
             num_heads = 8, 
             ff_dim = 2048, 
             emb_dropout_rate = 0.1, 
-            num_joiner_layers = 3
+            num_joiner_layers = 4
         ):
         super().__init__(vocab_size=vocab_size, emb_dim=emb_dim, proj_dim=proj_dim, emb_dropout_rate=emb_dropout_rate)
 
