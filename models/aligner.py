@@ -92,24 +92,38 @@ class Aligner(BasePromptableDeTR):
         logger.info(msg="Encoder weights frozen successfully.")
 
 
-    def save_joiner_weights(self, dir_path, ckpt_step = None):
+    def save_joiner_weights(self, dir_path, loss, samples, ckpt_step = None):
         """
         Save the joiner weights.
 
         Args:
             dir_path (str): The path to the directory where the weights will be saved.
+            loss (float): The loss of the model at the checkpoint.
+            samples (List[Tuple[str, str]]): The validation results at the checkpoint.
             ckpt_step (int): The checkpoint step. (Default: None)
         """
         logger.info(msg="Saving the joiner weights.")
 
         # Define the checkpoint path.
-        ckpt_name = "joiner.pth"
+        name = "joiner"
         if ckpt_step is not None:
-            ckpt_name = "joiner-ckpt-%d.pth" % ckpt_step
+            name = "joiner-ckpt-%d" % ckpt_step
         os.makedirs(name=dir_path, exist_ok=True)
-        ckpt_fp = os.path.join(dir_path, ckpt_name)
+        ckpt_fp = os.path.join(dir_path, name + ".pth")
+        log_fp = os.path.join(dir_path, name + ".log")
 
+        # Save the weights.
         torch.save(obj=self.joiner.state_dict(), f=ckpt_fp)
+
+        # Save the log.
+        with open(file=log_fp, mode="w") as f:
+            f.write("Loss: %s\n\n" % (loss))
+            f.write("Samples:\n")
+            for y_true, y_pred in samples:
+                f.write("True: %s\n" % (y_true))
+                f.write("Pred: %s\n" % (y_pred))
+                f.write("\n")
+
         logger.info(msg="Joiner weights saved successfully.")
 
 
