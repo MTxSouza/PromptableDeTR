@@ -126,7 +126,7 @@ def run_forward(model, batch, device, is_training = True):
     return logits, captions
 
 
-def get_random_sample(y, logits, tokenizer):
+def get_random_sample(y, logits, tokenizer, remove_special_tokens = True):
     """
     Get a random sample from the logits and the true captions to 
     be visualized further.
@@ -135,6 +135,7 @@ def get_random_sample(y, logits, tokenizer):
         y (torch.Tensor): The true captions.
         logits (torch.Tensor): The logits from the model.
         tokenizer (Tokenizer): The tokenizer object.
+        remove_special_tokens (bool): Whether to remove special tokens. (Default: True)
 
     Returns:
         Tuple[str, str]: The true and predicted captions.
@@ -147,8 +148,8 @@ def get_random_sample(y, logits, tokenizer):
     logits_sample = logits[idx].argmax(dim=1).cpu().detach().numpy().tolist()
 
     # Decode samples.
-    y_caption = tokenizer.decode(indices=y_sample)[0]
-    logits_caption = tokenizer.decode(indices=logits_sample)[0]
+    y_caption = tokenizer.decode(indices=y_sample, remove_special_tokens=remove_special_tokens)[0]
+    logits_caption = tokenizer.decode(indices=logits_sample, remove_special_tokens=remove_special_tokens)[0]
 
     return y_caption, logits_caption
 
@@ -221,7 +222,7 @@ def train(model, train_data_loader, valid_data_loader, args):
                     total_loss += loss.cpu().numpy().item()
 
                     # Get a random sample.
-                    y_caption, logits_caption = get_random_sample(y=y, logits=logits, tokenizer=tokenizer)
+                    y_caption, logits_caption = get_random_sample(y=y, logits=logits, tokenizer=tokenizer, remove_special_tokens=False)
                     samples.append((y_caption, logits_caption))
 
                 total_loss /= len(valid_data_loader)
