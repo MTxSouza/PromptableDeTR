@@ -65,7 +65,7 @@ class Encoder(nn.Module):
         logger.info(msg="Calling `Encoder` forward method.")
         logger.debug(msg="- Image shape: %s" % (image.shape,))
         logger.debug(msg="- Prompt shape: %s" % (prompt.shape,))
-        logger.debug(msg="- Prompt mask shape: %s" % (prompt_mask.shape if prompt_mask is not None else None))
+        logger.debug(msg="- Prompt mask shape: %s" % (prompt_mask.shape if prompt_mask is not None else None,))
 
         # Encode images and text.
         logger.debug(msg="- Calling `MobileNetV3` block to the tensor %s." % (image.shape,))
@@ -134,13 +134,14 @@ class BasePromptableDeTR(Encoder):
             self.text_encoder.load_state_dict(torch.load(f=text_encoder_weights, weights_only=True))
 
 
-    def forward(self, image, prompt):
+    def forward(self, image, prompt, prompt_mask = None):
         """
         Forward pass of the PromptableDeTR model.
 
         Args:
             image (torch.Tensor): Image tensor.
             prompt (torch.Tensor): Prompt tensor.
+            prompt_mask (torch.Tensor): Prompt mask tensor. (Default: None)
 
         Returns:
             PromptableDeTROutput: Bounding box and presence predictions.
@@ -150,7 +151,7 @@ class BasePromptableDeTR(Encoder):
         logger.debug(msg="- Prompt shape: %s" % (prompt.shape,))
 
         # Encode images and text.
-        image_emb, text_emb = super().forward(image=image, prompt=prompt)
+        image_emb, text_emb = super().forward(image=image, prompt=prompt, prompt_mask=prompt_mask)
 
         # Join image and text embeddings.
         logger.debug(msg="- Calling `Joiner` block to the image and text tensors.")

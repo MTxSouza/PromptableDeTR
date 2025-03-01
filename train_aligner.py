@@ -1,7 +1,7 @@
 """
 This script trains the Aligner model to optimize the Joiner block of the PromptableDeTR model.
 """
-import os
+import time
 
 import torch
 import torch.optim as optim
@@ -92,13 +92,14 @@ def get_model(args, data_loader):
     return model
 
 
-def run_forward(model, batch, is_training = True):
+def run_forward(model, batch, device, is_training = True):
     """
     Run the forward pass of the model.
 
     Args:
         model (Aligner): The Aligner model.
         batch (List[AlignerSample]): The batch of samples.
+        device (torch.device): The device to run the model on.
         is_training (bool): Whether the model is in training mode. (Default: True)
 
     Returns:
@@ -106,15 +107,18 @@ def run_forward(model, batch, is_training = True):
     """
     # Get tensors.
     images, captions, mask = PromptableDeTRDataLoader.convert_batch_into_tensor(batch=batch, aligner=True)
+    images = images.to(device=device)
+    captions = captions.to(device=device)
+    mask = mask.to(device=device)
 
     # Run the forward pass.
     if not is_training:
         model.eval()
         with torch.no_grad():
-            logits = model(images=images, captions=captions, mask=mask)
+            logits = model(images, captions, mask)
     else:
         model.train()
-        logits = model(images=images, captions=captions, mask=mask)
+        logits = model(images, captions, mask)
 
     return logits, captions
 
@@ -175,12 +179,16 @@ def train(model, train_data_loader, valid_data_loader, args):
         valid_data_loader (PromptableDeTRDataLoader): The validation data loader.
         args (argparse.Namespace): The arguments from the command line.
     """
+    # Get the device.
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model.to(device=device)
+
     # Define optimizer.
     opt = optim.Adam(params=model.parameters(), lr=args.lr)
 
     # Define main training loop.
     tokenizer = train_data_loader.get_tokenizer()
-    it = 0
+    it = 1
     overfit_counter = 0
     is_overfitting = False
     best_loss = float("inf")
@@ -198,10 +206,11 @@ def train(model, train_data_loader, valid_data_loader, args):
                 # Loop over the validation data loader.
                 total_loss = 0.0
                 samples = []
+                init_time = time.time()
                 for validation_batch in valid_data_loader:
                     
                     # Run the forward pass.
-                    logits, y = run_forward(model=model, batch=validation_batch, is_training=False)
+                    logits, y = run_forward(model=model, batch=validation_batch, device=device, is_training=False)
 
                     # Compute the loss.
                     loss = model.compute_aligner_loss(y_pred=logits, y_true=y)
@@ -212,6 +221,8 @@ def train(model, train_data_loader, valid_data_loader, args):
                     samples.append((y_caption, logits_caption))
 
                 total_loss /= len(valid_data_loader)
+                end_time = (time.time() - init_time) / 60.0
+                print("Validation time: %.2f minutes" % end_time)
                 print("Validation loss: %.4f" % total_loss)
 
                 # Print the samples.
@@ -220,23 +231,20 @@ def train(model, train_data_loader, valid_data_loader, args):
                 # Save the model weights.
                 if best_loss > total_loss:
                     best_loss = total_loss
-                    model.save_joiner_weights(dir_path=args.model_dir, ckpt_step=it)
+                    model.save_joiner_weights(dir_path=args.exp_dir, ckpt_step=it)
                     print("Model weights saved successfully.")
                 
                 # Check if it is overfitting.
-                elif (current_train_loss - total_loss).abs() > args.overfit_threshold:
+                elif abs(current_train_loss - total_loss) > args.overfit_threshold:
                     overfit_counter += 1
                     if overfit_counter >= args.overfit_patience:
                         print("Overfitting detected. Stopping training.")
                         is_overfitting = True
                         break
                 print("=" * 100)
-            
-            else:
-                print("-" * 100)
 
             # Run the forward pass.
-            logits, y = run_forward(model=model, batch=training_batch)
+            logits, y = run_forward(model=model, batch=training_batch, device=device)
 
             # Compute the loss.
             loss = model.compute_aligner_loss(y_pred=logits, y_true=y)
@@ -251,6 +259,7 @@ def train(model, train_data_loader, valid_data_loader, args):
                 current_train_loss = loss.cpu().detach().numpy().item()
                 print("Iteration [%d/%d]" % (it, args.max_iter))
                 print("Loss: %.4f" % current_train_loss)
+                print("-" * 100)
 
             # Increment the iteration.
             it += 1
@@ -262,16 +271,26 @@ def main():
 
     # Get the arguments.
     args = get_args()
+    for name, value in vars(args).items():
+        print("[%s]: %s" % (name, value))
 
     # Prepare the data loader.
     train_data_loader, valid_data_loader = get_data_loader(args=args)
 
     # Create the model.
     model = get_model(args=args, data_loader=train_data_loader)
+    model.load_base_weights(image_encoder_weights=args.image_encoder_weights, text_encoder_weights=args.text_encoder_weights)
+    model.freeze_encoder()
 
     # Train the model.
     train(model=model, train_data_loader=train_data_loader, valid_data_loader=valid_data_loader, args=args)
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        print("Training interrupted by the user.")
+    except Exception as e:
+        print("An error occurred during training.")
+        print(e)

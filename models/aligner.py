@@ -49,13 +49,14 @@ class Aligner(BasePromptableDeTR):
     
 
     # Methods.
-    def forward(self, image, prompt):
+    def forward(self, image, prompt, prompt_mask = None):
         """
         Forward pass of the aligner.
 
         Args:
             image (torch.Tensor): Image tensor.
             prompt (torch.Tensor): Prompt tensor.
+            prompt_mask (torch.Tensor): Prompt mask tensor. (Default: None)
 
         Returns:
             Tuple[torch.Tensor, torch.Tensor, torch.Tensor]: Encoded image and text tensors and alignment tensor.
@@ -66,7 +67,7 @@ class Aligner(BasePromptableDeTR):
 
         # Encode images and text.
         logger.debug(msg="- Calling `BasePromptableDeTR` block to the tensors %s and %s." % (image.shape, prompt.shape))
-        joiner_emb = super().forward(image=image, prompt=prompt)
+        joiner_emb = super().forward(image=image, prompt=prompt, prompt_mask=prompt_mask)
         logger.debug(msg="- Result of the `BasePromptableDeTR` block: %s." % (joiner_emb.shape,))
 
         # Align image and text embeddings.
@@ -77,6 +78,18 @@ class Aligner(BasePromptableDeTR):
         logger.info(msg="Returning the final output of the `Aligner` model with one tensor.")
         logger.debug(msg="- Alignment shape: %s" % (alignment.shape,))
         return alignment
+
+
+    def freeze_encoder(self):
+        """
+        Freeze the encoder weights.
+        """
+        logger.info(msg="Freezing the encoder weights.")
+        for param in self.image_encoder.parameters():
+            param.requires_grad = False
+        for param in self.text_encoder.parameters():
+            param.requires_grad = False
+        logger.info(msg="Encoder weights frozen successfully.")
 
 
     def save_joiner_weights(self, dir_path, ckpt_step = None):
@@ -93,19 +106,21 @@ class Aligner(BasePromptableDeTR):
         ckpt_name = "joiner.pth"
         if ckpt_step is not None:
             ckpt_name = "joiner-ckpt-%d.pth" % ckpt_step
+        os.makedirs(name=dir_path, exist_ok=True)
         ckpt_fp = os.path.join(dir_path, ckpt_name)
 
         torch.save(obj=self.joiner.state_dict(), f=ckpt_fp)
         logger.info(msg="Joiner weights saved successfully.")
 
 
-    def compute_aligner_loss(self, y_pred, y_true):
+    def compute_aligner_loss(self, y_pred, y_true, padding_idx = 0):
         """
         Compute the loss needed to train the aligner model.
 
         Args:
             y_pred (torch.Tensor): The predicted tensor.
             y_true (torch.Tensor): The true tensor.
+            padding_idx (int): The padding index. (Default: 0)
 
         Returns:
             torch.Tensor: The loss value.
@@ -120,7 +135,8 @@ class Aligner(BasePromptableDeTR):
         loss = F.cross_entropy(
             input=f_y_pred, 
             target=f_y_true, 
-            reduction="mean"
+            reduction="mean",
+            ignore_index=padding_idx
         )
         logger.info(msg="Returning the loss value.")
         return loss
