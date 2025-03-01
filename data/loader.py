@@ -109,13 +109,13 @@ class PromptableDeTRDataLoader:
             if aligner:
 
                 if sample.masked_caption_tokens.size(0) != max_len:
-                    sample.masked_caption_tokens = F.pad(input=sample.masked_caption_tokens, pad=(0, pad_len), value=0)
+                    sample.masked_caption_tokens = F.pad(input=sample.masked_caption_tokens, pad=(0, pad_len), value=pad_value)
                 sample.masked_caption_tokens = sample.masked_caption_tokens.unsqueeze(dim=0)
 
                 if masked_captions_tensor is None:
                     masked_captions_tensor = sample.masked_caption_tokens
                 else:
-                    masked_captions_tensor = torch.cat(tensors=(masked_captions_tensor, sample.masked_caption_tokens), dim=0)
+                    masked_captions_tensor = torch.cat(tensors=(masked_captions_tensor, sample.masked_caption_tokens), dim=pad_value)
 
         # Concatenate the image tensors.
         tensor_images = torch.cat(tensors=[sample.image.unsqueeze(dim=0) for sample in batch], dim=0)
