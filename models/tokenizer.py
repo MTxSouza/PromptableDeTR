@@ -232,12 +232,13 @@ class Tokenizer:
         return clean_indices
 
 
-    def decode(self, indices):
+    def decode(self, indices, remove_special_tokens = True):
         """
         Decode a list of token indices into text.
 
         Args:
             indices (List[int]|List[List[int]]): List or list of lists of token indices.
+            remove_special_tokens (bool): Whether to remove special tokens. (Default: True)
 
         Returns:
             list: List of texts.
@@ -269,7 +270,8 @@ class Tokenizer:
             text = text.replace("##", "")
 
             # Remove special tokens.
-            text = self.special_tokens_regex.sub(repl="", string=text)
+            if remove_special_tokens:
+                text = self.special_tokens_regex.sub(repl="", string=text)
             text = text.strip()
 
             # Append text.
