@@ -105,9 +105,9 @@ class Aligner(BasePromptableDeTR):
         logger.info(msg="Saving the joiner weights.")
 
         # Define the checkpoint path.
-        name = "joiner.pth"
+        name = "joiner"
         if ckpt_step is not None:
-            name = "joiner-ckpt-%d.pth" % ckpt_step
+            name = "joiner-ckpt-%d" % ckpt_step
         os.makedirs(name=dir_path, exist_ok=True)
         ckpt_fp = os.path.join(dir_path, name + ".pth")
         log_fp = os.path.join(dir_path, name + ".log")
