@@ -2,7 +2,12 @@
 This module stores all data schemas.
 """
 from dataclasses import dataclass
-from typing import List, LiteralString, Optional
+from typing import List, Optional
+
+try:
+    from typing import LiteralString
+except ImportError:
+    from typing_extensions import LiteralString
 
 import numpy as np
 import torch
