@@ -186,7 +186,7 @@ class PromptableDeTRDataLoader:
         # Shuffle the samples.
         if shuffle:
             np.random.seed(seed=seed)
-            sample_file_paths = np.random.permutation(x=sample_file_paths).tolist()
+            sample_file_paths = np.random.permutation(sample_file_paths).tolist()
 
         # Attributes.
         self.sample_file_paths = sample_file_paths
