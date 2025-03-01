@@ -424,6 +424,20 @@ class MobileNetV3(nn.Module):
         return MobileNetV3Output(high_resolution_feat=high_res_proj, mid_resolution_feat=mid_res_proj, low_resolution_feat=low_res_proj)
 
 
+    def freeze_encoder(self):
+        """
+        Freeze the encoder weights.
+        """
+        for param in self.backbone.parameters():
+            param.requires_grad = False
+        for param in self.features_1.parameters():
+            param.requires_grad = False
+        for param in self.features_2.parameters():
+            param.requires_grad = False
+        for param in self.features_3.parameters():
+            param.requires_grad = False
+
+
 
 if __name__ == "__main__":
 
