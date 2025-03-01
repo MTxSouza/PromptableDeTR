@@ -231,7 +231,7 @@ def train(model, train_data_loader, valid_data_loader, args):
                 # Save the model weights.
                 if best_loss > total_loss:
                     best_loss = total_loss
-                    model.save_joiner_weights(dir_path=args.exp_dir, ckpt_step=it)
+                    model.save_joiner_weights(dir_path=args.exp_dir, ckpt_step=it, loss=total_loss, samples=samples)
                     print("Model weights saved successfully.")
                 
                 # Check if it is overfitting.
