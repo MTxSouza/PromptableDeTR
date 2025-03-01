@@ -100,8 +100,7 @@ class Aligner(BasePromptableDeTR):
         Freeze the encoder weights.
         """
         logger.info(msg="Freezing the encoder weights.")
-        for param in self.image_encoder.parameters():
-            param.requires_grad = False
+        self.image_encoder.freeze_encoder()
         for param in self.text_encoder.parameters():
             param.requires_grad = False
         logger.info(msg="Encoder weights frozen successfully.")
