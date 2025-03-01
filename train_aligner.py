@@ -200,6 +200,24 @@ def train(model, train_data_loader, valid_data_loader, args):
         # Loop over the training data loader.
         for training_batch in train_data_loader:
 
+            # Run the forward pass.
+            logits, y = run_forward(model=model, batch=training_batch, device=device)
+
+            # Compute the loss.
+            loss = model.compute_aligner_loss(y_pred=logits, y_true=y)
+
+            # Backward pass.
+            opt.zero_grad()
+            loss.backward()
+            opt.step()
+
+            # Check if it is time to log the loss.
+            current_train_loss = loss.cpu().detach().numpy().item()
+            if it % args.log_interval == 0:
+                print("Iteration [%d/%d]" % (it, args.max_iter))
+                print("Loss: %.4f" % current_train_loss)
+                print("-" * 100)
+
             # Check if it is time to validate the model.
             if it % args.eval_interval == 0:
                 print("=" * 100)
@@ -244,24 +262,6 @@ def train(model, train_data_loader, valid_data_loader, args):
                         is_overfitting = True
                         break
                 print("=" * 100)
-
-            # Run the forward pass.
-            logits, y = run_forward(model=model, batch=training_batch, device=device)
-
-            # Compute the loss.
-            loss = model.compute_aligner_loss(y_pred=logits, y_true=y)
-
-            # Backward pass.
-            opt.zero_grad()
-            loss.backward()
-            opt.step()
-
-            # Check if it is time to log the loss.
-            if it % args.log_interval == 0:
-                current_train_loss = loss.cpu().detach().numpy().item()
-                print("Iteration [%d/%d]" % (it, args.max_iter))
-                print("Loss: %.4f" % current_train_loss)
-                print("-" * 100)
 
             # Increment the iteration.
             it += 1
