@@ -139,6 +139,12 @@ def get_args():
         help="The number of attention heads."
     )
     model_parser.add_argument(
+        "--ff-dim",
+        type=int,
+        default=2048,
+        help="The feedforward dimension."
+    )
+    model_parser.add_argument(
         "--num-joiner-layers",
         "-jl",
         type=int,

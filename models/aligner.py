@@ -27,7 +27,10 @@ class Aligner(BasePromptableDeTR):
             vocab_size = 30522, 
             emb_dim = 128, 
             proj_dim = 512, 
-            emb_dropout_rate = 0.1
+            num_heads = 8, 
+            ff_dim = 2048, 
+            emb_dropout_rate = 0.1, 
+            num_joiner_layers = 3
         ):
         """
         Initializes the Aligner class used to align images and text informations.
@@ -37,9 +40,21 @@ class Aligner(BasePromptableDeTR):
             vocab_size (int): The size of the vocabulary. (Default: 30522)
             emb_dim (int): The embedding dimension. (Default: 128)
             proj_dim (int): The projection dimension. (Default: 512)
+            num_heads (int): The number of heads. (Default: 8)
+            ff_dim (int): The feedforward dimension. (Default: 2048)
             emb_dropout_rate (float): The embedding dropout rate. (Default: 0.1)
+            num_joiner_layers (int): The number of joiner layers. (Default: 3)
         """
-        super().__init__(image_tokens=image_tokens, vocab_size=vocab_size, emb_dim=emb_dim, proj_dim=proj_dim, emb_dropout_rate=emb_dropout_rate)
+        super().__init__(
+            image_tokens=image_tokens, 
+            vocab_size=vocab_size, 
+            emb_dim=emb_dim, 
+            proj_dim=proj_dim, 
+            num_heads=num_heads, 
+            ff_dim=ff_dim, 
+            emb_dropout_rate=emb_dropout_rate, 
+            num_joiner_layers=num_joiner_layers
+        )
 
         # Aligner.
         self.aligner = nn.Sequential(
