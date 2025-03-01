@@ -299,5 +299,5 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         print("Training interrupted by the user.")
     except Exception as e:
-        print("An error occurred during training.")
+        print("😵 An error occurred during training.")
         print(e)
