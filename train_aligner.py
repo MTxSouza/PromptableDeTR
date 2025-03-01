@@ -150,25 +150,6 @@ def get_random_sample(y, logits, tokenizer):
     return y_caption, logits_caption
 
 
-def print_samples(samples):
-    """
-    Print the true and predicted captions.
-
-    Args:
-        samples (List[Tuple[str, str]]): The list of true and predicted captions.
-    """
-    # Loop over the samples.
-    max_samples = len(samples)
-    print("Check results:")
-    for idx, (y_caption, logits_caption) in enumerate(iterable=samples):
-        print("Sample %d:" % (idx + 1))
-        print("\tTrue caption:", y_caption)
-        print("\tPredicted caption:", logits_caption)
-
-        if idx + 1 < max_samples:
-            print("-" * 100)
-
-
 def train(model, train_data_loader, valid_data_loader, args):
     """
     Function that deploy the training loop for the Aligner model.
@@ -244,9 +225,6 @@ def train(model, train_data_loader, valid_data_loader, args):
                 end_time = (time.time() - init_time) / 60.0
                 print("Validation time: %.2f minutes" % end_time)
                 print("Validation loss: %.4f" % total_loss)
-
-                # Print the samples.
-                print_samples(samples=samples)
 
                 # Save the model weights.
                 if best_loss > total_loss:
