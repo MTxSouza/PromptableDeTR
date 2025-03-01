@@ -150,6 +150,20 @@ class BasePromptableDeTR(Encoder):
         if joiner_weights is not None:
             logger.debug(msg="- Loading the joiner weights.")
             self.joiner.load_state_dict(torch.load(f=joiner_weights, weights_only=True))
+    
+
+    def load_full_weights(self, base_model_weights):
+        """
+        Load the full weights of the model.
+
+        Args:
+            base_model_weights (str): Path to the base model weights.
+        """
+        logger.info(msg="Loading the full weights of the model.")
+        logger.debug(msg="- Base model weights: %s" % base_model_weights)
+
+        # Load weights.
+        self.load_state_dict(torch.load(f=base_model_weights, weights_only=True))
 
 
     def forward(self, image, prompt, prompt_mask = None):
