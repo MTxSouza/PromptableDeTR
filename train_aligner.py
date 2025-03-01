@@ -144,8 +144,8 @@ def get_random_sample(y, logits, tokenizer):
     logits_sample = logits[idx].argmax(dim=1).cpu().detach().numpy().tolist()
 
     # Decode samples.
-    y_caption = tokenizer.decode(indices=y_sample)
-    logits_caption = tokenizer.decode(indices=logits_sample)
+    y_caption = tokenizer.decode(indices=y_sample)[0]
+    logits_caption = tokenizer.decode(indices=logits_sample)[0]
 
     return y_caption, logits_caption
 
