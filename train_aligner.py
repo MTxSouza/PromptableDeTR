@@ -193,6 +193,8 @@ def train(model, train_data_loader, valid_data_loader, args):
     is_overfitting = False
     best_loss = float("inf")
     current_train_loss = 0.0
+    print("Starting the training loop...")
+    print("=" * 100)
     while it < args.max_iter and not is_overfitting:
 
         # Loop over the training data loader.
@@ -273,11 +275,16 @@ def main():
     args = get_args()
     for name, value in vars(args).items():
         print("[%s]: %s" % (name, value))
+    print("=" * 100)
+    print("🚀 Starting PromptableDeTR - Aligner training")
+    print("=" * 100)
 
     # Prepare the data loader.
+    print("Preparing the data loader...")
     train_data_loader, valid_data_loader = get_data_loader(args=args)
 
     # Create the model.
+    print("Creating the model...")
     model = get_model(args=args, data_loader=train_data_loader)
     model.load_base_weights(image_encoder_weights=args.image_encoder_weights, text_encoder_weights=args.text_encoder_weights)
     model.freeze_encoder()
