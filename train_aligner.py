@@ -227,10 +227,10 @@ def train(model, train_data_loader, valid_data_loader, args):
                 print("Validation loss: %.4f" % total_loss)
 
                 # Save the model weights.
+                is_best = False
                 if best_loss > total_loss:
                     best_loss = total_loss
-                    model.save_joiner_weights(dir_path=args.exp_dir, ckpt_step=it, loss=total_loss, samples=samples)
-                    print("Model weights saved successfully.")
+                    is_best = True
                 
                 # Check if it is overfitting.
                 elif abs(current_train_loss - total_loss) > args.overfit_threshold:
@@ -239,6 +239,8 @@ def train(model, train_data_loader, valid_data_loader, args):
                         print("Overfitting detected. Stopping training.")
                         is_overfitting = True
                         break
+
+                model.save_joiner_weights(dir_path=args.exp_dir, ckpt_step=it, loss=total_loss, samples=samples, is_best=is_best)
                 print("=" * 100)
 
             # Increment the iteration.

@@ -112,17 +112,19 @@ class BasePromptableDeTR(Encoder):
 
 
     # Methods.
-    def load_base_weights(self, image_encoder_weights = None, text_encoder_weights = None):
+    def load_base_weights(self, image_encoder_weights = None, text_encoder_weights = None, joiner_weights = None):
         """
         Load the weights of the image and text encoders.
 
         Args:
             image_encoder_weights (str): Path to the image encoder weights. (Default: None)
             text_encoder_weights (str): Path to the text encoder weights. (Default: None)
+            joiner_weights (str): Path to the joiner weights. (Default: None)
         """
         logger.info(msg="Loading the weights of the image and text encoders.")
         logger.debug(msg="- Image encoder weights: %s" % image_encoder_weights)
         logger.debug(msg="- Text encoder weights: %s" % text_encoder_weights)
+        logger.debug(msg="- Joiner weights: %s" % joiner_weights)
 
         # Load weights.
         if image_encoder_weights is not None:
@@ -132,6 +134,10 @@ class BasePromptableDeTR(Encoder):
         if text_encoder_weights is not None:
             logger.debug(msg="- Loading the text encoder weights.")
             self.text_encoder.load_state_dict(torch.load(f=text_encoder_weights, weights_only=True))
+        
+        if joiner_weights is not None:
+            logger.debug(msg="- Loading the joiner weights.")
+            self.joiner.load_state_dict(torch.load(f=joiner_weights, weights_only=True))
 
 
     def forward(self, image, prompt, prompt_mask = None):

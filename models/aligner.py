@@ -92,7 +92,7 @@ class Aligner(BasePromptableDeTR):
         logger.info(msg="Encoder weights frozen successfully.")
 
 
-    def save_joiner_weights(self, dir_path, loss, samples, ckpt_step = None):
+    def save_joiner_weights(self, dir_path, loss, samples, ckpt_step = None, is_best = False):
         """
         Save the joiner weights.
 
@@ -101,13 +101,20 @@ class Aligner(BasePromptableDeTR):
             loss (float): The loss of the model at the checkpoint.
             samples (List[Tuple[str, str]]): The validation results at the checkpoint.
             ckpt_step (int): The checkpoint step. (Default: None)
+            is_best (bool): Whether the checkpoint is the best. (Default: False)
         """
         logger.info(msg="Saving the joiner weights.")
 
         # Define the checkpoint path.
         name = "joiner"
+
+        # Check if the model is the best.
+        if is_best:
+            name += "-best"
+
         if ckpt_step is not None:
-            name = "joiner-ckpt-%d" % ckpt_step
+            name += "-ckpt-%d" % ckpt_step
+
         os.makedirs(name=dir_path, exist_ok=True)
         ckpt_fp = os.path.join(dir_path, name + ".pth")
         log_fp = os.path.join(dir_path, name + ".log")
