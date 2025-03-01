@@ -86,6 +86,21 @@ class Attention(nn.Module):
         self.query = nn.Linear(in_features=emb_dim, out_features=emb_proj)
         self.key = nn.Linear(in_features=emb_dim, out_features=emb_proj)
         self.value = nn.Linear(in_features=emb_dim, out_features=emb_proj)
+    
+        # Attributes.
+        self.__attention = None
+
+
+    # Properties.
+    @property
+    def attention(self):
+        """
+        Get the attention weights.
+
+        Returns:
+            torch.Tensor: Attention weights tensor.
+        """
+        return self.__attention
 
 
     # Methods.
@@ -121,6 +136,7 @@ class Attention(nn.Module):
 
         # Compute attention weights.
         attention_weights = torch.softmax(input=attention_scores, dim=-1)
+        self.__attention = attention_weights
 
         # Compute attended value.
         attended_value = attention_weights @ value
@@ -154,6 +170,18 @@ class MultiHeadAttention(nn.Module):
             Attention(emb_proj=emb_proj, emb_dim=emb_dim) for _ in range(num_heads)
         ])
         self.projection = nn.Linear(in_features=emb_dim, out_features=emb_dim)
+    
+
+    # Properties.
+    @property
+    def attentions(self):
+        """
+        Get the attention weights of all attention heads.
+
+        Returns:
+            List[torch.Tensor]: List containing attention weights tensors.
+        """
+        return [attention_head.attention for attention_head in self.attention_heads]
 
 
     # Methods.
@@ -298,6 +326,18 @@ class Joiner(nn.Module):
 
         num_image_feature_levels = len(image_tokens)
         self.level_emb = nn.Parameter(data=torch.Tensor(num_image_feature_levels, emb_dim))
+
+
+    # Properties.
+    @property
+    def attentions(self):
+        """
+        Get the attention weights of all joiner blocks.
+
+        Returns:
+            List[torch.Tensor]: List containing attention weights tensors.
+        """
+        return [joiner_block.multi_head_attention.attentions for joiner_block in self.joiner_blocks]
 
 
     # Methods.
