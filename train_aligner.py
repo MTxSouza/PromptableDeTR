@@ -227,8 +227,6 @@ def train(model, train_data_loader, valid_data_loader, args):
 
                 total_loss /= len(valid_data_loader)
                 end_time = (time.time() - init_time) / 60.0
-                print("Validation time: %.2f minutes" % end_time)
-                print("Validation loss: %.4f" % total_loss)
 
                 # Save the model weights.
                 is_best = False
@@ -242,14 +240,16 @@ def train(model, train_data_loader, valid_data_loader, args):
                     if overfit_counter >= args.overfit_patience:
                         print("Overfitting detected. Stopping training.")
                         is_overfitting = True
-                        break
 
+                print("Validation time: %.2f minutes" % end_time)
+                print("Overfit counter: %d" % overfit_counter)
+                print("Validation loss: %.4f" % total_loss)
                 model.save_joiner_weights(dir_path=args.exp_dir, ckpt_step=it, loss=total_loss, samples=samples, is_best=is_best)
                 print("=" * 100)
 
             # Increment the iteration.
             it += 1
-            if it >= args.max_iter:
+            if it >= args.max_iter or is_overfitting:
                 break
 
 
