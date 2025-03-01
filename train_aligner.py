@@ -244,7 +244,7 @@ def train(model, train_data_loader, valid_data_loader, args):
                 print("Validation time: %.2f minutes" % end_time)
                 print("Overfit counter: %d" % overfit_counter)
                 print("Validation loss: %.4f" % total_loss)
-                model.save_joiner_weights(dir_path=args.exp_dir, ckpt_step=it, loss=total_loss, samples=samples, is_best=is_best)
+                model.save_base_model_weights(dir_path=args.exp_dir, ckpt_step=it, loss=total_loss, samples=samples, is_best=is_best)
                 print("=" * 100)
 
             # Increment the iteration.

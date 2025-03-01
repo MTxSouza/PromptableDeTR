@@ -106,9 +106,9 @@ class Aligner(BasePromptableDeTR):
         logger.info(msg="Encoder weights frozen successfully.")
 
 
-    def save_joiner_weights(self, dir_path, loss, samples, ckpt_step = None, is_best = False):
+    def save_base_model_weights(self, dir_path, loss, samples, ckpt_step = None, is_best = False):
         """
-        Save the joiner weights.
+        Save the base model weights.
 
         Args:
             dir_path (str): The path to the directory where the weights will be saved.
@@ -117,10 +117,10 @@ class Aligner(BasePromptableDeTR):
             ckpt_step (int): The checkpoint step. (Default: None)
             is_best (bool): Whether the checkpoint is the best. (Default: False)
         """
-        logger.info(msg="Saving the joiner weights.")
+        logger.info(msg="Saving the base model weights.")
 
         # Define the checkpoint path.
-        name = "joiner"
+        name = "base-model"
 
         # Check if the model is the best.
         if is_best:
@@ -134,10 +134,11 @@ class Aligner(BasePromptableDeTR):
         log_fp = os.path.join(dir_path, name + ".log")
 
         # Save the weights.
-        torch.save(obj=self.joiner.state_dict(), f=ckpt_fp)
+        torch.save(obj=self.get_base_model_state_dict(), f=ckpt_fp)
 
         # Save the log.
         with open(file=log_fp, mode="w") as f:
+            f.write("Aligner results:\n")
             f.write("Loss: %s\n\n" % (loss))
             f.write("Samples:\n")
             for y_true, y_pred in samples:
@@ -145,7 +146,7 @@ class Aligner(BasePromptableDeTR):
                 f.write("Pred: %s\n" % (y_pred))
                 f.write("\n")
 
-        logger.info(msg="Joiner weights saved successfully.")
+        logger.info(msg="Base model weights saved successfully.")
 
 
     def compute_aligner_loss(self, y_pred, y_true, padding_idx = 0):
