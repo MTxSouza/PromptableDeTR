@@ -84,11 +84,11 @@ if __name__=="__main__":
             caption_tokens = sample.caption_tokens.unsqueeze(dim=0).to(device=device)
             masked_caption_tokens = sample.masked_caption_tokens.unsqueeze(dim=0).to(device=device)
 
-            mask = caption_tokens.clone()
-            mask[masked_caption_tokens == 0] = 103
+            # mask = caption_tokens.clone()
+            # mask[masked_caption_tokens == 0] = 103
 
             caption = sample.caption
-            masked_caption = tokenizer.decode(indices=mask.squeeze(dim=0).cpu().tolist())[0]
+            masked_caption = tokenizer.decode(indices=masked_caption_tokens.squeeze(dim=0).cpu().tolist())[0]
 
             print("\tImage shape:", image.size())
             print("\tInput tokens:", caption_tokens.size(), ":", caption_tokens.tolist())

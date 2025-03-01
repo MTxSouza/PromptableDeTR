@@ -280,6 +280,7 @@ class MaskCaption(BaseTransform):
         # Load the tokenizer.
         self.tokenizer = Tokenizer(vocab_filepath=vocab_file)
 
+        self.mask_token = self.tokenizer.token_to_index["[MASK]"]
         self.mask_ratio = mask_ratio
 
 
@@ -353,13 +354,13 @@ class MaskCaption(BaseTransform):
         random_tokens = random.choices(population=mask_indices, k=num_tokens)
 
         # Mask the caption.
-        masked_caption = torch.ones_like(input=sample.masked_caption_tokens)
+        masked_caption = sample.masked_caption_tokens.clone()
         for tokens in random_tokens:
             if isinstance(tokens, int):
                 tokens = [tokens]
             for token in tokens:
                 mask_filter = sample.masked_caption_tokens == token
-                masked_caption[mask_filter] = 0
+                masked_caption[mask_filter] = self.mask_token
         sample.masked_caption_tokens = masked_caption
 
         return sample
