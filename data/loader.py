@@ -82,7 +82,7 @@ class PromptableDeTRDataLoader:
             aligner (bool): Whether to convert the batch for the aligner model. (Default: False)
 
         Returns:
-            Tuple[torch.Tensor, torch.Tensor, torch.Tensor]: The image, caption, and mask tensors.
+            Tuple[torch.Tensor, torch.Tensor, torch.Tensor]: The image, caption, and either the mask tensors or the object tensors.
         """
         # Find the maximum length of the captions.
         max_len = max([sample.caption_tokens.size(0) for sample in batch])
