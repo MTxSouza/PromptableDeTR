@@ -83,7 +83,7 @@ class Trainer:
         for more efficient training.
         """
         # Compile the model.
-        self.model = torch.compile(model=self.model)
+        # self.model = torch.compile(model=self.model)
 
         # Define the optimizer.
         self.optimizer = self.optimizer(params=self.model.parameters(), lr=self.lr)
