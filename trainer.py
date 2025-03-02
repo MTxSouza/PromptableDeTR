@@ -182,13 +182,13 @@ class Trainer:
         
         # Check if it is overfitting.
         elif abs(self.__current_train_loss - valid_loss) > self.overfit_threshold:
-            overfit_counter += 1
-            if overfit_counter >= self.overfit_patience:
+            self.__overfit_counter += 1
+            if self.__overfit_counter >= self.overfit_patience:
                 print("Overfitting detected. Stopping training.")
                 self.__is_overfitting = True
 
         print("Validation time: %.2f minutes" % valid_time)
-        print("Overfit counter: %d" % overfit_counter)
+        print("Overfit counter: %d" % self.__overfit_counter)
         print("Validation loss: %.4f" % valid_loss)
         self.model.save_model(
             dir_path=self.exp_dir, 
