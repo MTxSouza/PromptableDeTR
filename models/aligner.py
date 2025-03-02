@@ -106,7 +106,7 @@ class Aligner(BasePromptableDeTR):
         logger.info(msg="Encoder weights frozen successfully.")
 
 
-    def save_base_model_weights(self, dir_path, loss, samples, ckpt_step = None, is_best = False):
+    def save_model(self, dir_path, loss, samples, ckpt_step = None, is_best = False):
         """
         Save the base model weights.
 
@@ -120,21 +120,26 @@ class Aligner(BasePromptableDeTR):
         logger.info(msg="Saving the base model weights.")
 
         # Define the checkpoint path.
-        name = "base-model"
+        base_model_name = "base-model"
+        aligner_name = "aligner"
 
         # Check if the model is the best.
         if is_best:
-            name += "-best"
+            base_model_name += "-best"
+            aligner_name += "-best"
 
         if ckpt_step is not None:
-            name += "-ckpt-%d" % ckpt_step
+            base_model_name += "-ckpt-%d" % ckpt_step
+            aligner_name += "-ckpt-%d" % ckpt_step
 
         os.makedirs(name=dir_path, exist_ok=True)
-        ckpt_fp = os.path.join(dir_path, name + ".pth")
-        log_fp = os.path.join(dir_path, name + ".log")
+        base_model_ckpt_fp = os.path.join(dir_path, base_model_name + ".pth")
+        aligner_ckpt_fp = os.path.join(dir_path, aligner_name + ".pth")
+        log_fp = os.path.join(dir_path, aligner_ckpt_fp + ".log")
 
         # Save the weights.
-        torch.save(obj=self.get_base_model_state_dict, f=ckpt_fp)
+        torch.save(obj=self.get_base_model_state_dict, f=base_model_ckpt_fp)
+        torch.save(obj=self.state_dict(), f=aligner_ckpt_fp)
 
         # Save the log.
         with open(file=log_fp, mode="w") as f:
