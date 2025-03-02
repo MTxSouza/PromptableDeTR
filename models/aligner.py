@@ -149,13 +149,13 @@ class Aligner(BasePromptableDeTR):
         logger.info(msg="Base model weights saved successfully.")
 
 
-    def compute_aligner_loss(self, y_pred, y_true, padding_idx = 0):
+    def compute_loss(self, logits, labels, padding_idx = 0):
         """
         Compute the loss needed to train the aligner model.
 
         Args:
-            y_pred (torch.Tensor): The predicted tensor.
-            y_true (torch.Tensor): The true tensor.
+            logits (torch.Tensor): The predicted tensor.
+            labels (torch.Tensor): The true tensor.
             padding_idx (int): The padding index. (Default: 0)
 
         Returns:
@@ -164,9 +164,9 @@ class Aligner(BasePromptableDeTR):
         logger.info(msg="Computing the aligner loss.")
 
         # Compute the loss.
-        B, N, _ = y_pred.shape
-        f_y_pred = y_pred.view(B * N, -1)
-        f_y_true = y_true.view(B * N)
+        B, N, _ = logits.shape
+        f_y_pred = logits.view(B * N, -1)
+        f_y_true = labels.view(B * N)
 
         loss = F.cross_entropy(
             input=f_y_pred, 
