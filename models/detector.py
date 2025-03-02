@@ -173,7 +173,7 @@ class PromptableDeTR(BasePromptableDeTR):
         # Compute presence loss.
         flt_sorted_pred_presence = sorted_pred_presence.view(-1, 2)
         flt_sorted_true_presence = sorted_true_presence.view(-1)
-        presence_loss = F.binary_cross_entropy_with_logits(input=flt_sorted_pred_presence, target=flt_sorted_true_presence)
+        presence_loss = F.cross_entropy(input=flt_sorted_pred_presence, target=flt_sorted_true_presence, reduction="mean")
 
         # Compute bounding box loss.
         flt_sorted_pred_boxes = sorted_pred_boxes.view(-1, 4)
