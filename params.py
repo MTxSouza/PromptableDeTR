@@ -80,14 +80,14 @@ def get_args():
     )
     model_parser.add_argument(
         "--image-encoder-weights",
-        "-imgw",
+        "--imgw",
         type=str,
         default=None,
         help="Path to the image encoder weights."
     )
     model_parser.add_argument(
         "--text-encoder-weights",
-        "-txtw",
+        "--txtw",
         type=str,
         default=None,
         help="Path to the text encoder weights."
