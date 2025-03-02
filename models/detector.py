@@ -133,6 +133,7 @@ class PromptableDeTR(BasePromptableDeTR):
 
         logger.debug(msg="- Calling `nn.Linear` block to the tensor %s." % (out.shape,))
         bbox = self.bbox_predictor(out)
+        bbox = F.sigmoid(input=bbox)
         presence = self.presence_predictor(out)
         logger.debug(msg="- Result of the `nn.Linear` block: %s and %s." % (bbox.shape, presence.shape))
 

@@ -26,10 +26,6 @@ def generalized_iou(boxes1, boxes2):
     """
     logger.debug(msg="- Computing the IoU between the two sets of boxes.")
 
-    # Convert boxes from (cx, cy, w, h) to (x1, y1, x2, y2).
-    boxes1 = cxcywh_to_xyxy(boxes1)
-    boxes2 = cxcywh_to_xyxy(boxes2)
-
     # Compute area.
     area1 = (boxes1[:, 2] - boxes1[:, 0]) * (boxes1[:, 3] - boxes1[:, 1])  # (N,)
     area2 = (boxes2[:, 2] - boxes2[:, 0]) * (boxes2[:, 3] - boxes2[:, 1])  # (M,)
@@ -55,22 +51,6 @@ def generalized_iou(boxes1, boxes2):
     giou = iou - (area - union) / (area + 1e-6)
 
     return giou
-
-
-def cxcywh_to_xyxy(boxes):
-    """
-    Convert boxes from (cx, cy, w, h) to (x1, y1, x2, y2).
-
-    Args:
-        boxes (torch.Tensor): The boxes to be converted with shape (N, 4).
-
-    Returns:
-        torch.Tensor: The converted boxes with shape (N, 4).
-    """
-    logger.debug(msg="- Converting boxes from (cx, cy, w, h) to (x1, y1, x2, y2).")
-    cx, cy, w, h = boxes.unbind(-1)
-    new_boxes = [(cx - 0.5 * w), (cy - 0.5 * h), (cx + 0.5 * w), (cy + 0.5 * h)]
-    return torch.stack(new_boxes, dim=-1)
 
 
 # Classes.
