@@ -130,6 +130,11 @@ class PromptableDeTRDataLoader:
             for sample in batch:
                 
                 bbox_tensor = sample.bbox_tensor
+
+                # Add presence column.
+                presence = torch.ones(size=(bbox_tensor.size(0), 1), dtype=torch.float32)
+                bbox_tensor = torch.cat(tensors=[bbox_tensor, presence], dim=-1)
+
                 if bbox_tensor.size(0) != max_objs:
 
                     # Pad the objects.
