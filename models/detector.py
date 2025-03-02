@@ -48,6 +48,23 @@ class PromptableDeTR(BasePromptableDeTR):
         self.matcher = None
 
 
+    # Private methods.
+    def __get_indices(self, matcher_indices):
+        """
+        Organize the indices to be used in the loss computation.
+
+        Args:
+            matcher_indices (List[Tuple[torch.Tensor, torch.Tensor]]): The indices from the matcher.
+
+        Returns:
+            Tuple[torch.Tensor, torch.Tensor, torch.Tensor]: The batch, source, and target indices.
+        """
+        batch_idx = torch.cat([torch.full_like(src, i) for i, (src, _) in enumerate(matcher_indices)])
+        src_idx = torch.cat([src for (src, _) in matcher_indices])
+        tgt_idx = torch.cat([tgt for (_, tgt) in matcher_indices])
+        return batch_idx, src_idx, tgt_idx
+
+
     # Methods.
     def define_matcher(self, presence_loss_weight = 1.0, l1_loss_weight = 1.0, giou_loss_weight = 1.0):
         """
@@ -163,14 +180,15 @@ class PromptableDeTR(BasePromptableDeTR):
         # Sort the logits and labels.
         pred_presence = logits[:, :, 4:]
         pred_boxes = logits[:, :, :4]
-        true_presence = labels[:, :, 4]
+        true_presence = labels[:, :, 4].long()
         true_boxes = labels[:, :, :4]
         indices = self.matcher(predict_scores=pred_presence, predict_boxes=pred_boxes, scores=true_presence, boxes=true_boxes)
+        batch_idx, src_idx, tgt_idx = self.__get_indices(matcher_indices=indices)
 
-        sorted_pred_presence = torch.gather(pred_presence, dim=1, index=indices)
-        sorted_pred_boxes = torch.gather(pred_boxes, dim=1, index=indices)
-        sorted_true_presence = torch.gather(true_presence, dim=1, index=indices)
-        sorted_true_boxes = torch.gather(true_boxes, dim=1, index=indices)
+        sorted_pred_presence = pred_presence[(batch_idx, src_idx)]
+        sorted_pred_boxes = pred_boxes[(batch_idx, src_idx)]
+        sorted_true_presence = true_presence[(batch_idx, tgt_idx)]
+        sorted_true_boxes = true_boxes[(batch_idx, tgt_idx)]
 
         # Compute presence loss.
         flt_sorted_pred_presence = sorted_pred_presence.view(-1, 2)
