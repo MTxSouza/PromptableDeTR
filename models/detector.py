@@ -39,7 +39,7 @@ class PromptableDeTR(BasePromptableDeTR):
             nn.ReLU()
         )
         self.bbox_predictor = nn.Linear(in_features=proj_dim * 2, out_features=4)
-        self.presence_predictor = nn.Linear(in_features=proj_dim * 2, out_features=1)
+        self.presence_predictor = nn.Linear(in_features=proj_dim * 2, out_features=2)
 
         # Matcher.
         self.__presence_weight = None
