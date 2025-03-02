@@ -161,7 +161,7 @@ class PromptableDeTR(BasePromptableDeTR):
         # Sort the logits and labels.
         pred_presence = logits[:, :, 4:]
         pred_boxes = logits[:, :, :4]
-        true_presence = labels[:, :, 4].view(-1, 1)
+        true_presence = labels[:, :, 4]
         true_boxes = labels[:, :, :4]
         indices = self.matcher(predict_scores=pred_presence, predict_boxes=pred_boxes, scores=true_presence, boxes=true_boxes)
 
