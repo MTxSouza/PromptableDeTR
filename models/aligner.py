@@ -106,9 +106,9 @@ class Aligner(BasePromptableDeTR):
         logger.info(msg="Encoder weights frozen successfully.")
 
 
-    def save_base_model_weights(self, dir_path, loss, samples, ckpt_step = None, is_best = False):
+    def save_model(self, dir_path, loss, samples, ckpt_step = None, is_best = False):
         """
-        Save the base model weights.
+        Save the model weights.
 
         Args:
             dir_path (str): The path to the directory where the weights will be saved.
@@ -117,24 +117,29 @@ class Aligner(BasePromptableDeTR):
             ckpt_step (int): The checkpoint step. (Default: None)
             is_best (bool): Whether the checkpoint is the best. (Default: False)
         """
-        logger.info(msg="Saving the base model weights.")
+        logger.info(msg="Saving the model weights.")
 
         # Define the checkpoint path.
-        name = "base-model"
+        base_model_name = "base-model"
+        aligner_name = "aligner"
 
         # Check if the model is the best.
         if is_best:
-            name += "-best"
+            base_model_name += "-best"
+            aligner_name += "-best"
 
         if ckpt_step is not None:
-            name += "-ckpt-%d" % ckpt_step
+            base_model_name += "-ckpt-%d" % ckpt_step
+            aligner_name += "-ckpt-%d" % ckpt_step
 
         os.makedirs(name=dir_path, exist_ok=True)
-        ckpt_fp = os.path.join(dir_path, name + ".pth")
-        log_fp = os.path.join(dir_path, name + ".log")
+        base_model_ckpt_fp = os.path.join(dir_path, base_model_name + ".pth")
+        aligner_ckpt_fp = os.path.join(dir_path, aligner_name + ".pth")
+        log_fp = os.path.join(dir_path, aligner_ckpt_fp + ".log")
 
         # Save the weights.
-        torch.save(obj=self.get_base_model_state_dict, f=ckpt_fp)
+        torch.save(obj=self.get_base_model_state_dict, f=base_model_ckpt_fp)
+        torch.save(obj=self.state_dict(), f=aligner_ckpt_fp)
 
         # Save the log.
         with open(file=log_fp, mode="w") as f:
@@ -149,13 +154,13 @@ class Aligner(BasePromptableDeTR):
         logger.info(msg="Base model weights saved successfully.")
 
 
-    def compute_aligner_loss(self, y_pred, y_true, padding_idx = 0):
+    def compute_loss(self, logits, labels, padding_idx = 0):
         """
         Compute the loss needed to train the aligner model.
 
         Args:
-            y_pred (torch.Tensor): The predicted tensor.
-            y_true (torch.Tensor): The true tensor.
+            logits (torch.Tensor): The predicted tensor.
+            labels (torch.Tensor): The true tensor.
             padding_idx (int): The padding index. (Default: 0)
 
         Returns:
@@ -164,9 +169,9 @@ class Aligner(BasePromptableDeTR):
         logger.info(msg="Computing the aligner loss.")
 
         # Compute the loss.
-        B, N, _ = y_pred.shape
-        f_y_pred = y_pred.view(B * N, -1)
-        f_y_true = y_true.view(B * N)
+        B, N, _ = logits.shape
+        f_y_pred = logits.view(B * N, -1)
+        f_y_true = labels.view(B * N)
 
         loss = F.cross_entropy(
             input=f_y_pred, 
