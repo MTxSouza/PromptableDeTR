@@ -11,7 +11,6 @@ import torch.nn.functional as F
 
 from data.daug import PrepareAlignerSample, PrepareDetectionSample
 from data.schemas import AlignerSample, DetectorSample, Sample
-from models.tokenizer import Tokenizer
 
 
 # Classes.
