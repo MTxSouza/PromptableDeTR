@@ -93,11 +93,11 @@ def get_args():
         help="Path to the text encoder weights."
     )
     model_parser.add_argument(
-        "--joiner-weights",
-        "-jw",
+        "--base-model-weights",
+        "-bmw",
         type=str,
         default=None,
-        help="Path to the joiner weights."
+        help="Path to the full base model weights."
     )
     model_parser.add_argument(
         "--image-size",
