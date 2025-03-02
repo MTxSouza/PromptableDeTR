@@ -33,7 +33,7 @@ LOG_INTERVAL=${LOG_INTERVAL:-"10"}
 OVERFIT_THRESHOLD=${OVERFIT_THRESHOLD:-"1e-3"}
 OVERFIT_PATIENTE=${OVERFIT_PATIENTE:-"5"}
 
-ALINGER_EXP_DIR="./exp_aligner"
+="./exp_aligner"
 DETECTOR_EXP_DIR="./exp_detector"
 
 GIOU_WEIGHT=${GIOU_WEIGHT:-"1.0"}
@@ -65,10 +65,10 @@ python train_aligner.py \
         --lr $LR \
         --overfit-threshold $OVERFIT_THRESHOLD \
         --overfit-patience $OVERFIT_PATIENTE \
-        --exp-dir $ALINGER_EXP_DIR
+        --exp-dir $ALIGNER_EXP_DIR
 
 # Get the base model weight.
-BASE_MODEL_WEIGHT=$(ls "$ALINGER_EXP_DIR"/*-best-*.pth | sort -t '-' -k4,4nr | head -1)
+BASE_MODEL_WEIGHT=$(ls "$ALIGNER_EXP_DIR"/*-best-*.pth | sort -t '-' -k4,4nr | head -1)
 
 python train_detector.py \
         --dataset-dir $DATASET_DIR \
@@ -95,6 +95,6 @@ python train_detector.py \
         --presence-weight $PRESENCE_WEIGHT \
         --l1-weight $L1_WEIGHT
 
-BEST_MODEL=$(ls $DETECTOR_EXP_DIR/*-best-*.pth | sort -t '-' -k4,4nr | head -1)
+BEST_MODEL=$(ls "$DETECTOR_EXP_DIR"/*-best-*.pth | sort -t '-' -k4,4nr | head -1)
 echo "All models has been trained."
 echo "- Checkpoint of the best model : $BEST_MODEL"
