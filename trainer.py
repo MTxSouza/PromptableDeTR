@@ -138,7 +138,7 @@ class Trainer:
             y (torch.Tensor): The true captions.
 
         Returns:
-            Tuple[str, str] | Tuple[numpy.ndarray, numpy.ndarray]: The true and predicted captions or objects.
+            Tuple[str, str] | Tuple[List[int], List[int]]: The true and predicted captions or objects.
         """
         # Get random batch index.
         batch_index = torch.randint(low=0, high=y.size(0), size=(1,)).item()
@@ -155,12 +155,8 @@ class Trainer:
             return logits_caption, y_caption
 
         else:
-            logits_sample = logits[batch_index].cpu().numpy().tolist()
-            y_sample = y[batch_index].cpu().numpy().tolist()
-
-            # Convert float points into coordinates and presences.
-            logits_objs = None
-            y_objs = None
+            logits_objs = logits[batch_index].cpu().numpy().tolist()
+            y_objs = y[batch_index].cpu().numpy().tolist()
 
             return logits_objs, y_objs
     
