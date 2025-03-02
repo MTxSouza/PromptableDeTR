@@ -120,7 +120,7 @@ class HuggarianMatcher(nn.Module):
         flt_predict_boxes = predict_boxes.view(-1, 4)
 
         # Join all targets.
-        all_scores = scores.view(-1)
+        all_scores = scores.view(-1).long()
         all_boxes = boxes.view(-1, 4)
 
         # Compute presence loss.
