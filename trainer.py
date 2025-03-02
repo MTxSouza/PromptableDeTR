@@ -113,10 +113,10 @@ class Trainer:
         def run_forward(model, images, captions, extra_data):
             # Check if the model is an Aligner or a Detector.
             if self.is_aligner:
-                logits = model(images=images, captions=extra_data) # Input: Image and the masked caption.
+                logits = model(images, extra_data) # Input: Image and the masked caption.
                 return logits, captions # Output: Pred caption and the true caption.
             else:
-                logits = model(images=images, captions=captions) # Input: Image and the caption.
+                logits = model(images, captions) # Input: Image and the caption.
                 return logits, extra_data # Output: Pred boxes and presences and the true boxes and presences.
 
         # Run the forward pass.
