@@ -68,7 +68,7 @@ python train_aligner.py \
         --exp-dir $ALIGNER_EXP_DIR
 
 # Get the base model weight.
-BASE_MODEL_WEIGHT=$(ls "$ALIGNER_EXP_DIR"/*-best-*.pth | sort -t '-' -k4,4nr | head -1)
+BBASE_MODEL_WEIGHT=$(ls "$ALIGNER_EXP_DIR"/base-model-best-*.pth | sort -t '-' -k5,5nr | head -1)
 
 python train_detector.py \
         --dataset-dir $DATASET_DIR \
@@ -95,6 +95,6 @@ python train_detector.py \
         --presence-weight $PRESENCE_WEIGHT \
         --l1-weight $L1_WEIGHT
 
-BEST_MODEL=$(ls "$DETECTOR_EXP_DIR"/*-best-*.pth | sort -t '-' -k4,4nr | head -1)
+BEST_MODEL=$(ls "$DETECTOR_EXP_DIR"/*-best-*.pth | sort -t '-' -k5,5nr | head -1)
 echo "All models has been trained."
 echo "- Checkpoint of the best model : $BEST_MODEL"
