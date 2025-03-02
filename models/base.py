@@ -124,7 +124,7 @@ class BasePromptableDeTR(Encoder):
 
 
     # Methods.
-    def load_base_weights(self, image_encoder_weights = None, text_encoder_weights = None, joiner_weights = None):
+    def load_base_weights(self, image_encoder_weights = None, text_encoder_weights = None):
         """
         Load the weights of the image and text encoders.
 
@@ -136,7 +136,6 @@ class BasePromptableDeTR(Encoder):
         logger.info(msg="Loading the weights of the image and text encoders.")
         logger.debug(msg="- Image encoder weights: %s" % image_encoder_weights)
         logger.debug(msg="- Text encoder weights: %s" % text_encoder_weights)
-        logger.debug(msg="- Joiner weights: %s" % joiner_weights)
 
         # Load weights.
         if image_encoder_weights is not None:
@@ -146,10 +145,6 @@ class BasePromptableDeTR(Encoder):
         if text_encoder_weights is not None:
             logger.debug(msg="- Loading the text encoder weights.")
             self.text_encoder.load_state_dict(torch.load(f=text_encoder_weights, weights_only=True))
-        
-        if joiner_weights is not None:
-            logger.debug(msg="- Loading the joiner weights.")
-            self.joiner.load_state_dict(torch.load(f=joiner_weights, weights_only=True))
     
 
     def load_full_weights(self, base_model_weights):
