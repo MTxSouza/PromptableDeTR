@@ -40,6 +40,8 @@ GIOU_WEIGHT=${GIOU_WEIGHT:-"1.0"}
 PRESENCE_WEIGHT=${PRESENCE_WEIGHT:-"1.0"}
 L1_WEIGHT=${L1_WEIGHT:-"1.0"}
 
+python install_utilities.py
+
 python train_aligner.py \
         --dataset-dir $DATASET_DIR \
         --image-dir $IMAGE_DIR \
