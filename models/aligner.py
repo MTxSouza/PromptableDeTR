@@ -135,7 +135,7 @@ class Aligner(BasePromptableDeTR):
         os.makedirs(name=dir_path, exist_ok=True)
         base_model_ckpt_fp = os.path.join(dir_path, base_model_name + ".pth")
         aligner_ckpt_fp = os.path.join(dir_path, aligner_name + ".pth")
-        log_fp = os.path.join(dir_path, aligner_ckpt_fp + ".log")
+        log_fp = os.path.join(dir_path, aligner_name + ".log")
 
         # Save the weights.
         torch.save(obj=self.get_base_model_state_dict, f=base_model_ckpt_fp)
