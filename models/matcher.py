@@ -5,7 +5,6 @@ detection task.
 import torch
 import torch.nn as nn
 from scipy.optimize import linear_sum_assignment
-from torchvision.ops.boxes import box_iou
 
 from logger import Logger
 
@@ -32,8 +31,8 @@ def generalized_iou(boxes1, boxes2):
     boxes2 = cxcywh_to_xyxy(boxes2)
 
     # Compute area.
-    area1 = box_iou(boxes1=boxes1, boxes2=boxes1)
-    area2 = box_iou(boxes1=boxes2, boxes2=boxes2)
+    area1 = (boxes1[:, 2] - boxes1[:, 0]) * (boxes1[:, 3] - boxes1[:, 1])  # (N,)
+    area2 = (boxes2[:, 2] - boxes2[:, 0]) * (boxes2[:, 3] - boxes2[:, 1])  # (M,)
 
     # Compute intersection.
     lt = torch.max(boxes1[:, None, :2], boxes2[:, :2])
@@ -42,7 +41,7 @@ def generalized_iou(boxes1, boxes2):
     inter = wh[:, :, 0] * wh[:, :, 1]
 
     # Compute union.
-    union = area1[:, None] + area2 - inter
+    union = area1[:, None] + area2[None, :] - inter
 
     # Compute IoU.
     iou = inter / union
@@ -53,7 +52,7 @@ def generalized_iou(boxes1, boxes2):
     wh = (rb - lt).clamp(min=0)
     area = wh[:, :, 0] * wh[:, :, 1]
 
-    giou = iou - (area - union) / area
+    giou = iou - (area - union) / (area + 1e-6)
 
     return giou
 
@@ -138,7 +137,7 @@ class HuggarianMatcher(nn.Module):
 
         # Compute the best matching.
         n_targets = [scores.shape[1] for _ in range(B)]
-        indices = [linear_sum_assignment(mtx[i]) for i, mtx in enumerate(iterable=mtx_loss.split(split_size=n_targets, dim=0))]
+        indices = [linear_sum_assignment(mtx[i]) for i, mtx in enumerate(iterable=mtx_loss.split(split_size=n_targets, dim=-1))]
         indices = [(torch.as_tensor(i, dtype=torch.int64), torch.as_tensor(j, dtype=torch.int64)) for i, j in indices]
 
         return indices

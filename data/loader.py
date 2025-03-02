@@ -11,7 +11,6 @@ import torch.nn.functional as F
 
 from data.daug import PrepareAlignerSample, PrepareDetectionSample
 from data.schemas import AlignerSample, DetectorSample, Sample
-from models.tokenizer import Tokenizer
 
 
 # Classes.
@@ -72,21 +71,19 @@ class PromptableDeTRDataLoader:
 
     # Static methods.
     @staticmethod
-    def convert_batch_into_tensor(batch, pad_value = 0, aligner = False):
+    def convert_batch_into_tensor(batch, max_len = 100, pad_value = 0, aligner = False):
         """
         Convert a list of AlignerSample objects into tensors.
 
         Args:
             batch (List[AlignerSample]): The batch of samples.
+            max_len (int): Maximum number of context length and object predictions. (Default: 100)
             pad_value (int): The padding value. (Default: 0)
             aligner (bool): Whether to convert the batch for the aligner model. (Default: False)
 
         Returns:
             Tuple[torch.Tensor, torch.Tensor, torch.Tensor]: The image, caption, and either the mask tensors or the object tensors.
         """
-        # Find the maximum length of the captions.
-        max_len = max([sample.caption_tokens.size(0) for sample in batch])
-
         # Standardize the captions length.
         tensor_captions = None
         masked_captions_tensor = None
@@ -123,18 +120,20 @@ class PromptableDeTRDataLoader:
         # Concatenate objects.
         if not aligner:
 
-            # Find the maximum number of objects.
-            max_objs = max([len(sample.objects) for sample in batch])
-
             # Standardize the objects length.
             tensor_objects = None
             for sample in batch:
                 
                 bbox_tensor = sample.bbox_tensor
-                if bbox_tensor.size(0) != max_objs:
+
+                # Add presence column.
+                presence = torch.ones(size=(bbox_tensor.size(0), 1), dtype=torch.float32)
+                bbox_tensor = torch.cat(tensors=[bbox_tensor, presence], dim=-1)
+
+                if bbox_tensor.size(0) != max_len:
 
                     # Pad the objects.
-                    pad_len = max_objs - bbox_tensor.size(0)
+                    pad_len = max_len - bbox_tensor.size(0)
                     bbox_tensor = F.pad(input=bbox_tensor, pad=(0, 0, 0, pad_len), value=pad_value)
 
                 bbox_tensor = bbox_tensor.unsqueeze(dim=0)
