@@ -152,13 +152,13 @@ class Trainer:
             logits_caption = self.tokenizer.decode(indices=logits_sample, remove_special_tokens=False)[0]
             y_caption = self.tokenizer.decode(indices=y_sample, remove_special_tokens=False)[0]
 
-            return logits_caption, y_caption
+            return y_caption, logits_caption
 
         else:
             logits_objs = logits[batch_index].cpu().numpy().tolist()
             y_objs = y[batch_index].cpu().numpy().tolist()
 
-            return logits_objs, y_objs
+            return y_objs, logits_objs
     
 
     def __save_model(self, valid_loss, valid_time, samples):
