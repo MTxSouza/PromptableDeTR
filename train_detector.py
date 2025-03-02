@@ -111,8 +111,7 @@ def main():
     # Create the model.
     print("Creating the model...")
     model = get_model(args=args, data_loader=train_data_loader)
-    model.load_base_weights(image_encoder_weights=args.image_encoder_weights, text_encoder_weights=args.text_encoder_weights)
-    model.freeze_encoder()
+    model.load_full_weights(base_model_weights=args.base_model_weights)
 
     # Train the model.
     trainer = Trainer(
