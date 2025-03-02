@@ -123,7 +123,7 @@ class PromptableDeTRDataLoader:
         if not aligner:
 
             # Find the maximum number of objects.
-            max_objs = max([len(sample.objects) for sample in batch])
+            max_objs = max([len(sample.bbox) for sample in batch])
 
             # Standardize the objects length.
             tensor_objects = None
