@@ -158,6 +158,8 @@ class PromptableDeTR(BasePromptableDeTR):
         """
         logger.info(msg="Computing the detector loss.")
 
+        assert self.matcher is not None, "Matcher is not defined."
+
         # Sort the logits and labels.
         pred_presence = logits[:, :, 4:]
         pred_boxes = logits[:, :, :4]
