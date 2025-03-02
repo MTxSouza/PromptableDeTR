@@ -434,8 +434,6 @@ class MobileNetV3(nn.Module):
             param.requires_grad = False
         for param in self.features_2.parameters():
             param.requires_grad = False
-        for param in self.features_3.parameters():
-            param.requires_grad = False
 
 
 
