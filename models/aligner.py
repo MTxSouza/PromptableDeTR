@@ -108,7 +108,7 @@ class Aligner(BasePromptableDeTR):
 
     def save_model(self, dir_path, loss, samples, ckpt_step = None, is_best = False):
         """
-        Save the base model weights.
+        Save the model weights.
 
         Args:
             dir_path (str): The path to the directory where the weights will be saved.
