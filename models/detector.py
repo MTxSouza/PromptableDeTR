@@ -21,7 +21,17 @@ class PromptableDeTR(BasePromptableDeTR):
 
 
     # Special methods.
-    def __init__(self, proj_dim = 512, **kwargs):
+    def __init__(
+            self, 
+            image_tokens, 
+            vocab_size = 30522, 
+            emb_dim = 128, 
+            proj_dim = 512, 
+            num_heads = 8, 
+            ff_dim = 2048, 
+            emb_dropout_rate = 0.1, 
+            num_joiner_layers = 3
+        ):
         """
         Initializes the Detector class used to predict bounding boxes and presence 
         of objects in the image.
@@ -29,7 +39,16 @@ class PromptableDeTR(BasePromptableDeTR):
         Args:
             proj_dim (int): The projection dimension of the image and text embeddings. (Default: 512)
         """
-        super().__init__(**kwargs)
+        super().__init__(
+            image_tokens=image_tokens, 
+            vocab_size=vocab_size, 
+            emb_dim=emb_dim, 
+            proj_dim=proj_dim, 
+            num_heads=num_heads, 
+            ff_dim=ff_dim, 
+            emb_dropout_rate=emb_dropout_rate, 
+            num_joiner_layers=num_joiner_layers
+        )
 
         # Layers.
         self.detector = nn.Sequential(
