@@ -169,10 +169,6 @@ class PrepareBBox(BaseTransform):
         # Transform the bounding box.
         bbox = sample.bbox
         bbox = torch.tensor(data=bbox, dtype=torch.float32)
-
-        _, h, w = sample.image.shape
-        bbox[:, 0::2] /= w
-        bbox[:, 1::2] /= h
         sample.bbox_tensor = bbox
 
         return sample
