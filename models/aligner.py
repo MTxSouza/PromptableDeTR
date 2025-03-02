@@ -117,7 +117,7 @@ class Aligner(BasePromptableDeTR):
             ckpt_step (int): The checkpoint step. (Default: None)
             is_best (bool): Whether the checkpoint is the best. (Default: False)
         """
-        logger.info(msg="Saving the base model weights.")
+        logger.info(msg="Saving the model weights.")
 
         # Define the checkpoint path.
         base_model_name = "base-model"
