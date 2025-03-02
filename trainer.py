@@ -149,8 +149,8 @@ class Trainer:
             y_sample = y[batch_index].cpu().numpy().tolist()
 
             # Decode samples.
-            logits_caption = self.train_dataset.tokenizer.decode(indices=logits_sample, remove_special_tokens=False)[0]
-            y_caption = self.train_dataset.tokenizer.decode(indices=y_sample, remove_special_tokens=False)[0]
+            logits_caption = self.tokenizer.decode(indices=logits_sample, remove_special_tokens=False)[0]
+            y_caption = self.tokenizer.decode(indices=y_sample, remove_special_tokens=False)[0]
 
             return logits_caption, y_caption
 
