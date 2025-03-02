@@ -206,16 +206,22 @@ def get_args():
         help="The path to the experiment directory."
     )
     training_parser.add_argument(
-        "--bbox-weight",
+        "--giou-weight",
         type=float,
         default=1.0,
-        help="The weight for the bounding box loss."
+        help="The weight for the GIoU loss."
     )
     training_parser.add_argument(
         "--presence-weight",
         type=float,
         default=1.0,
         help="The weight for the presence loss."
+    )
+    training_parser.add_argument(
+        "--l1-weight",
+        type=float,
+        default=1.0,
+        help="The weight for the L1 loss."
     )
 
     # Parse the arguments.
