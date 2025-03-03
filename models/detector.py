@@ -277,7 +277,7 @@ class PromptableDeTR(BasePromptableDeTR):
         bbox_loss = bbox_loss.sum() / num_boxes
         logger.debug(msg="- Bounding box loss: %s." % bbox_loss)
 
-        giou_loss = 1 - torch.diag(generalized_iou(sorted_pred_boxes, sorted_true_boxes))
+        giou_loss = 1 - torch.diag(generalized_iou(flt_sorted_pred_boxes, flt_sorted_true_boxes))
         giou_loss = giou_loss.sum() / num_boxes
         logger.debug(msg="- GIoU loss: %s." % giou_loss)
 
