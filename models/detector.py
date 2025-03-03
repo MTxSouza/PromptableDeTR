@@ -181,9 +181,22 @@ class PromptableDeTR(BasePromptableDeTR):
             f.write("Loss: %s\n\n" % loss)
             f.write("Samples:\n")
             for (y_sample, y_pred) in samples:
-                f.write("True: %s\n" % str(y_sample))
-                f.write("Pred: %s\n" % str(y_pred))
-                f.write("\n")
+                f.write("True:")
+                for idx, (x1, y1, x2, y2) in enumerate(iterable=y_sample):
+                    x1 = round(x1, 4)
+                    y1 = round(y1, 4)
+                    x2 = round(x2, 4)
+                    y2 = round(y2, 4)
+                    f.write("\t%dº Object : (%d, %d, %d, %d)\n" % (idx, x1, y1, x2, y2))
+                f.write("Pred:")
+                for idx, (x1, y1, x2, y2, no_obj_conf, obj_conf) in enumerate(iterable=y_pred):
+                    x1 = round(x1, 4)
+                    y1 = round(y1, 4)
+                    x2 = round(x2, 4)
+                    y2 = round(y2, 4)
+                    no_obj_conf = round(no_obj_conf * 100, 2)
+                    obj_conf = round(obj_conf * 100, 2)
+                    f.write("\t%dº Object : (%d, %d, %d, %d) | Prob : (No: %d% ; Present: %d%)\n" % (idx, x1, y1, x2, y2, no_obj_conf, obj_conf))
 
 
 
