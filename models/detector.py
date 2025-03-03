@@ -253,7 +253,7 @@ class PromptableDeTR(BasePromptableDeTR):
         flt_sorted_pred_boxes = sorted_pred_boxes.view(-1, 4)
         flt_sorted_true_boxes = sorted_true_boxes.view(-1, 4)
         bbox_loss = F.l1_loss(input=flt_sorted_pred_boxes, target=flt_sorted_true_boxes, reduction="mean")
-        giou_loss = -torch.diag(generalized_iou(sorted_pred_boxes, sorted_true_boxes))
+        giou_loss = 1 - torch.diag(generalized_iou(sorted_pred_boxes, sorted_true_boxes))
         giou_loss = giou_loss.mean()
 
         # Compute the total loss.
