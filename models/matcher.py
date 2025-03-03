@@ -5,6 +5,7 @@ detection task.
 import torch
 import torch.nn as nn
 from scipy.optimize import linear_sum_assignment
+from torchvision.ops.boxes import box_area
 
 from logger import Logger
 
@@ -27,8 +28,8 @@ def generalized_iou(boxes1, boxes2):
     logger.debug(msg="- Computing the IoU between the two sets of boxes.")
 
     # Compute area.
-    area1 = (boxes1[:, 2] - boxes1[:, 0]) * (boxes1[:, 3] - boxes1[:, 1])  # (N,)
-    area2 = (boxes2[:, 2] - boxes2[:, 0]) * (boxes2[:, 3] - boxes2[:, 1])  # (M,)
+    area1 = box_area(boxes1)
+    area2 = box_area(boxes2)
 
     # Compute intersection.
     lt = torch.max(boxes1[:, None, :2], boxes2[:, :2])
@@ -37,7 +38,7 @@ def generalized_iou(boxes1, boxes2):
     inter = wh[:, :, 0] * wh[:, :, 1]
 
     # Compute union.
-    union = area1[:, None] + area2[None, :] - inter
+    union = area1[:, None] + area2 - inter
 
     # Compute IoU.
     iou = inter / union
@@ -48,7 +49,7 @@ def generalized_iou(boxes1, boxes2):
     wh = (rb - lt).clamp(min=0)
     area = wh[:, :, 0] * wh[:, :, 1]
 
-    giou = iou - (area - union) / (area + 1e-6)
+    giou = iou - (area - union) / area
 
     return giou
 
