@@ -159,8 +159,13 @@ class Trainer:
             return y_caption, logits_caption
 
         else:
-            logits_objs = logits[batch_index].cpu().numpy().tolist()
-            y_objs = y[batch_index].cpu().numpy().tolist()
+            logits_objs = logits[batch_index].cpu().numpy()
+            y_objs = y[batch_index].cpu().numpy()
+
+            # Filter the objects.
+            logits_max = logits_objs[:, 4:].argmax(axis=1)
+            logits_objs = logits_objs[logits_max == 1][:, :4].tolist()
+            y_objs = y_objs[y_objs[:, 4] == 1][:, :4].tolist()
 
             return y_objs, logits_objs
     
