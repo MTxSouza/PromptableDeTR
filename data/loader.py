@@ -246,6 +246,9 @@ class PromptableDeTRDataLoader:
                 else:
                     # Get random object.
                     n_objs = len(raw_sample["objects"])
+                    if n_objs == 0: # BUGFIX: Skip samples with no objects.
+                        continue
+
                     curr_obj = raw_sample["objects"][np.random.randint(0, n_objs)]
 
                     # Get current caption.
