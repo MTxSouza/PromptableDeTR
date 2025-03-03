@@ -108,16 +108,20 @@ class Trainer:
         images, captions, extra_data = PromptableDeTRDataLoader.convert_batch_into_tensor(batch=batch, aligner=self.is_aligner)
         images = images.to(device=self.device)
         captions = captions.to(device=self.device)
-        extra_data = extra_data.to(device=self.device)
 
         def run_forward(model, images, captions, extra_data):
             # Check if the model is an Aligner or a Detector.
             if self.is_aligner:
-                logits = model(images, extra_data) # Input: Image and the masked caption.
+                masked_caption = extra_data["masked_caption"].to(device=self.device)
+                mask = extra_data["mask"].to(device=self.device)
+
+                logits = model(images, masked_caption, mask) # Input: Image, masked caption and the mask to occlude padded tokens.
                 return logits, captions # Output: Pred caption and the true caption.
             else:
+                bbox = extra_data["bbox"].to(device=self.device)
+
                 logits = model(images, captions) # Input: Image and the caption.
-                return logits, extra_data # Output: Pred boxes and presences and the true boxes and presences.
+                return logits, bbox # Output: Pred boxes and presences and the true boxes and presences.
 
         # Run the forward pass.
         if not is_training:
