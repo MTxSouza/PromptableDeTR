@@ -46,8 +46,9 @@ def generalized_iou(boxes1, boxes2):
     """
     logger.debug(msg="- Computing the IoU between the two sets of boxes.")
 
-    # Convert predictions to (x1, y1, x2, y2).
-    boxes1 = xywh2xyxy(boxes=boxes1) # Only the predicted boxes is needed.
+    # Convert coordinates to (x1, y1, x2, y2).
+    boxes1 = xywh2xyxy(boxes=boxes1)
+    boxes2 = xywh2xyxy(boxes=boxes2)
 
     assert (boxes1[:, 2:] >= boxes1[:, :2]).all()
     assert (boxes2[:, 2:] >= boxes2[:, :2]).all()

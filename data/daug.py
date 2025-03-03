@@ -172,13 +172,15 @@ class PrepareBBox(BaseTransform):
 
         # Normalize the bounding box.
         _, h, w = sample.image.shape
-        bbox[:, 0::2] /= w
-        bbox[:, 1::2] /= h
+        
+        # Transform the bounding box from xyxy to xywh.
+        new_bbox = torch.zeros_like(bbox)
+        new_bbox[:, 0] = (bbox[:, 0] + bbox[:, 2]) / 2
+        new_bbox[:, 1] = (bbox[:, 1] + bbox[:, 3]) / 2
+        new_bbox[:, 2] = bbox[:, 2] - bbox[:, 0]
+        new_bbox[:, 3] = bbox[:, 3] - bbox[:, 1]
 
-        # Clamp the bounding box to [0, 1].
-        bbox = torch.clamp(input=bbox, min=0, max=1)
-
-        sample.bbox_tensor = bbox
+        sample.bbox_tensor = new_bbox
 
         return sample
 
