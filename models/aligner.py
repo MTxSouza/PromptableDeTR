@@ -137,7 +137,7 @@ class Aligner(BasePromptableDeTR):
         log_fp = os.path.join(dir_path, aligner_name + ".log")
 
         # Save the weights.
-        torch.save(obj=self.get_base_model_state_dict, f=base_model_ckpt_fp)
+        torch.save(obj=super().state_dict(), f=base_model_ckpt_fp)
 
         # Save the log.
         with open(file=log_fp, mode="w") as f:

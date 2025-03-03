@@ -111,18 +111,6 @@ class BasePromptableDeTR(Encoder):
         )
 
 
-    # Properties.
-    @property
-    def get_base_model_state_dict(self):
-        """
-        Get the state dictionary of the base model.
-
-        Returns:
-            Dict[str, torch.Tensor]: The state dictionary of the base model.
-        """
-        return self.state_dict()
-
-
     # Methods.
     def load_base_weights(self, image_encoder_weights = None, text_encoder_weights = None):
         """
