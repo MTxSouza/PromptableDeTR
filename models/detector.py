@@ -60,6 +60,9 @@ class PromptableDeTR(BasePromptableDeTR):
         self.bbox_predictor = nn.Linear(in_features=proj_dim * 2, out_features=4)
         self.presence_predictor = nn.Linear(in_features=proj_dim * 2, out_features=2)
 
+        # Initialize weights.
+        self.__initialize_weights()
+
         # Matcher.
         self.__presence_weight = None
         self.__l1_weight = None
@@ -68,6 +71,20 @@ class PromptableDeTR(BasePromptableDeTR):
 
 
     # Private methods.
+    def __initialize_weights(self):
+        """
+        Initialize the weights of the model.
+        """
+        def init_weights(module):
+            if isinstance(module, nn.Linear):
+                nn.init.xavier_uniform_(module.weight)
+                nn.init.zeros_(module.bias)
+        
+        self.detector.apply(init_weights)
+        self.bbox_predictor.apply(init_weights)
+        self.presence_predictor.apply(init_weights)
+
+
     def __get_indices(self, matcher_indices):
         """
         Organize the indices to be used in the loss computation.
