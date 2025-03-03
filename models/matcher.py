@@ -93,35 +93,34 @@ class HuggarianMatcher(nn.Module):
         """
         # Get the batch size and number of predicted objects.
         B, N = predict_scores.size()[:2]
+        indices = []
 
-        # Flatten the predicted scores and boxes.
-        flt_predict_scores = predict_scores.view(-1, 2).softmax(dim=1)
-        flt_predict_boxes = predict_boxes.view(-1, 4)
+        for batch in range(B):
 
-        # Join all targets.
-        all_scores = scores.view(-1)
-        all_boxes = boxes.view(-1, 4)
-        obj_idx = all_scores == 1
-        all_scores = all_scores[obj_idx]
-        all_boxes = all_boxes[obj_idx]
+            # Get the predicted scores and boxes for the current batch.
+            batch_predict_scores = predict_scores[batch].softmax(dim=1)
+            batch_predict_boxes = predict_boxes[batch]
+            batch_scores = scores[batch]
+            batch_boxes = boxes[batch]
 
-        # Compute presence loss.
-        # presence_loss = -flt_predict_scores[torch.arange(B * N)[:, None], all_scores[None, :]]
-        presence_loss = -flt_predict_scores[:, all_scores]
+            obj_idx = batch_scores == 1
+            batch_scores = batch_scores[obj_idx]
+            batch_boxes = batch_boxes[obj_idx]
 
-        # Compute L1 loss.
-        l1_loss = torch.cdist(flt_predict_boxes, all_boxes, p=1)
+            # Compute presence loss.
+            presence_loss = -batch_predict_boxes[:, batch_scores]
 
-        # Compute GIoU loss.
-        giou_loss = -generalized_iou(flt_predict_boxes, all_boxes)
+            # Compute L1 loss.
+            l1_loss = torch.cdist(batch_predict_boxes, batch_boxes, p=1)
 
-        # Compute matrix loss.
-        mtx_loss = self.presence_loss_weight * presence_loss + self.l1_loss_weight * l1_loss + self.giou_loss_weight * giou_loss
-        mtx_loss = mtx_loss.view(B, N, -1).cpu()
+            # Compute GIoU loss.
+            giou_loss = -generalized_iou(batch_predict_boxes, batch_boxes)
 
-        # Compute the best matching.
-        n_targets = [(scores[i] == 1).sum() for i in range(B)]
-        indices = [linear_sum_assignment(mtx[i]) for i, mtx in enumerate(iterable=mtx_loss.split(split_size=n_targets, dim=-1))]
+            # Compute matrix loss.
+            mtx_loss = self.presence_loss_weight * presence_loss + self.l1_loss_weight * l1_loss + self.giou_loss_weight * giou_loss
+            row_idx, col_idx = linear_sum_assignment(mtx_loss.cpu())
+            indices.append((row_idx, col_idx))
+
         indices = [(torch.as_tensor(i, dtype=torch.int64), torch.as_tensor(j, dtype=torch.int64)) for i, j in indices]
 
         return indices
