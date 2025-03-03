@@ -115,7 +115,7 @@ class HuggarianMatcher(nn.Module):
             l1_loss = torch.cdist(batch_predict_boxes, batch_boxes, p=1)
 
             # Compute GIoU loss.
-            giou_loss = -generalized_iou(batch_predict_boxes, batch_boxes)
+            giou_loss = 1 - generalized_iou(batch_predict_boxes, batch_boxes)
 
             # Compute matrix loss.
             mtx_loss = self.presence_loss_weight * presence_loss + self.l1_loss_weight * l1_loss + self.giou_loss_weight * giou_loss
