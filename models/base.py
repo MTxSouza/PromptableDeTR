@@ -150,7 +150,7 @@ class BasePromptableDeTR(Encoder):
         weights = torch.load(f=base_model_weights, weights_only=True)
         filtered_weights = {k: v for k, v in weights.items() if k in current_state_dict}
 
-        self.load_state_dict(filtered_weights)
+        self.load_state_dict(filtered_weights, strict=False)
 
 
     def forward(self, image, prompt, prompt_mask = None):
