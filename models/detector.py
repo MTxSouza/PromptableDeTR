@@ -233,7 +233,8 @@ class PromptableDeTR(BasePromptableDeTR):
         # Compute presence loss.
         flt_sorted_pred_presence = sorted_pred_presence.view(-1, 2)
         flt_sorted_true_presence = sorted_true_presence.view(-1)
-        presence_loss = F.cross_entropy(input=flt_sorted_pred_presence, target=flt_sorted_true_presence, reduction="mean")
+        presence_weight = torch.tensor([1.0, self.__presence_weight], device=flt_sorted_pred_presence.device)
+        presence_loss = F.cross_entropy(input=flt_sorted_pred_presence, target=flt_sorted_true_presence, weight=presence_weight, reduction="mean")
 
         # Compute bounding box loss.
         flt_sorted_pred_boxes = sorted_pred_boxes.view(-1, 4)
