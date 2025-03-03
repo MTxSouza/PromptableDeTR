@@ -95,28 +95,32 @@ class HuggarianMatcher(nn.Module):
         B, N = predict_scores.size()[:2]
 
         # Flatten the predicted scores and boxes.
-        flt_predict_scores = predict_scores.view(-1, 2)
+        flt_predict_scores = predict_scores.view(-1, 2).softmax(dim=1)
         flt_predict_boxes = predict_boxes.view(-1, 4)
 
         # Join all targets.
         all_scores = scores.view(-1)
         all_boxes = boxes.view(-1, 4)
+        obj_idx = all_scores == 1
+        all_scores = all_scores[obj_idx]
+        all_boxes = all_boxes[obj_idx]
 
         # Compute presence loss.
-        presence_loss = -flt_predict_scores[torch.arange(B * N)[:, None], all_scores[None, :]]
+        # presence_loss = -flt_predict_scores[torch.arange(B * N)[:, None], all_scores[None, :]]
+        presence_loss = -flt_predict_scores[:, all_scores]
 
         # Compute L1 loss.
         l1_loss = torch.cdist(flt_predict_boxes, all_boxes, p=1)
 
         # Compute GIoU loss.
-        giou_loss = 1 - generalized_iou(flt_predict_boxes, all_boxes)
+        giou_loss = -generalized_iou(flt_predict_boxes, all_boxes)
 
         # Compute matrix loss.
         mtx_loss = self.presence_loss_weight * presence_loss + self.l1_loss_weight * l1_loss + self.giou_loss_weight * giou_loss
         mtx_loss = mtx_loss.view(B, N, -1).cpu()
 
         # Compute the best matching.
-        n_targets = [scores.shape[1] for _ in range(B)]
+        n_targets = [(scores[i] == 1).sum() for i in range(B)]
         indices = [linear_sum_assignment(mtx[i]) for i, mtx in enumerate(iterable=mtx_loss.split(split_size=n_targets, dim=-1))]
         indices = [(torch.as_tensor(i, dtype=torch.int64), torch.as_tensor(j, dtype=torch.int64)) for i, j in indices]
 
