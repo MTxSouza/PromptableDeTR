@@ -14,6 +14,25 @@ logger = Logger(name="model")
 
 
 # Functions.
+def xywh2xyxy(boxes):
+    """
+    This function converts the coordinates from (x, y, w, h) to (x1, y1, x2, y2).
+
+    Args:
+        boxes (torch.Tensor): The boxes with shape (N, 4).
+
+    Returns:
+        torch.Tensor: The converted boxes with shape (N, 4).
+    """
+    cx, cy, w, h = boxes.unbind(dim=-1)
+    x1 = cx - w / 2
+    y1 = cy - h / 2
+    x2 = cx + w / 2
+    y2 = cy + h / 2
+    new_boxes = torch.stack([x1, y1, x2, y2], dim=-1)
+    return new_boxes
+
+
 def generalized_iou(boxes1, boxes2):
     """
     Compute the Generalized Intersection over Union (GIoU) between two sets of boxes.
@@ -26,6 +45,10 @@ def generalized_iou(boxes1, boxes2):
         torch.Tensor: The GIoU between the two sets of boxes.
     """
     logger.debug(msg="- Computing the IoU between the two sets of boxes.")
+
+    # Convert predictions to (x1, y1, x2, y2).
+    boxes1 = xywh2xyxy(boxes=boxes1) # Only the predicted boxes is needed.
+
     assert (boxes1[:, 2:] >= boxes1[:, :2]).all()
     assert (boxes2[:, 2:] >= boxes2[:, :2]).all()
 
