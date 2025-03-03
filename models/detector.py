@@ -197,7 +197,7 @@ class PromptableDeTR(BasePromptableDeTR):
             f.write("Detector results:\n")
             f.write("Loss: %s\n\n" % loss)
             f.write("Samples:\n")
-            print("=" * 50)
+            f.write("=" * 50)
             for (y_sample, y_pred) in samples:
                 f.write("True:\n")
                 for idx, (x1, y1, x2, y2) in enumerate(iterable=y_sample):
@@ -215,7 +215,7 @@ class PromptableDeTR(BasePromptableDeTR):
                     no_obj_conf = round(no_obj_conf * 100, 2)
                     obj_conf = round(obj_conf * 100, 2)
                     f.write("\t%dº Object : (%f, %f, %f, %f) | Prob : (No: %f%% - Present: %f%%)\n" % (idx, x1, y1, x2, y2, no_obj_conf, obj_conf))
-                f.write("=" * 50)
+                f.write("=" * 50 + "\n")
 
 
     def load_base_model(self, base_model_weights):
