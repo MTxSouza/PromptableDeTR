@@ -5,6 +5,7 @@
 
 # General params.
 SEED=${SEED:-"42"}
+SKIP_ALIGNER=${SKIP_ALIGNER:-"False"}
 
 # Dataset params.
 DATASET_DIR=${DATASET_DIR}
@@ -41,30 +42,32 @@ L1_WEIGHT=${L1_WEIGHT:-"1.0"}
 
 python install_utilities.py
 
-python train_aligner.py \
-        --dataset-dir $DATASET_DIR \
-        --image-dir $IMAGE_DIR \
-        --aligner \
-        --valid-split $VALID_SPLIT \
-        --mask-ratio $MASK_RATIO \
-        --shuffle \
-        --vocab-file $VOCAB_FILE \
-        --imgw $IMG_ENC_WEIGHT \
-        --txtw $TXT_ENC_WEIGHT \
-        --image-size $IMG_SIZE \
-        --image-tokens 1600 400 100 \
-        --emb-dim 128 \
-        --proj-dim 512 \
-        --emb-dropout-rate 0.1 \
-        --heads 8 \
-        --ff-dim 2048 \
-        --num-joiner-layers $NUM_JOINER_LAYERS \
-        --max-iter $MAX_ITER \
-        --batch-size $BATCH_SIZE \
-        --lr $LR \
-        --overfit-threshold $OVERFIT_THRESHOLD \
-        --overfit-patience $OVERFIT_PATIENTE \
-        --exp-dir $ALIGNER_EXP_DIR
+if [ "$SKIP_ALIGNER" == "False" ]; then
+        python train_aligner.py \
+                --dataset-dir $DATASET_DIR \
+                --image-dir $IMAGE_DIR \
+                --aligner \
+                --valid-split $VALID_SPLIT \
+                --mask-ratio $MASK_RATIO \
+                --shuffle \
+                --vocab-file $VOCAB_FILE \
+                --imgw $IMG_ENC_WEIGHT \
+                --txtw $TXT_ENC_WEIGHT \
+                --image-size $IMG_SIZE \
+                --image-tokens 1600 400 100 \
+                --emb-dim 128 \
+                --proj-dim 512 \
+                --emb-dropout-rate 0.1 \
+                --heads 8 \
+                --ff-dim 2048 \
+                --num-joiner-layers $NUM_JOINER_LAYERS \
+                --max-iter $MAX_ITER \
+                --batch-size $BATCH_SIZE \
+                --lr $LR \
+                --overfit-threshold $OVERFIT_THRESHOLD \
+                --overfit-patience $OVERFIT_PATIENTE \
+                --exp-dir $ALIGNER_EXP_DIR
+fi
 
 # Get the base model weight.
 BBASE_MODEL_WEIGHT=$(ls "$ALIGNER_EXP_DIR"/base-model-best-*.pth | sort -t '-' -k5,5nr | head -1)
