@@ -187,6 +187,21 @@ class PromptableDeTR(BasePromptableDeTR):
                 f.write("\n")
 
 
+
+    def load_base_model(self, base_model_weights):
+        """
+        Load the weights of the base model only.
+
+        Args:
+            base_model_weights (str): Path to the base model weights.
+        """
+        logger.info(msg="Loading the base model weights.")
+        logger.debug(msg="- Base model weights: %s" % base_model_weights)
+
+        # Load weights.
+        super().load_full_weights(base_model_weights=base_model_weights)
+
+
     def compute_loss(self, logits, labels):
         """
         Compute the loss needed to train the detector model.
