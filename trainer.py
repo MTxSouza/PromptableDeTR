@@ -175,6 +175,7 @@ class Trainer:
         if self.__best_loss > valid_loss:
             self.__best_loss = valid_loss
             is_best = True
+            self.__overfit_counter = 0 # Reset the overfit counter.
         
         # Check if it is overfitting.
         elif abs(self.__current_train_loss - valid_loss) > self.overfit_threshold:
