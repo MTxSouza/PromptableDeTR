@@ -181,9 +181,8 @@ class PromptableDeTR(BasePromptableDeTR):
             f.write("Loss: %s\n\n" % loss)
             f.write("Samples:\n")
             for (y_sample, y_pred) in samples:
-                for true_box, pred_box in zip(y_sample, y_pred):
-                    f.write("True: %s\n" % str(true_box))
-                    f.write("Pred: %s\n" % str(pred_box))
+                f.write("True: %s\n" % str(y_sample))
+                f.write("Pred: %s\n" % str(y_pred))
                 f.write("\n")
 
 
