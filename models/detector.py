@@ -270,7 +270,7 @@ class PromptableDeTR(BasePromptableDeTR):
         # Compute bounding box loss.
         flt_sorted_pred_boxes = sorted_pred_boxes.view(-1, 4)
         flt_sorted_true_boxes = sorted_true_boxes.view(-1, 4)
-        bbox_loss = F.l1_loss(input=flt_sorted_pred_boxes, target=flt_sorted_true_boxes, reduction="mean")
+        bbox_loss = F.l1_loss(input=flt_sorted_pred_boxes, target=flt_sorted_true_boxes, reduction="none")
         giou_loss = 1 - torch.diag(generalized_iou(sorted_pred_boxes, sorted_true_boxes))
         giou_loss = giou_loss.mean()
         logger.debug(msg="- Bounding box loss: %s." % bbox_loss)
