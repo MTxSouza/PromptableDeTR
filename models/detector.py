@@ -197,7 +197,7 @@ class PromptableDeTR(BasePromptableDeTR):
             f.write("Detector results:\n")
             f.write("Loss: %s\n\n" % loss)
             f.write("Samples:\n")
-            f.write("=" * 50)
+            f.write("=" * 50 + "\n")
             for (y_sample, y_pred) in samples:
                 f.write("True:\n")
                 for idx, (x1, y1, x2, y2) in enumerate(iterable=y_sample):
