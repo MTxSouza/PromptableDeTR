@@ -75,6 +75,14 @@ fi
 # Get the base model weight.
 BASE_MODEL_WEIGHT=$(ls "$ALIGNER_EXP_DIR"/base-model-best-*.pth | sort -t '-' -k5,5nr | head -1)
 
+# Delete other ckpts to free space.
+for ckpt in "$ALIGNER_EXP_DIR"/*.pth; do
+        fp=$(basename "$ckpt")
+        if [ "$fp" != "$BASE_MODEL_WEIGHT" ]; then
+                rm "$ckpt"
+        fi
+done
+
 python train_detector.py \
         --dataset-dir $DATASET_DIR \
         --image-dir $IMAGE_DIR \
@@ -102,6 +110,16 @@ python train_detector.py \
         --presence-weight $PRESENCE_WEIGHT \
         --l1-weight $L1_WEIGHT
 
+# Get the best model.
 BEST_MODEL=$(ls "$DETECTOR_EXP_DIR"/*-best-*.pth | sort -t '-' -k5,5nr | head -1)
+
+# Delete other ckpts to free space.
+for ckpt in "$DETECTOR_EXP_DIR"/*.pth; do
+        fp=$(basename "$ckpt")
+        if [ "$fp" != "$BEST_MODEL" ]; then
+                rm "$ckpt"
+        fi
+done
+
 echo "All models has been trained."
 echo "- Checkpoint of the best model : $BEST_MODEL"
