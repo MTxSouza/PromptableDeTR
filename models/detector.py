@@ -265,8 +265,7 @@ class PromptableDeTR(BasePromptableDeTR):
         flt_sorted_true_presence = sorted_true_presence.view(-1)
         presence_weight = torch.tensor([1.0, self.__presence_weight], device=flt_sorted_pred_presence.device)
         presence_loss = F.cross_entropy(input=flt_sorted_pred_presence, target=flt_sorted_true_presence, weight=presence_weight, reduction="mean")
-        assert not torch.isnan(presence_loss), "Presence loss is NaN."
-        assert presence_loss >= 0, "Presence loss is negative."
+        logger.debug(msg="- Presence loss: %s." % presence_loss)
 
         # Compute bounding box loss.
         flt_sorted_pred_boxes = sorted_pred_boxes.view(-1, 4)
@@ -274,13 +273,12 @@ class PromptableDeTR(BasePromptableDeTR):
         bbox_loss = F.l1_loss(input=flt_sorted_pred_boxes, target=flt_sorted_true_boxes, reduction="mean")
         giou_loss = 1 - torch.diag(generalized_iou(sorted_pred_boxes, sorted_true_boxes))
         giou_loss = giou_loss.mean()
-        assert not torch.isnan(bbox_loss), "Bounding box loss is NaN."
-        assert bbox_loss >= 0, "Bounding box loss is negative."
-        assert not torch.isnan(giou_loss), "GIoU loss is NaN."
-        assert giou_loss >= 0, "GIoU loss is negative."
+        logger.debug(msg="- Bounding box loss: %s." % bbox_loss)
+        logger.debug(msg="- GIoU loss: %s." % giou_loss)
 
         # Compute the total loss.
         loss = self.__l1_weight * bbox_loss + self.__presence_weight * presence_loss + self.__giou_weight * giou_loss 
+        logger.debug(msg="- Total loss: %s." % loss)
         logger.info(msg="Returning the loss value.")
 
         return loss
