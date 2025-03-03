@@ -175,6 +175,9 @@ class PrepareBBox(BaseTransform):
         bbox[:, 0::2] /= w
         bbox[:, 1::2] /= h
 
+        # Clip the bounding box to [0, 1].
+        bbox = torch.clamp(input=bbox, min=0, max=1)
+
         sample.bbox_tensor = bbox
 
         return sample
