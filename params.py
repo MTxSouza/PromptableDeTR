@@ -94,7 +94,7 @@ def get_args():
     )
     model_parser.add_argument(
         "--base-model-weights",
-        "-bmw",
+        "--bmw",
         type=str,
         default=None,
         help="Path to the full base model weights."
