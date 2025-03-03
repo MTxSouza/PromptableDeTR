@@ -71,7 +71,7 @@ if [ "$SKIP_ALIGNER" == "False" ]; then
 fi
 
 # Get the base model weight.
-BBASE_MODEL_WEIGHT=$(ls "$ALIGNER_EXP_DIR"/base-model-best-*.pth | sort -t '-' -k5,5nr | head -1)
+BASE_MODEL_WEIGHT=$(ls "$ALIGNER_EXP_DIR"/base-model-best-*.pth | sort -t '-' -k5,5nr | head -1)
 
 python train_detector.py \
         --dataset-dir $DATASET_DIR \
