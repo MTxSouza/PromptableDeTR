@@ -101,7 +101,7 @@ class PromptableDeTRDataLoader:
 
             caption_tokens = caption_tokens.unsqueeze(dim=0)
             mask = torch.ones_like(input=caption_tokens, dtype=torch.int32)
-            mask[masked_captions_tensor == pad_value] = 0
+            mask[caption_tokens == pad_value] = 0
 
             if tensor_captions is None:
                 tensor_captions = caption_tokens
