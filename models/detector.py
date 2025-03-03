@@ -260,9 +260,12 @@ class PromptableDeTR(BasePromptableDeTR):
         sorted_true_presence = true_presence[(batch_idx, tgt_idx)]
         sorted_true_boxes = true_boxes[(batch_idx, tgt_idx)]
 
-        # Compute presence loss.
         flt_sorted_pred_presence = sorted_pred_presence.view(-1, 2)
         flt_sorted_true_presence = sorted_true_presence.view(-1)
+        num_boxes = flt_sorted_true_presence.sum()
+        logger.debug(msg="- Number of boxes: %s." % num_boxes)
+
+        # Compute presence loss.
         presence_weight = torch.tensor([1.0, self.__presence_weight], device=flt_sorted_pred_presence.device)
         presence_loss = F.cross_entropy(input=flt_sorted_pred_presence, target=flt_sorted_true_presence, weight=presence_weight, reduction="mean")
         logger.debug(msg="- Presence loss: %s." % presence_loss)
@@ -271,9 +274,11 @@ class PromptableDeTR(BasePromptableDeTR):
         flt_sorted_pred_boxes = sorted_pred_boxes.view(-1, 4)
         flt_sorted_true_boxes = sorted_true_boxes.view(-1, 4)
         bbox_loss = F.l1_loss(input=flt_sorted_pred_boxes, target=flt_sorted_true_boxes, reduction="none")
-        giou_loss = 1 - torch.diag(generalized_iou(sorted_pred_boxes, sorted_true_boxes))
-        giou_loss = giou_loss.mean()
+        bbox_loss = bbox_loss.sum() / num_boxes
         logger.debug(msg="- Bounding box loss: %s." % bbox_loss)
+
+        giou_loss = 1 - torch.diag(generalized_iou(sorted_pred_boxes, sorted_true_boxes))
+        giou_loss = giou_loss.sum() / num_boxes
         logger.debug(msg="- GIoU loss: %s." % giou_loss)
 
         # Compute the total loss.
