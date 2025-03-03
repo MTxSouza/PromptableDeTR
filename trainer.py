@@ -163,7 +163,7 @@ class Trainer:
             y_objs = y[batch_index].cpu().numpy()
 
             # Filter the objects.
-            logits_max = logits_objs[:, 4:].argmax(axis=1)
+            logits_max = logits_objs[:, 4:].argmax(dim=1)
             logits_objs = logits_objs[logits_max == 1]
             logits_objs[:, 4:] = logits_objs[:, 4:].softmax(dim=1)
             logits_objs = logits_objs.numpy().tolist()
