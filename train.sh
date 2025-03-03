@@ -64,6 +64,8 @@ if [ "$SKIP_ALIGNER" == "False" ]; then
                 --num-joiner-layers $NUM_JOINER_LAYERS \
                 --max-iter $MAX_ITER \
                 --batch-size $BATCH_SIZE \
+                --log-interval $LOG_INTERVAL \
+                --eval-interval $EVAL_INTERVAL \
                 --lr $LR \
                 --overfit-threshold $OVERFIT_THRESHOLD \
                 --overfit-patience $OVERFIT_PATIENTE \
@@ -90,6 +92,8 @@ python train_detector.py \
         --num-joiner-layers $NUM_JOINER_LAYERS \
         --max-iter $MAX_ITER \
         --batch-size $BATCH_SIZE \
+        --log-interval $LOG_INTERVAL \
+        --eval-interval $EVAL_INTERVAL \
         --lr $LR \
         --overfit-threshold $OVERFIT_THRESHOLD \
         --overfit-patience $OVERFIT_PATIENTE \
