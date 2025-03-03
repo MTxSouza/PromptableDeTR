@@ -108,7 +108,7 @@ class HuggarianMatcher(nn.Module):
             batch_boxes = batch_boxes[obj_idx]
 
             # Compute presence loss.
-            presence_loss = -batch_predict_boxes[:, batch_scores]
+            presence_loss = -batch_predict_scores[:, batch_scores]
 
             # Compute L1 loss.
             l1_loss = torch.cdist(batch_predict_boxes, batch_boxes, p=1)
