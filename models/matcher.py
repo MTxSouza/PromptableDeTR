@@ -26,6 +26,8 @@ def generalized_iou(boxes1, boxes2):
         torch.Tensor: The GIoU between the two sets of boxes.
     """
     logger.debug(msg="- Computing the IoU between the two sets of boxes.")
+    assert (boxes1[:, 2:] >= boxes1[:, :2]).all()
+    assert (boxes2[:, 2:] >= boxes2[:, :2]).all()
 
     # Compute area.
     area1 = box_area(boxes1)
