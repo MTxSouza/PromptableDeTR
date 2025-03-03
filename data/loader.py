@@ -82,11 +82,13 @@ class PromptableDeTRDataLoader:
             aligner (bool): Whether to convert the batch for the aligner model. (Default: False)
 
         Returns:
-            Tuple[torch.Tensor, torch.Tensor, torch.Tensor]: The image, caption, and either the mask tensors or the object tensors.
+            Tuple[torch.Tensor, torch.Tensor, dict]: The image, caption and the extra data needed for the model.
         """
         # Standardize the captions length.
         tensor_captions = None
         masked_captions_tensor = None
+        mask_tensors = None
+        tensor_objects = None
         for sample in batch:
 
             caption_tokens = sample.caption_tokens
@@ -109,10 +111,15 @@ class PromptableDeTRDataLoader:
                     sample.masked_caption_tokens = F.pad(input=sample.masked_caption_tokens, pad=(0, pad_len), value=pad_value)
                 sample.masked_caption_tokens = sample.masked_caption_tokens.unsqueeze(dim=0)
 
+                mask = torch.ones_like(input=sample.masked_caption_tokens, dtype=torch.int32)
+                mask[masked_captions_tensor == pad_value] = 0
+
                 if masked_captions_tensor is None:
                     masked_captions_tensor = sample.masked_caption_tokens
+                    mask_tensors = mask
                 else:
-                    masked_captions_tensor = torch.cat(tensors=(masked_captions_tensor, sample.masked_caption_tokens), dim=pad_value)
+                    masked_captions_tensor = torch.cat(tensors=(masked_captions_tensor, sample.masked_caption_tokens), dim=0)
+                    mask_tensors = torch.cat(tensors=(mask_tensors, mask), dim=0)
 
         # Concatenate the image tensors.
         tensor_images = torch.cat(tensors=[sample.image.unsqueeze(dim=0) for sample in batch], dim=0)
@@ -121,7 +128,6 @@ class PromptableDeTRDataLoader:
         if not aligner:
 
             # Standardize the objects length.
-            tensor_objects = None
             for sample in batch:
                 
                 bbox_tensor = sample.bbox_tensor
@@ -142,7 +148,14 @@ class PromptableDeTRDataLoader:
                 else:
                     tensor_objects = torch.cat(tensors=(tensor_objects, bbox_tensor), dim=0)
         
-        return tensor_images, tensor_captions, masked_captions_tensor if aligner else tensor_objects
+        # Create the extra data.
+        extra_data = {
+            "masked_caption": masked_captions_tensor, 
+            "mask": mask_tensors, 
+            "bbox": tensor_objects
+        }
+        
+        return tensor_images, tensor_captions, extra_data
 
 
     # Special methods.
