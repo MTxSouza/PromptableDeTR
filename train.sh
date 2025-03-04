@@ -76,7 +76,7 @@ fi
 BASE_MODEL_WEIGHT=$(ls "$ALIGNER_EXP_DIR"/base-model-best-*.pth | sort -t '-' -k5,5nr | head -1)
 
 # Delete other ckpts to free space.
-if [ "$BASE_MODEL_WEIGHT" ]; then
+if [ -n "$BASE_MODEL_WEIGHT" ]; then
         for ckpt in "$ALIGNER_EXP_DIR"/*.pth; do
                 if [ "$ckpt" != "$BASE_MODEL_WEIGHT" ]; then
                         rm "$ckpt"
