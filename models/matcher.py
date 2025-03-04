@@ -130,9 +130,9 @@ class HuggarianMatcher(nn.Module):
             batch_scores = scores[batch]
             batch_boxes = boxes[batch]
 
-            # obj_idx = batch_scores == 1
-            # batch_scores = batch_scores[obj_idx]
-            # batch_boxes = batch_boxes[obj_idx]
+            obj_idx = batch_scores == 1
+            batch_scores = batch_scores[obj_idx]
+            batch_boxes = batch_boxes[obj_idx]
 
             # Compute presence loss.
             presence_loss = -batch_predict_scores[:, batch_scores]
