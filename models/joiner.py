@@ -328,13 +328,6 @@ class Joiner(nn.Module):
         num_image_feature_levels = len(image_tokens)
         self.level_emb = nn.Parameter(data=torch.Tensor(num_image_feature_levels, emb_dim))
 
-        # Weights for contrastive loss.
-        self.__img_emb = None
-        self.__txt_emb = None
-        self.__w_img = nn.Parameter(data=torch.Tensor(emb_dim, emb_dim))
-        self.__w_txt = nn.Parameter(data=torch.Tensor(emb_dim, emb_dim))
-        self.__temp = 0.7
-
 
     # Properties.
     @property
@@ -349,40 +342,6 @@ class Joiner(nn.Module):
 
 
     # Methods.
-    def contrastive_loss(self):
-        """
-        Compute the contrastive loss between text and image embeddings.
-
-        Returns:
-            torch.Tensor: Contrastive loss tensor.
-        """
-        logger.debug(msg="Calling `Joiner` contrastive loss method.")
-        assert self.__img_emb is not None and self.__txt_emb is not None, "Embeddings are not available."
-
-        # Join text and image embeddings.
-        feat_image = F.normalize(input=self.__img_emb @ self.__w_img, p=2, dim=2)
-        feat_text = F.normalize(input=self.__txt_emb @ self.__w_txt, p=2, dim=2)
-
-        # Scale similarities.
-        temp = torch.tensor(self.__temp).to(feat_image.device)
-        logits = feat_image @ feat_text.transpose(-2, -1) * torch.exp(temp)
-
-        # Compute contrastive loss.
-        batch_size = logits.size(0)
-        
-        img_labels = torch.arange(logits.size(1)).unsqueeze(dim=0).to(logits.device)
-        img_labels = img_labels.expand(batch_size, -1)
-
-        txt_labels = torch.arange(logits.size(2)).unsqueeze(dim=1).to(logits.device)
-        txt_labels = txt_labels.expand(batch_size, -1)
-
-        loss_img = F.cross_entropy(logits, txt_labels)
-        loss_txt = F.cross_entropy(logits.transpose(-2, -1), img_labels)
-        loss = (loss_img + loss_txt) / 2
-
-        return loss
-
-
     def forward(self, image_features, text_embedding):
         """
         Forward pass of the joiner block.
@@ -429,10 +388,10 @@ class Joiner(nn.Module):
         logger.debug(msg="Processed image features shape: %s" % (processed_image_features.shape,))
 
         # Join text and image embeddings.
-        self.__img_emb = processed_image_features
-        self.__txt_emb = text_embedding
+        embeddings = (text_embedding, processed_image_features)
         for joiner_block in self.joiner_blocks:
-            text_embedding = joiner_block(text_embedding, processed_image_features)
-            logger.debug(msg="Text embedding shape: %s" % (text_embedding.shape,))
+            embeddings = joiner_block(*embeddings)
+            embeddings = (embeddings, embeddings)
+            logger.debug(msg="Text embedding shape: %s" % (embeddings.shape,))
 
         return text_embedding
