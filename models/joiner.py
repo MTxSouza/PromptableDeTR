@@ -368,9 +368,16 @@ class Joiner(nn.Module):
         logits = feat_image @ feat_text.transpose(-2, -1) * torch.exp(temp)
 
         # Compute contrastive loss.
-        labels = torch.arange(logits.size(0)).to(logits.device)
-        loss_img = F.cross_entropy(logits, labels)
-        loss_txt = F.cross_entropy(logits.transpose(-2, -1), labels)
+        batch_size = logits.size(0)
+        
+        img_labels = torch.arange(logits.size(1)).unsqueeze(dim=0).to(logits.device)
+        img_labels = img_labels.expand(batch_size, -1)
+
+        txt_labels = torch.arange(logits.size(2)).unsqueeze(dim=1).to(logits.device)
+        txt_labels = txt_labels.expand(batch_size, -1)
+
+        loss_img = F.cross_entropy(logits, txt_labels)
+        loss_txt = F.cross_entropy(logits.transpose(-2, -1), img_labels)
         loss = (loss_img + loss_txt) / 2
 
         return loss
