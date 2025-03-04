@@ -286,7 +286,8 @@ class PromptableDeTR(BasePromptableDeTR):
         presence_weight = None
         if self.__presence_weight != 1.0:
             presence_weight = torch.tensor([1.0, self.__presence_weight], device=pred_presence.device)
-        presence_loss = F.cross_entropy(input=pred_presence, target=new_scores, weight=presence_weight, reduction="mean")
+        B, N, C = pred_presence.shape
+        presence_loss = F.cross_entropy(input=pred_presence.view(B * N, C), target=new_scores.view(-1), weight=presence_weight, reduction="mean")
         logger.debug(msg="- Presence loss: %s." % presence_loss)
 
         # Compute bounding box loss.
