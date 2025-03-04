@@ -282,11 +282,8 @@ class PromptableDeTR(BasePromptableDeTR):
         giou_loss = giou_loss.sum() / num_boxes
         logger.debug(msg="- GIoU loss: %s." % giou_loss)
 
-        # Compute contrastive loss.
-        contrastive_loss = self.joiner.contrastive_loss()
-
         # Compute the total loss.
-        loss = self.__l1_weight * bbox_loss + self.__presence_weight * presence_loss + self.__giou_weight * giou_loss + contrastive_loss
+        loss = self.__l1_weight * bbox_loss + self.__presence_weight * presence_loss + self.__giou_weight * giou_loss
         logger.debug(msg="- Total loss: %s." % loss)
         logger.info(msg="Returning the loss value.")
 
