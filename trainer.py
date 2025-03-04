@@ -73,7 +73,7 @@ class Trainer:
         self.__best_loss = float("inf")
         self.__is_overfitting = False
         self.__overfit_counter = 0
-        self.__current_train_loss = 0.0
+        self.__losses = []
 
 
     # Private methods.
@@ -90,6 +90,23 @@ class Trainer:
 
         # Move the model to the device.
         self.model.to(device=self.device)
+
+
+    def __compute_current_training_loss(self, reset = True):
+        """
+        It computes the current training loss.
+
+        Args:
+            reset (bool): Whether to reset the loss or not. (Default: True)
+
+        Returns:
+            float: The current training loss.
+        """
+        # Compute mean loss.
+        mean_loss = sum(self.__losses) / len(self.__losses)
+        if reset:
+            self.__losses.clear()
+        return mean_loss
     
 
     def __run_forward(self, model, batch, is_training = True):
@@ -183,13 +200,14 @@ class Trainer:
         """
         # Save the model weights.
         is_best = False
+        current_train_loss = self.__compute_current_training_loss()
         if self.__best_loss > valid_loss:
             self.__best_loss = valid_loss
             is_best = True
             self.__overfit_counter = 0 # Reset the overfit counter.
         
         # Check if it is overfitting.
-        elif abs(self.__current_train_loss - valid_loss) > self.overfit_threshold:
+        elif abs(current_train_loss - valid_loss) > self.overfit_threshold:
             self.__overfit_counter += 1
             if self.__overfit_counter >= self.overfit_patience:
                 print("Overfitting detected. Stopping training.")
@@ -231,10 +249,11 @@ class Trainer:
                 self.optimizer.step()
 
                 # Check if it is time to log the loss.
-                self.__current_train_loss = loss.cpu().detach().numpy().item()
+                self.__losses.append(loss.cpu().detach().numpy().item())
                 if self.__current_iter % self.log_interval == 0:
+                    current_loss = self.__compute_current_training_loss(reset=False)
                     print("Iteration [%d/%d]" % (self.__current_iter, self.max_iter))
-                    print("Loss: %.4f" % self.__current_train_loss)
+                    print("Loss: %.4f" % current_loss)
                     print("-" * 100)
 
                 # Check if it is time to validate the model.
