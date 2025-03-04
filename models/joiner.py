@@ -364,7 +364,8 @@ class Joiner(nn.Module):
         feat_text = F.normalize(input=self.__txt_emb @ self.__w_txt, p=2, dim=2)
 
         # Scale similarities.
-        logits = feat_image @ feat_text.transpose(-2, -1) * torch.exp(self.__temp)
+        temp = torch.tensor(self.__temp).to(feat_image.device)
+        logits = feat_image @ feat_text.transpose(-2, -1) * torch.exp(temp)
 
         # Compute contrastive loss.
         labels = torch.arange(logits.size(0)).to(logits.device)
