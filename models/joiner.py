@@ -394,4 +394,4 @@ class Joiner(nn.Module):
             embeddings = (embeddings, embeddings)
             logger.debug(msg="Text embedding shape: %s" % (embeddings.shape,))
 
-        return text_embedding
+        return embeddings[0]
