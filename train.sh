@@ -77,8 +77,7 @@ BASE_MODEL_WEIGHT=$(ls "$ALIGNER_EXP_DIR"/base-model-best-*.pth | sort -t '-' -k
 
 # Delete other ckpts to free space.
 for ckpt in "$ALIGNER_EXP_DIR"/*.pth; do
-        fp=$(basename "$ckpt")
-        if [ "$fp" != "$BASE_MODEL_WEIGHT" ]; then
+        if [ "$ckpt" != "$BASE_MODEL_WEIGHT" ]; then
                 rm "$ckpt"
         fi
 done
@@ -115,8 +114,7 @@ BEST_MODEL=$(ls "$DETECTOR_EXP_DIR"/*-best-*.pth | sort -t '-' -k5,5nr | head -1
 
 # Delete other ckpts to free space.
 for ckpt in "$DETECTOR_EXP_DIR"/*.pth; do
-        fp=$(basename "$ckpt")
-        if [ "$fp" != "$BEST_MODEL" ]; then
+        if [ "$ckpt" != "$BEST_MODEL" ]; then
                 rm "$ckpt"
         fi
 done
