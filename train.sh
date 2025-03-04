@@ -88,6 +88,8 @@ python train_detector.py \
         --valid-split $VALID_SPLIT \
         --shuffle \
         --vocab-file $VOCAB_FILE \
+        --imgw $IMG_ENC_WEIGHT \
+        --txtw $TXT_ENC_WEIGHT \
         --bmw $BASE_MODEL_WEIGHT \
         --image-size $IMG_SIZE \
         --image-tokens 1600 400 100 \
