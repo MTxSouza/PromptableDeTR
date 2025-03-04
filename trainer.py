@@ -207,7 +207,7 @@ class Trainer:
             self.__overfit_counter = 0 # Reset the overfit counter.
         
         # Check if it is overfitting.
-        elif abs(current_train_loss - valid_loss) > self.overfit_threshold:
+        elif valid_loss - current_train_loss > self.overfit_threshold:
             self.__overfit_counter += 1
             if self.__overfit_counter >= self.overfit_patience:
                 print("Overfitting detected. Stopping training.")
