@@ -123,13 +123,14 @@ class PromptableDeTR(BasePromptableDeTR):
         )
 
 
-    def forward(self, image, prompt):
+    def forward(self, image, prompt, prompt_mask = None):
         """
         Forward pass of the detector.
 
         Args:
             image (torch.Tensor): Image tensor.
             prompt (torch.Tensor): Prompt tensor.
+            prompt_mask (torch.Tensor): Prompt mask tensor. (Default: None)
 
         Returns:
             torch.Tensor: The predicted bounding boxes and presence.
@@ -140,7 +141,7 @@ class PromptableDeTR(BasePromptableDeTR):
 
         # Compute joint embeddings.
         logger.debug(msg="- Calling `BasePromptableDeTR` forward method.")
-        joint = super().forward(image=image, prompt=prompt)
+        joint = super().forward(image=image, prompt=prompt, prompt_mask=prompt_mask)
         logger.debug(msg="- Result of the `BasePromptableDeTR` forward method: %s." % (joint.shape,))
 
         # Predict bounding boxes and presence.
