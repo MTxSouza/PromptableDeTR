@@ -273,7 +273,7 @@ class PromptableDeTR(BasePromptableDeTR):
         logger.debug(msg="- Sorted true boxes shape: %s." % (sorted_true_boxes.shape,))
 
         # Define new scores labels.
-        new_scores = torch.full(size=sorted_pred_presence.shape[:2], fill_value=0, device=sorted_pred_presence.device).long()
+        new_scores = torch.full(size=pred_presence.shape[:2], fill_value=0, device=sorted_pred_presence.device).long()
         logger.debug(msg="- New scores shape: %s." % (new_scores.shape,))
         new_scores[(batch_idx, tgt_idx)] = sorted_true_presence
 
