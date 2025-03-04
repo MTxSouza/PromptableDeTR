@@ -253,16 +253,28 @@ class PromptableDeTR(BasePromptableDeTR):
         pred_boxes = logits[:, :, :4]
         true_presence = labels[:, :, 4].long()
         true_boxes = labels[:, :, :4]
+        logger.debug(msg="- Predicted presence shape: %s." % (pred_presence.shape,))
+        logger.debug(msg="- Predicted boxes shape: %s." % (pred_boxes.shape,))
+        logger.debug(msg="- True presence shape: %s." % (true_presence.shape,))
+        logger.debug(msg="- True boxes shape: %s." % (true_boxes.shape,))
         indices = self.matcher(predict_scores=pred_presence, predict_boxes=pred_boxes, scores=true_presence, boxes=true_boxes)
         batch_idx, src_idx, tgt_idx = self.__get_indices(matcher_indices=indices)
+        logger.debug(msg="- Batch index shape: %s." % (batch_idx.shape,))
+        logger.debug(msg="- Source index shape: %s." % (src_idx.shape,))
+        logger.debug(msg="- Target index shape: %s." % (tgt_idx.shape,))
 
         sorted_pred_presence = pred_presence[(batch_idx, src_idx)]
         sorted_pred_boxes = pred_boxes[(batch_idx, src_idx)]
         sorted_true_presence = true_presence[(batch_idx, tgt_idx)]
         sorted_true_boxes = true_boxes[(batch_idx, tgt_idx)]
+        logger.debug(msg="- Sorted predicted presence shape: %s." % (sorted_pred_presence.shape,))
+        logger.debug(msg="- Sorted predicted boxes shape: %s." % (sorted_pred_boxes.shape,))
+        logger.debug(msg="- Sorted true presence shape: %s." % (sorted_true_presence.shape,))
+        logger.debug(msg="- Sorted true boxes shape: %s." % (sorted_true_boxes.shape,))
 
         # Define new scores labels.
         new_scores = torch.full(size=sorted_pred_presence.shape[:2], fill_value=0, device=sorted_pred_presence.device).long()
+        logger.debug(msg="- New scores shape: %s." % (new_scores.shape,))
         new_scores[(batch_idx, tgt_idx)] = sorted_true_presence
 
         # Compute number of boxes.
