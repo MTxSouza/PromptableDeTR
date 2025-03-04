@@ -111,7 +111,8 @@ def main():
     # Create the model.
     print("Creating the model...")
     model = get_model(args=args, data_loader=train_data_loader)
-    model.load_full_weights(base_model_weights=args.base_model_weights)
+    if args.base_model_weights is not None:
+        model.load_full_weights(base_model_weights=args.base_model_weights)
 
     # Train the model.
     trainer = Trainer(
