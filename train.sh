@@ -82,6 +82,8 @@ if [ "$BASE_MODEL_WEIGHT" ]; then
                         rm "$ckpt"
                 fi
         done
+else
+        BASE_MODEL_WEIGHT=None
 fi
 
 python train_detector.py \
