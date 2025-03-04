@@ -391,7 +391,7 @@ class Joiner(nn.Module):
         embeddings = (text_embedding, processed_image_features)
         for joiner_block in self.joiner_blocks:
             embeddings = joiner_block(*embeddings)
-            embeddings = (embeddings, embeddings)
             logger.debug(msg="Text embedding shape: %s" % (embeddings.shape,))
+            embeddings = (embeddings, embeddings)
 
         return embeddings[0]
