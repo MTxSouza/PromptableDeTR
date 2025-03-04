@@ -76,11 +76,13 @@ fi
 BASE_MODEL_WEIGHT=$(ls "$ALIGNER_EXP_DIR"/base-model-best-*.pth | sort -t '-' -k5,5nr | head -1)
 
 # Delete other ckpts to free space.
-for ckpt in "$ALIGNER_EXP_DIR"/*.pth; do
-        if [ "$ckpt" != "$BASE_MODEL_WEIGHT" ]; then
-                rm "$ckpt"
-        fi
-done
+if [ "$BASE_MODEL_WEIGHT" ]; then
+        for ckpt in "$ALIGNER_EXP_DIR"/*.pth; do
+                if [ "$ckpt" != "$BASE_MODEL_WEIGHT" ]; then
+                        rm "$ckpt"
+                fi
+        done
+fi
 
 python train_detector.py \
         --dataset-dir $DATASET_DIR \
