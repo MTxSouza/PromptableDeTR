@@ -262,9 +262,8 @@ class PromptableDeTR(BasePromptableDeTR):
         sorted_true_boxes = true_boxes[(batch_idx, tgt_idx)]
 
         # Define new scores labels.
-        new_scores = torch.full(size=sorted_pred_presence.shape[:2], fill_value=0).long()
-        new_scores[(batch_idx, tgt_idx)] = 1
-        new_scores = new_scores.to(device=sorted_pred_presence.device)
+        new_scores = torch.full(size=sorted_pred_presence.shape[:2], fill_value=0, device=sorted_pred_presence.device).long()
+        new_scores[(batch_idx, tgt_idx)] = sorted_pred_presence
 
         # Compute number of boxes.
         obj_idx = new_scores == 1
