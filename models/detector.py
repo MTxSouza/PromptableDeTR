@@ -261,8 +261,12 @@ class PromptableDeTR(BasePromptableDeTR):
         sorted_true_presence = true_presence[(batch_idx, tgt_idx)]
         sorted_true_boxes = true_boxes[(batch_idx, tgt_idx)]
 
+        # Define new scores labels.
+        new_scores = torch.full(size=sorted_pred_presence.shape[:2], fill_value=0, device=sorted_pred_presence.device)
+        new_scores[(batch_idx, tgt_idx)] = sorted_true_presence
+
         # Compute number of boxes.
-        obj_idx = sorted_true_presence == 1
+        obj_idx = new_scores == 1
         num_boxes = obj_idx.sum()
         logger.debug(msg="- Number of boxes: %s." % num_boxes)
 
@@ -270,7 +274,7 @@ class PromptableDeTR(BasePromptableDeTR):
         presence_weight = None
         if self.__presence_weight != 1.0:
             presence_weight = torch.tensor([1.0, self.__presence_weight], device=sorted_pred_presence.device)
-        presence_loss = F.cross_entropy(input=sorted_pred_presence, target=sorted_true_presence, weight=presence_weight, reduction="mean")
+        presence_loss = F.cross_entropy(input=sorted_pred_presence, target=new_scores, weight=presence_weight, reduction="mean")
         logger.debug(msg="- Presence loss: %s." % presence_loss)
 
         # Compute bounding box loss.
