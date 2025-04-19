@@ -113,8 +113,6 @@ def main():
         image_encoder_weights=args.image_encoder_weights,
         text_encoder_weights=args.text_encoder_weights
     )
-    if args.base_model_weights is not None:
-        model.load_full_weights(base_model_weights=args.base_model_weights)
 
     # Train the model.
     trainer = Trainer(
@@ -129,8 +127,7 @@ def main():
         max_iter=args.max_iter,
         overfit_threshold=args.overfit_threshold,
         overfit_patience=args.overfit_patience,
-        exp_dir=args.exp_dir,
-        is_aligner=False
+        exp_dir=args.exp_dir
     )
     trainer.train()
 

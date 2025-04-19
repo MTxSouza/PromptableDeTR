@@ -42,12 +42,6 @@ def get_args():
         help="The path to the image directory."
     )
     dataset_parser.add_argument(
-        "--aligner",
-        "-a",
-        action="store_true",
-        help="Whether to use the aligner samples."
-    )
-    dataset_parser.add_argument(
         "--valid-split",
         "--valid",
         "-vs",
