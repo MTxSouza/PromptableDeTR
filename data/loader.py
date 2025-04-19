@@ -10,7 +10,7 @@ import torch
 import torch.nn.functional as F
 
 from data.daug import PrepareAlignerSample, PrepareDetectionSample
-from data.schemas import AlignerSample, DetectorSample, Sample
+from data.schemas import AlignerSample, DetectorSample
 
 
 # Classes.
@@ -49,7 +49,7 @@ class PromptableDeTRDataLoader:
                 raw_sample = json.load(fp=f)
 
             # Check if the samples are valid.
-            Sample(**raw_sample)
+            DetectorSample(**raw_sample)
             del raw_sample
 
             # Append the samples.
@@ -229,7 +229,6 @@ class PromptableDeTRDataLoader:
                 # Load the samples.
                 with open(file=file, mode="r") as f:
                     raw_sample = json.load(fp=f)
-                    raw_sample["image_path"] = os.path.join(self.image_directory, raw_sample.pop("image_name"))
 
                 # Load the samples for a specific model.
                 if self.aligner:
