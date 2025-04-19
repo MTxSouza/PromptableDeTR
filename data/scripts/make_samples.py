@@ -150,7 +150,7 @@ def make_sample(image_file, annot_file, captions):
 
 def main():
     """
-    Main function to execute the script."
+    Main function to execute the script.
     """
     # Parse command line arguments.
     args = parse_args()
