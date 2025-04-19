@@ -47,7 +47,6 @@ class PromptableDeTRDataLoader:
             sample_file = os.path.join(sample_directory, file)
             with open(file=sample_file, mode="r") as f:
                 raw_sample = json.load(fp=f)
-                raw_sample["image_path"] = raw_sample.pop("image_name")
 
             # Check if the samples are valid.
             Sample(**raw_sample)
