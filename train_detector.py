@@ -40,8 +40,7 @@ def get_data_loader(args):
             ReshapeImage(image_size=args.image_size)
         ],
         shuffle=args.shuffle,
-        seed=args.seed,
-        aligner=False # Mandatory for Detector training.
+        seed=args.seed
     )
 
     valid_data_loader = PromptableDeTRDataLoader(
@@ -53,8 +52,7 @@ def get_data_loader(args):
             ReshapeImage(image_size=args.image_size)
         ],
         shuffle=args.shuffle,
-        seed=args.seed,
-        aligner=False # Mandatory for Detector training.
+        seed=args.seed
     )
 
     return train_data_loader, valid_data_loader

@@ -27,8 +27,7 @@ class Trainer:
             max_iter, 
             overfit_threshold,
             overfit_patience,
-            exp_dir,
-            is_aligner = False
+            exp_dir
         ):
         """
         Initializes the Trainer class used to train models.
@@ -46,7 +45,6 @@ class Trainer:
             overfit_threshold (float): The threshold to consider overfitting.
             overfit_patience (int): The number of iterations to wait before considering overfitting.
             exp_dir (str): The directory to save the experiment.
-            is_aligner (bool): Whether the model is an Aligner or not. (Default: False)
         """
         # Attributes.
         self.trainer_name = trainer_name
@@ -61,10 +59,7 @@ class Trainer:
         self.overfit_threshold = overfit_threshold
         self.overfit_patience = overfit_patience
         self.exp_dir = exp_dir
-        self.is_aligner = is_aligner
         self.tokenizer = None
-        if is_aligner:
-            self.tokenizer = train_dataset.get_tokenizer()
     
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -122,23 +117,15 @@ class Trainer:
             Tuple[torch.Tensor, torch.Tensor]: The logits and the labels.
         """
         # Convert the batch into tensors.
-        images, captions, mask, extra_data = PromptableDeTRDataLoader.convert_batch_into_tensor(batch=batch, aligner=self.is_aligner)
+        images, captions, mask, extra_data = PromptableDeTRDataLoader.convert_batch_into_tensor(batch=batch)
         images = images.to(device=self.device)
         captions = captions.to(device=self.device)
         mask = mask.to(device=self.device)
 
         def run_forward(model, images, captions, extra_data):
-            # Check if the model is an Aligner or a Detector.
-            if self.is_aligner:
-                masked_caption = extra_data["masked_caption"].to(device=self.device)
-
-                logits = model(images, masked_caption, mask) # Input: Image, masked caption and the mask to occlude padded tokens.
-                return logits, captions # Output: Pred caption and the true caption.
-            else:
-                bbox = extra_data["bbox"].to(device=self.device)
-
-                logits = model(images, captions, mask) # Input: Image, caption and the mask to occlude padded tokens.
-                return logits, bbox # Output: Pred boxes and presences and the true boxes and presences.
+            bbox = extra_data["bbox"].to(device=self.device)
+            logits = model(images, captions, mask) # Input: Image, caption and the mask to occlude padded tokens.
+            return logits, bbox # Output: Pred boxes and presences and the true boxes and presences.
 
         # Run the forward pass.
         if not is_training:
@@ -165,28 +152,17 @@ class Trainer:
         batch_index = torch.randint(low=0, high=y.size(0), size=(1,)).item()
 
         # Retrieve samples.
-        if self.is_aligner:
-            logits_sample = logits[batch_index].argmax(dim=1).cpu().numpy().tolist()
-            y_sample = y[batch_index].cpu().numpy().tolist()
+        logits_objs = logits[batch_index].cpu()
+        y_objs = y[batch_index].cpu().numpy()
 
-            # Decode samples.
-            logits_caption = self.tokenizer.decode(indices=logits_sample, remove_special_tokens=False)[0]
-            y_caption = self.tokenizer.decode(indices=y_sample, remove_special_tokens=False)[0]
+        # Filter the objects.
+        logits_max = logits_objs[:, 4:].argmax(dim=1)
+        logits_objs = logits_objs[logits_max == 1]
+        logits_objs[:, 4:] = logits_objs[:, 4:].softmax(dim=1)
+        logits_objs = logits_objs.numpy().tolist()
+        y_objs = y_objs[y_objs[:, 4] == 1][:, :4].tolist()
 
-            return y_caption, logits_caption
-
-        else:
-            logits_objs = logits[batch_index].cpu()
-            y_objs = y[batch_index].cpu().numpy()
-
-            # Filter the objects.
-            logits_max = logits_objs[:, 4:].argmax(dim=1)
-            logits_objs = logits_objs[logits_max == 1]
-            logits_objs[:, 4:] = logits_objs[:, 4:].softmax(dim=1)
-            logits_objs = logits_objs.numpy().tolist()
-            y_objs = y_objs[y_objs[:, 4] == 1][:, :4].tolist()
-
-            return y_objs, logits_objs
+        return y_objs, logits_objs
     
 
     def __save_model(self, valid_loss, valid_time, samples):
