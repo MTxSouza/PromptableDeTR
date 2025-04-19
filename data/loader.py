@@ -9,8 +9,8 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 
-from data.daug import PrepareAlignerSample, PrepareDetectionSample
-from data.schemas import AlignerSample, DetectorSample, Sample
+from data.daug import PrepareSample
+from data.schemas import Sample
 
 
 # Classes.
@@ -47,7 +47,6 @@ class PromptableDeTRDataLoader:
             sample_file = os.path.join(sample_directory, file)
             with open(file=sample_file, mode="r") as f:
                 raw_sample = json.load(fp=f)
-                raw_sample["image_path"] = raw_sample.pop("image_name")
 
             # Check if the samples are valid.
             Sample(**raw_sample)
@@ -71,7 +70,7 @@ class PromptableDeTRDataLoader:
 
     # Static methods.
     @staticmethod
-    def convert_batch_into_tensor(batch, max_len = 100, pad_value = 0, aligner = False):
+    def convert_batch_into_tensor(batch, max_len = 100, pad_value = 0):
         """
         Convert a list of AlignerSample objects into tensors.
 
@@ -79,7 +78,6 @@ class PromptableDeTRDataLoader:
             batch (List[AlignerSample]): The batch of samples.
             max_len (int): Maximum number of context length and object predictions. (Default: 100)
             pad_value (int): The padding value. (Default: 0)
-            aligner (bool): Whether to convert the batch for the aligner model. (Default: False)
 
         Returns:
             Tuple[torch.Tensor, torch.Tensor, torch.Tensor, dict]: The image, caption, mask to occlude the caption and the extra data needed for the model.
@@ -109,45 +107,30 @@ class PromptableDeTRDataLoader:
             else:
                 tensor_captions = torch.cat(tensors=(tensor_captions, caption_tokens), dim=0)
                 mask_tensors = torch.cat(tensors=(mask_tensors, mask), dim=0)
-            
-            # Update mask.
-            if aligner:
-
-                if sample.masked_caption_tokens.size(0) != max_len:
-                    sample.masked_caption_tokens = F.pad(input=sample.masked_caption_tokens, pad=(0, pad_len), value=pad_value)
-                sample.masked_caption_tokens = sample.masked_caption_tokens.unsqueeze(dim=0)
-
-                if masked_captions_tensor is None:
-                    masked_captions_tensor = sample.masked_caption_tokens
-                else:
-                    masked_captions_tensor = torch.cat(tensors=(masked_captions_tensor, sample.masked_caption_tokens), dim=0)
 
         # Concatenate the image tensors.
         tensor_images = torch.cat(tensors=[sample.image.unsqueeze(dim=0) for sample in batch], dim=0)
 
-        # Concatenate objects.
-        if not aligner:
+        # Standardize the objects length.
+        for sample in batch:
+            
+            bbox_tensor = sample.bbox_tensor
 
-            # Standardize the objects length.
-            for sample in batch:
-                
-                bbox_tensor = sample.bbox_tensor
+            # Add presence column.
+            presence = torch.ones(size=(bbox_tensor.size(0), 1), dtype=torch.float32)
+            bbox_tensor = torch.cat(tensors=[bbox_tensor, presence], dim=-1)
 
-                # Add presence column.
-                presence = torch.ones(size=(bbox_tensor.size(0), 1), dtype=torch.float32)
-                bbox_tensor = torch.cat(tensors=[bbox_tensor, presence], dim=-1)
+            if bbox_tensor.size(0) != max_len:
 
-                if bbox_tensor.size(0) != max_len:
+                # Pad the objects.
+                pad_len = max_len - bbox_tensor.size(0)
+                bbox_tensor = F.pad(input=bbox_tensor, pad=(0, 0, 0, pad_len), value=pad_value)
 
-                    # Pad the objects.
-                    pad_len = max_len - bbox_tensor.size(0)
-                    bbox_tensor = F.pad(input=bbox_tensor, pad=(0, 0, 0, pad_len), value=pad_value)
-
-                bbox_tensor = bbox_tensor.unsqueeze(dim=0)
-                if tensor_objects is None:
-                    tensor_objects = bbox_tensor
-                else:
-                    tensor_objects = torch.cat(tensors=(tensor_objects, bbox_tensor), dim=0)
+            bbox_tensor = bbox_tensor.unsqueeze(dim=0)
+            if tensor_objects is None:
+                tensor_objects = bbox_tensor
+            else:
+                tensor_objects = torch.cat(tensors=(tensor_objects, bbox_tensor), dim=0)
         
         # Create the extra data.
         extra_data = {
@@ -166,7 +149,6 @@ class PromptableDeTRDataLoader:
             batch_size, 
             transformations = None, 
             shuffle = True, 
-            aligner = False, 
             seed = 42
         ):
         """
@@ -178,7 +160,6 @@ class PromptableDeTRDataLoader:
             batch_size (int): The batch size.
             transformations (List[BaseTransform]): The transforms to apply to the data. (Default: None)
             shuffle (bool): Whether to shuffle the samples. (Default: True)
-            aligner (bool): Whether to use the aligner model. (Default: False)
             seed (int): The seed for the random number generator. (Default: 42)
         """
 
@@ -189,11 +170,8 @@ class PromptableDeTRDataLoader:
         if transformations is None:
             raise ValueError("Transformations must be specified.")
 
-        if aligner:
-            if not isinstance(transformations[0], PrepareAlignerSample):
-                raise ValueError("Transformations must be a list containing the PrepareAlignerSample class.")
-        elif not isinstance(transformations[0], PrepareDetectionSample):
-            raise ValueError("Transformations must be a list containing the PrepareDetectionSample class.")
+        if not isinstance(transformations[0], PrepareSample):
+            raise ValueError("Transformations must be a list containing the PrepareSample class.")
 
         # Shuffle the samples.
         if shuffle:
@@ -206,7 +184,6 @@ class PromptableDeTRDataLoader:
         self.batch_size = batch_size
         self.shuffle = shuffle
         self.transformations = transformations
-        self.aligner = aligner
         self.seed = seed
 
 
@@ -230,34 +207,9 @@ class PromptableDeTRDataLoader:
                 # Load the samples.
                 with open(file=file, mode="r") as f:
                     raw_sample = json.load(fp=f)
-                    raw_sample["image_path"] = os.path.join(self.image_directory, raw_sample.pop("image_name"))
 
-                # Load the samples for a specific model.
-                if self.aligner:
-                    # Get random caption.
-                    n_caps = len(raw_sample["captions"])
-                    curr_cap = raw_sample["captions"][np.random.randint(0, n_caps)]
-                    raw_sample["caption"] = curr_cap
-                    del raw_sample["objects"], raw_sample["captions"]
-
-                    # Define sample.
-                    sample = AlignerSample(**raw_sample)
-
-                else:
-                    # Get random object.
-                    n_objs = len(raw_sample["objects"])
-                    if n_objs == 0: # BUGFIX: Skip samples with no objects.
-                        continue
-
-                    curr_obj = raw_sample["objects"][np.random.randint(0, n_objs)]
-
-                    # Get current caption.
-                    raw_sample["caption"] = curr_obj["text"]
-                    raw_sample["bbox"] = curr_obj["bbox"]
-                    del raw_sample["objects"], raw_sample["captions"]
-
-                    # Define sample.
-                    sample = DetectorSample(**raw_sample)
+                # Define sample.
+                sample = Sample(**raw_sample)
 
                 # Append the samples.
                 curr_samples.append(sample)
@@ -278,6 +230,6 @@ class PromptableDeTRDataLoader:
             Tokenizer | None: The tokenizer object.
         """
         for transform in self.transformations:
-            if isinstance(transform, (PrepareAlignerSample, PrepareDetectionSample)):
+            if isinstance(transform, PrepareSample):
                 return transform.caption_transform.tokenizer
         return None

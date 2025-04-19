@@ -4,7 +4,7 @@ in images based on the prompts.
 """
 import torch.optim as optim
 
-from data.daug import PrepareDetectionSample, ReshapeImage
+from data.daug import PrepareSample, ReshapeImage
 from data.loader import PromptableDeTRDataLoader
 from models.detector import PromptableDeTR
 from params import get_args
@@ -36,12 +36,11 @@ def get_data_loader(args):
         image_directory=args.image_dir,
         batch_size=args.batch_size,
         transformations=[
-            PrepareDetectionSample(vocab_file=args.vocab_file),
+            PrepareSample(vocab_file=args.vocab_file),
             ReshapeImage(image_size=args.image_size)
         ],
         shuffle=args.shuffle,
-        seed=args.seed,
-        aligner=False # Mandatory for Detector training.
+        seed=args.seed
     )
 
     valid_data_loader = PromptableDeTRDataLoader(
@@ -49,12 +48,11 @@ def get_data_loader(args):
         image_directory=args.image_dir,
         batch_size=args.batch_size,
         transformations=[
-            PrepareDetectionSample(vocab_file=args.vocab_file),
+            PrepareSample(vocab_file=args.vocab_file),
             ReshapeImage(image_size=args.image_size)
         ],
         shuffle=args.shuffle,
-        seed=args.seed,
-        aligner=False # Mandatory for Detector training.
+        seed=args.seed
     )
 
     return train_data_loader, valid_data_loader
@@ -115,8 +113,6 @@ def main():
         image_encoder_weights=args.image_encoder_weights,
         text_encoder_weights=args.text_encoder_weights
     )
-    if args.base_model_weights is not None:
-        model.load_full_weights(base_model_weights=args.base_model_weights)
 
     # Train the model.
     trainer = Trainer(
@@ -131,8 +127,7 @@ def main():
         max_iter=args.max_iter,
         overfit_threshold=args.overfit_threshold,
         overfit_patience=args.overfit_patience,
-        exp_dir=args.exp_dir,
-        is_aligner=False
+        exp_dir=args.exp_dir
     )
     trainer.train()
 
