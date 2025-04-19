@@ -9,8 +9,8 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 
-from data.daug import PrepareDetectionSample
-from data.schemas import DetectorSample
+from data.daug import PrepareSample
+from data.schemas import Sample
 
 
 # Classes.
@@ -49,7 +49,7 @@ class PromptableDeTRDataLoader:
                 raw_sample = json.load(fp=f)
 
             # Check if the samples are valid.
-            DetectorSample(**raw_sample)
+            Sample(**raw_sample)
             del raw_sample
 
             # Append the samples.
@@ -170,8 +170,8 @@ class PromptableDeTRDataLoader:
         if transformations is None:
             raise ValueError("Transformations must be specified.")
 
-        if not isinstance(transformations[0], PrepareDetectionSample):
-            raise ValueError("Transformations must be a list containing the PrepareDetectionSample class.")
+        if not isinstance(transformations[0], PrepareSample):
+            raise ValueError("Transformations must be a list containing the PrepareSample class.")
 
         # Shuffle the samples.
         if shuffle:
@@ -209,7 +209,7 @@ class PromptableDeTRDataLoader:
                     raw_sample = json.load(fp=f)
 
                 # Define sample.
-                sample = DetectorSample(**raw_sample)
+                sample = Sample(**raw_sample)
 
                 # Append the samples.
                 curr_samples.append(sample)
@@ -230,6 +230,6 @@ class PromptableDeTRDataLoader:
             Tokenizer | None: The tokenizer object.
         """
         for transform in self.transformations:
-            if isinstance(transform, PrepareDetectionSample):
+            if isinstance(transform, PrepareSample):
                 return transform.caption_transform.tokenizer
         return None

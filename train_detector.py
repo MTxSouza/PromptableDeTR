@@ -4,7 +4,7 @@ in images based on the prompts.
 """
 import torch.optim as optim
 
-from data.daug import PrepareDetectionSample, ReshapeImage
+from data.daug import PrepareSample, ReshapeImage
 from data.loader import PromptableDeTRDataLoader
 from models.detector import PromptableDeTR
 from params import get_args
@@ -36,7 +36,7 @@ def get_data_loader(args):
         image_directory=args.image_dir,
         batch_size=args.batch_size,
         transformations=[
-            PrepareDetectionSample(vocab_file=args.vocab_file),
+            PrepareSample(vocab_file=args.vocab_file),
             ReshapeImage(image_size=args.image_size)
         ],
         shuffle=args.shuffle,
@@ -48,7 +48,7 @@ def get_data_loader(args):
         image_directory=args.image_dir,
         batch_size=args.batch_size,
         transformations=[
-            PrepareDetectionSample(vocab_file=args.vocab_file),
+            PrepareSample(vocab_file=args.vocab_file),
             ReshapeImage(image_size=args.image_size)
         ],
         shuffle=args.shuffle,

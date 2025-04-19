@@ -110,7 +110,7 @@ class Trainer:
 
         Args:
             model (nn.Module): The model to run the forward pass.
-            batch (List[AlignerSample|DetectorSample]): The batch of data.
+            batch (List[Sample]): The batch of data.
             is_training (bool): Whether the model is training or not.
 
         Returns:

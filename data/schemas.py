@@ -26,16 +26,6 @@ class ObjectAnnotation:
 @dataclass
 class Sample:
     """
-    Sample structure that stores all annotation of a specific image.
-    """
-    image_path: LiteralString
-    captions: List
-    objects: List[ObjectAnnotation]
-
-
-@dataclass
-class DetectorSample:
-    """
     Sample structure.
     """
     image_path: str
@@ -45,16 +35,3 @@ class DetectorSample:
     image: Optional[torch.FloatTensor | np.ndarray] = None
     caption_tokens: Optional[torch.IntTensor | np.ndarray] = None
     bbox_tensor: Optional[torch.FloatTensor | np.ndarray] = None
-
-
-@dataclass
-class AlignerSample:
-    """
-    Sample structure.
-    """
-    image_path: str
-    caption: str
-
-    image: Optional[torch.FloatTensor | np.ndarray] = None
-    caption_tokens: Optional[torch.IntTensor | np.ndarray] = None
-    masked_caption_tokens: Optional[torch.IntTensor | np.ndarray] = None

@@ -12,7 +12,7 @@ import tqdm
 import yaml
 from PIL import Image
 
-from data.schemas import DetectorSample
+from data.schemas import Sample
 
 
 def parse_args():
@@ -100,7 +100,7 @@ def make_sample(image_file, annot_file, captions):
         captions (list): List of captions for the image.
 
     Returns:
-        List[DetectorSample]: A list of DetectorSample objects.
+        List[Sample]: A list of Sample objects.
     """
     # Load the annotation file.
     with open(file=annot_file, mode="r") as file_buffer:
@@ -138,7 +138,7 @@ def make_sample(image_file, annot_file, captions):
     for caption, box_list in tqdm.tqdm(iterable=mapper.items(), desc="Creating samples..."):
 
         # Create a sample object.
-        sample = DetectorSample(
+        sample = Sample(
             image_path=image_file,
             caption=caption,
             bbox=box_list

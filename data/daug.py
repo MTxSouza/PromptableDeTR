@@ -11,7 +11,7 @@ import torch
 import torch.nn.functional as F
 from PIL import Image
 
-from data.schemas import AlignerSample, DetectorSample
+from data.schemas import Sample
 from models.tokenizer import Tokenizer
 
 
@@ -65,8 +65,8 @@ class BaseTransform(ABC):
 
         # Check if all objects are samples.
         for sample in samples:
-            if not isinstance(sample, (AlignerSample, DetectorSample)):
-                raise ValueError("All objects in the list must be either AlignerSample or DetectorSample.")
+            if not isinstance(sample, Sample):
+                raise ValueError("All objects in the list must be a Sample.")
 
         return samples
 
@@ -181,49 +181,7 @@ class PrepareBBox(BaseTransform):
         return sample
 
 
-class PrepareAlignerSample(BaseTransform):
-
-
-    # Special methods.
-    def __init__(self, vocab_file):
-        """
-        This class prepares the raw sample for training loading the 
-        image and transforming the caption.
-
-        Args:
-            vocab (Vocab): File path to the vocabulary of the model.
-        """
-        
-        # Define the transformations.
-        self.image_transform = PrepareImage()
-        self.caption_transform = PrepareCaption(vocab_file=vocab_file)
-
-
-    def __call__(self, samples):
-        
-        # Validate the samples.
-        samples = self.validate_samples(samples=samples)
-
-        # Prepare the samples.
-        samples = [self.transform(sample=sample) for sample in samples]
-
-        return samples
-
-
-    # Methods.
-    def transform(self, sample):
-        
-        # Prepare the image.
-        sample = self.image_transform.transform(sample=sample)
-
-        # Prepare the caption.
-        sample = self.caption_transform.transform(sample=sample)
-        sample.masked_caption_tokens = sample.caption_tokens.clone()
-
-        return sample
-
-
-class PrepareDetectionSample(BaseTransform):
+class PrepareSample(BaseTransform):
 
 
     # Special methods.
