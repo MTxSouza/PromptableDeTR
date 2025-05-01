@@ -281,23 +281,25 @@ class JoinerBlock(nn.Module):
 
 
     # Methods.
-    def forward(self, text_embedding, image_embedding):
+    def forward(self, query_embedding, text_embedding, image_embedding):
         """
         Forward pass of the joiner block.
 
         Args:
-            text_embedding (torch.Tensor): Text embedding tensor. It will be used as the query tensor.
+            query_embedding (torch.Tensor): Detection embedding tensor. It will be used as the query tensor.
+            text_embedding (torch.Tensor): Text embedding tensor. It will be used as the key tensor.
             image_embedding (torch.Tensor): Image embedding tensor. It will be used as the key and value tensors.
 
         Returns:
             torch.Tensor: Output tensor.
         """
         logger.debug(msg="Calling `JoinerBlock` forward method.")
+        logger.debug(msg="Query embedding shape: %s" % (query_embedding.shape,))
         logger.debug(msg="Text embedding shape: %s" % (text_embedding.shape,))
         logger.debug(msg="Image embedding shape: %s" % (image_embedding.shape,))
 
         # Compute multi-head attention.
-        attention_output = self.multi_head_attention(text_embedding, image_embedding, image_embedding)
+        attention_output = self.multi_head_attention(query_embedding, text_embedding, image_embedding)
         attention_output = self.norm1(text_embedding + attention_output)
         logger.debug(msg="Attention output shape: %s" % (attention_output.shape,))
 
@@ -316,6 +318,10 @@ class Joiner(nn.Module):
     # Special methods.
     def __init__(self, image_tokens, emb_dim = 512, num_heads = 8, ff_dim = 2048, num_joins = 3):
         super().__init__()
+
+        # Prepare query vector.
+        num_queries = sum(image_tokens)
+        self.query_vector = nn.Parameter(data=torch.Tensor(num_queries, emb_dim))
 
         # Layers.
         self.img_pe = nn.ModuleList(modules=[
@@ -358,8 +364,7 @@ class Joiner(nn.Module):
         text_embedding = text_embedding.last_hidden_state
         image_features = [
             image_features.high_resolution_feat, 
-            image_features.mid_resolution_feat, 
-            image_features.low_resolution_feat
+            image_features.mid_resolution_feat
         ]
 
         logger.debug(msg="Text embedding shape: %s" % (text_embedding.shape,))
@@ -387,11 +392,15 @@ class Joiner(nn.Module):
         processed_image_features = torch.cat(processed_image_features, dim=1)
         logger.debug(msg="Processed image features shape: %s" % (processed_image_features.shape,))
 
+        # Project query vector.
+        query_vector = self.query_vector.unsqueeze(0).expand(text_embedding.size(0), -1, -1)
+        logger.debug(msg="Query vector shape: %s" % (query_vector.shape,))
+
         # Join text and image embeddings.
-        embeddings = (text_embedding, processed_image_features)
+        embeddings = (query_vector, text_embedding, processed_image_features)
         for joiner_block in self.joiner_blocks:
             embeddings = joiner_block(*embeddings)
             logger.debug(msg="Text embedding shape: %s" % (embeddings.shape,))
-            embeddings = (embeddings, embeddings)
+            embeddings = (embeddings, embeddings, embeddings)
 
         return embeddings[0]

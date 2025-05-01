@@ -105,7 +105,7 @@ def get_args():
         "--img-tk",
         type=int,
         nargs="+",
-        default=[1600, 400, 100],
+        default=[400, 100],
         help="The image tokens."
     )
     model_parser.add_argument(

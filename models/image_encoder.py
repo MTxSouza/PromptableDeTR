@@ -32,7 +32,6 @@ class MobileNetV3Output:
     """
     high_resolution_feat: torch.FloatTensor
     mid_resolution_feat: torch.FloatTensor
-    low_resolution_feat: torch.FloatTensor
 
 
 # Functions.
@@ -340,11 +339,7 @@ class MobileNetV3(nn.Module):
             InvertedResidual(24, 24, 3, 1, 1, nn.Conv2d, nn.BatchNorm2d, nn.ReLU, 72, 1, False),
             InvertedResidual(24, 40, 5, 2, 1, nn.Conv2d, nn.BatchNorm2d, nn.ReLU, 72, 2, False, True),
             InvertedResidual(40, 40, 5, 1, 1, nn.Conv2d, nn.BatchNorm2d, nn.ReLU, 120, 2, False, True),
-            InvertedResidual(40, 40, 5, 1, 1, nn.Conv2d, nn.BatchNorm2d, nn.ReLU, 120, 2, False, True)
-        )
-
-        # Features maps.
-        self.features_1 = nn.Sequential(
+            InvertedResidual(40, 40, 5, 1, 1, nn.Conv2d, nn.BatchNorm2d, nn.ReLU, 120, 2, False, True),
             InvertedResidual(40, 80, 3, 2, 1, nn.Conv2d, nn.BatchNorm2d, nn.Hardswish, 240, 1, False),
             InvertedResidual(80, 80, 3, 1, 1, nn.Conv2d, nn.BatchNorm2d, nn.Hardswish, 200, 1, False),
             InvertedResidual(80, 80, 3, 1, 1, nn.Conv2d, nn.BatchNorm2d, nn.Hardswish, 184, 1, False),
@@ -352,23 +347,24 @@ class MobileNetV3(nn.Module):
             InvertedResidual(80, 112, 3, 1, 1, nn.Conv2d, nn.BatchNorm2d, nn.Hardswish, 480, 1, False, True),
             InvertedResidual(112, 112, 3, 1, 1, nn.Conv2d, nn.BatchNorm2d, nn.Hardswish, 672, 1, False, True)
         )
-        self.features_2 = nn.Sequential(
+
+        # Features maps.
+        self.features_1 = nn.Sequential(
             InvertedResidual(112, 160, 5, 2, 1, nn.Conv2d, nn.BatchNorm2d, nn.Hardswish, 672, 2, False, True),
             InvertedResidual(160, 160, 5, 1, 1, nn.Conv2d, nn.BatchNorm2d, nn.Hardswish, 960, 2, False, True),
             InvertedResidual(160, 160, 5, 1, 1, nn.Conv2d, nn.BatchNorm2d, nn.Hardswish, 960, 2, False, True)
         )
 
         # Extra features.
-        self.features_3 = nn.Sequential(
+        self.features_2 = nn.Sequential(
             InvertedResidual(160, 320, 5, 2, 1, nn.Conv2d, nn.BatchNorm2d, nn.Hardswish, 960, 2, False, True), 
             InvertedResidual(320, 320, 5, 1, 1, nn.Conv2d, nn.BatchNorm2d, nn.Hardswish, 1280, 2, False, True), 
             InvertedResidual(320, 320, 5, 1, 1, nn.Conv2d, nn.BatchNorm2d, nn.Hardswish, 1280, 2, False, True)
         )
 
         # Project features.
-        self.feat_proj_1 = nn.Conv2d(in_channels=112, out_channels=emb_dim, kernel_size=1, stride=1, padding=0)
-        self.feat_proj_2 = nn.Conv2d(in_channels=160, out_channels=emb_dim, kernel_size=1, stride=1, padding=0)
-        self.feat_proj_3 = nn.Conv2d(in_channels=320, out_channels=emb_dim, kernel_size=1, stride=1, padding=0)
+        self.feat_proj_1 = nn.Conv2d(in_channels=160, out_channels=emb_dim, kernel_size=1, stride=1, padding=0)
+        self.feat_proj_2 = nn.Conv2d(in_channels=320, out_channels=emb_dim, kernel_size=1, stride=1, padding=0)
 
 
     # Methods.
@@ -399,10 +395,6 @@ class MobileNetV3(nn.Module):
         mid_res = self.features_2(high_res)
         logger.debug(msg="- Result of the `features_2` block: %s" % (mid_res.shape,))
 
-        logger.debug(msg="- Forward pass on the `features_3` through the input tensor %s." % (mid_res.shape,))
-        low_res = self.features_3(mid_res)
-        logger.debug(msg="- Result of the `features_3` block: %s" % (low_res.shape,))
-
         # Project final channels.
         logger.debug(msg="- Projecting the features maps to the embedding dimension.")
         logger.debug(msg="- Projecting the high resolution features %s." % (high_res.shape,))
@@ -413,15 +405,10 @@ class MobileNetV3(nn.Module):
         mid_res_proj = self.feat_proj_2(mid_res)
         logger.debug(msg="- Result of the mid resolution projection: %s" % (mid_res_proj.shape,))
 
-        logger.debug(msg="- Projecting the low resolution features %s." % (low_res.shape,))
-        low_res_proj = self.feat_proj_3(low_res)
-        logger.debug(msg="- Result of the low resolution projection: %s" % (low_res_proj.shape,))
-
         logger.info(msg="Returning the final output of the `MobileNetV3` model with three feature maps stored in `MobileNetV3Output` structure.")
         logger.debug(msg="- High resolution features: %s" % (high_res_proj.shape,))
         logger.debug(msg="- Mid resolution features: %s" % (mid_res_proj.shape,))
-        logger.debug(msg="- Low resolution features: %s" % (low_res_proj.shape,))
-        return MobileNetV3Output(high_resolution_feat=high_res_proj, mid_resolution_feat=mid_res_proj, low_resolution_feat=low_res_proj)
+        return MobileNetV3Output(high_resolution_feat=high_res_proj, mid_resolution_feat=mid_res_proj)
 
 
     def freeze_encoder(self):

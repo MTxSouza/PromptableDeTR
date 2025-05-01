@@ -59,7 +59,7 @@ if __name__=="__main__":
         warn("The model is being run on the CPU. This will be slow.")
 
     # Create the model object.
-    model = PromptableDeTR(image_tokens=[1600, 400, 100])
+    model = PromptableDeTR(image_tokens=[400, 100])
     model.load_base_weights(
         image_encoder_weights=args.image_encoder_weights, 
         text_encoder_weights=args.text_encoder_weights
@@ -68,7 +68,7 @@ if __name__=="__main__":
 
     # Display the model architecture.
     image_size = (1, 3, 640, 640)
-    text_size = (1, 64)
+    text_size = (1, 400 + 100)
     summary(
         model=model, 
         input_size=(image_size, text_size), 
@@ -113,7 +113,7 @@ if __name__=="__main__":
     print("Compute batch inference time...")
     for batch_size in [1, 2, 4, 8, 16, 32, 64]:
         image_size = (batch_size, 3, 640, 640)
-        text_size = (batch_size, 64)
+        text_size = (batch_size, 500)
         print(f"Batch size: {batch_size}")
         try:
             infer_time = compute_inference_time(image_size=image_size, text_size=text_size)
