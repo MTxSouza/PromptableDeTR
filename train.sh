@@ -16,12 +16,6 @@ MASK_RATIO=${MASK_RATIO:-"0.8"}
 VOCAB_FILE=${VOCAB_FILE}
 IMG_ENC_WEIGHT=${IMG_ENC_WEIGHT}
 TXT_ENC_WEIGHT=${TXT_ENC_WEIGHT}
-IMG_SIZE="640" # Mandatory
-IMG_TOKENS="[1600, 400, 100]" # Mandatory
-EMB_DIM="128" # Mandatory
-PROJ_DIM="512" # Mandatory
-HEADS="8" # Mandatory
-FF_DIM="2048" # Mandatory
 NUM_JOINER_LAYERS=${NUM_JOINER_LAYERS:-"4"}
 
 # Training params.
@@ -49,7 +43,7 @@ python train_detector.py \
         --imgw $IMG_ENC_WEIGHT \
         --txtw $TXT_ENC_WEIGHT \
         --image-size $IMG_SIZE \
-        --image-tokens 1600 400 100 \
+        --image-tokens 400 100 \
         --emb-dim 128 \
         --proj-dim 512 \
         --emb-dropout-rate 0.1 \

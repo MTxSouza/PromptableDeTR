@@ -78,7 +78,6 @@ class Encoder(nn.Module):
         logger.info(msg="Returning the final output of the `Encoder` model with five tensors.")
         logger.debug(msg="- High resolution image shape: %s" % (image_emb.high_resolution_feat.shape,))
         logger.debug(msg="- Medium resolution image shape: %s" % (image_emb.mid_resolution_feat.shape,))
-        logger.debug(msg="- Low resolution image shape: %s" % (image_emb.low_resolution_feat.shape,))
         logger.debug(msg="- Last hidden state shape: %s" % (text_emb.last_hidden_state.shape,))
         logger.debug(msg="- Pooled output shape: %s" % (text_emb.pooled_output.shape,))
         return image_emb, text_emb
