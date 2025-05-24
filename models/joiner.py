@@ -322,6 +322,7 @@ class Joiner(nn.Module):
         # Prepare query vector.
         num_queries = sum(image_tokens)
         self.query_vector = nn.Parameter(data=torch.Tensor(num_queries, emb_dim))
+        self.query_layer = nn.Linear(in_features=emb_dim, out_features=emb_dim)
 
         # Layers.
         self.img_pe = nn.ModuleList(modules=[
@@ -395,6 +396,7 @@ class Joiner(nn.Module):
         # Project query vector.
         query_vector = self.query_vector.unsqueeze(0).expand(text_embedding.size(0), -1, -1)
         logger.debug(msg="Query vector shape: %s" % (query_vector.shape,))
+        query_vector = self.query_layer(query_vector)
 
         # Join text and image embeddings.
         embeddings = (query_vector, text_embedding, processed_image_features)
