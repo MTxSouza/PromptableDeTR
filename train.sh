@@ -35,7 +35,7 @@ L1_WEIGHT=${L1_WEIGHT:-"1.0"}
 
 python install_utilities.py
 python train.py \
-        --train-dataset-dir $DATASET_DIR \
+        --train-dataset-dir $TRAIN_DATASET_DIR \
         --valid-dataset-dir $VALID_DATASET_DIR \
         --image-dir $IMAGE_DIR \
         --shuffle \
