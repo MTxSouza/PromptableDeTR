@@ -26,12 +26,20 @@ def get_args():
     # Dataset arguments.
     dataset_parser = parser.add_argument_group(title="Dataset")
     dataset_parser.add_argument(
-        "--dataset-dir",
-        "--dataset",
-        "-d",
+        "--train-dataset-dir",
+        "--train-dataset",
+        "-td",
         type=str,
         required=True,
-        help="The path to the dataset directory."
+        help="The path to the train dataset directory."
+    )
+    dataset_parser.add_argument(
+        "--valid-dataset-dir",
+        "--valid-dataset",
+        "-vd",
+        type=str,
+        required=True,
+        help="The path to the valid dataset directory."
     )
     dataset_parser.add_argument(
         "--image-dir",
