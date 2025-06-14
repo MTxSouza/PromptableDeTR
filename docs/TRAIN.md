@@ -15,6 +15,6 @@ You can easily run the script using the command below:
 ```bash
 $ bash TRAIN_DATASET_DIR=<...> IMAGE_DIR=<...> IMG_ENC_WEIGHT=<...> TXT_ENC_WEIGHT=<...> VOCAB_FILE=<...> train.sh
 ```
-> The `.sh` script will delete all weight files stored at experiment directory when the training finished and will save only the best weights for you, whereas the `.py` will only run the training and will not free the disk space of your computer when the training is over.
+> The `.sh` script will first run the `install_utilities.py` script to install all dependencies for training, and after training is over, it'll delete all weight files stored at experiment directory, keeping only the best weights for you, whereas the `.py` will only run the main training script.
 
 During training, it will create an experiment directory where all weights and training logs will be stored, the `.log` files will contains some predictions of the model, so you be able to monitoring the optimization of the model during time.
