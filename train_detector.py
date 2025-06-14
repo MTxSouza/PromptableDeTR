@@ -22,13 +22,13 @@ def get_data_loader(args):
     Returns:
         Tuple[PromptableDeTRDataLoader, PromptableDeTRDataLoader]: The training and validation data loaders.
     """
-    # Split into training and validation.
-    train_files, valid_files = PromptableDeTRDataLoader.get_train_val_split(
-        sample_directory=args.dataset_dir,
-        val_split=args.valid_split,
-        shuffle_samples=args.shuffle,
-        seed=args.seed
-    )
+    # Get train and valid samples.
+    train_files = PromptableDeTRDataLoader.get_samples_from_dir(dirpath=args.train_dataset_dir)
+    valid_files = PromptableDeTRDataLoader.get_samples_from_dir(dirpath=args.valid_dataset_dir)
+    if len(train_files) == 0:
+        raise ValueError("No training samples found in the directory: %s" % args.train_dataset_dir)
+    if len(valid_files) == 0:
+        raise ValueError("No validation samples found in the directory: %s" % args.valid_dataset_dir)
 
     # Get the data loader.
     train_data_loader = PromptableDeTRDataLoader(
