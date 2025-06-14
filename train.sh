@@ -7,9 +7,9 @@
 SEED=${SEED:-"42"}
 
 # Dataset params.
-DATASET_DIR=${DATASET_DIR}
+TRAIN_DATASET_DIR=${DATASET_DIR}
+VALID_DATASET_DIR=${VALID_DATASET_DIR:-"${DATASET_DIR}"}
 IMAGE_DIR=${IMAGE_DIR}
-VALID_SPLIT=${VALID_SPLIT:-"0.2"}
 MASK_RATIO=${MASK_RATIO:-"0.8"}
 
 # Model params.
@@ -27,17 +27,17 @@ LOG_INTERVAL=${LOG_INTERVAL:-"10"}
 OVERFIT_THRESHOLD=${OVERFIT_THRESHOLD:-"1e-3"}
 OVERFIT_PATIENTE=${OVERFIT_PATIENTE:-"5"}
 
-EXP_DIR=${EXP_DIR:-"./exp_detector"}
+EXP_DIR=${EXP_DIR:-"./promptable_detr_exp"}
 
 GIOU_WEIGHT=${GIOU_WEIGHT:-"1.0"}
 PRESENCE_WEIGHT=${PRESENCE_WEIGHT:-"1.0"}
 L1_WEIGHT=${L1_WEIGHT:-"1.0"}
 
 python install_utilities.py
-python train_detector.py \
-        --dataset-dir $DATASET_DIR \
+python train.py \
+        --train-dataset-dir $TRAIN_DATASET_DIR \
+        --valid-dataset-dir $VALID_DATASET_DIR \
         --image-dir $IMAGE_DIR \
-        --valid-split $VALID_SPLIT \
         --shuffle \
         --vocab-file $VOCAB_FILE \
         --imgw $IMG_ENC_WEIGHT \

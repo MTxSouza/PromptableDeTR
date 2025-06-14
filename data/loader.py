@@ -22,6 +22,40 @@ class PromptableDeTRDataLoader:
 
     # Class methods.
     @classmethod
+    def get_samples_from_dir(cls, dirpath):
+        """
+        Get all valid samples from the directory.
+
+        Args:
+            dirpath (str): The path to the directory containing the samples.
+
+        Returns:
+            list: A list of valid sample file paths.
+        """
+        # Get the samples from the directory.
+        samples = []
+        for file in os.listdir(path=dirpath):
+
+            # Skip non-JSON files.
+            if not file.endswith(".json"):
+                continue
+
+            # Load the samples.
+            sample_file = os.path.join(dirpath, file)
+            with open(file=sample_file, mode="r") as f:
+                raw_sample = json.load(fp=f)
+
+            # Check if the samples are valid.
+            Sample(**raw_sample)
+            del raw_sample
+
+            # Append the samples.
+            samples.append(sample_file)
+            
+        return samples
+
+
+    @classmethod
     def get_train_val_split(cls, sample_directory, val_split = 0.2, shuffle_samples = True, seed = 42):
         """
         Get the train and validation split from the sample directory.
