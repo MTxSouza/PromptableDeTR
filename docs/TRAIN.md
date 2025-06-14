@@ -1,4 +1,4 @@
-# Train
+# How to train
 
 To train the **PromptableDeTR** model, you'll need to download the pre-trained weights of the encoders and some other necessary files to use the main model. Check the `Base weights` page on `Releases`.
 
