@@ -50,14 +50,6 @@ def get_args():
         help="The path to the image directory."
     )
     dataset_parser.add_argument(
-        "--valid-split",
-        "--valid",
-        "-vs",
-        type=float,
-        default=0.2,
-        help="The validation split."
-    )
-    dataset_parser.add_argument(
         "--mask-ratio",
         "-mr",
         type=float,
