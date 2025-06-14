@@ -34,7 +34,7 @@ PRESENCE_WEIGHT=${PRESENCE_WEIGHT:-"1.0"}
 L1_WEIGHT=${L1_WEIGHT:-"1.0"}
 
 python install_utilities.py
-python train_detector.py \
+python train.py \
         --dataset-dir $DATASET_DIR \
         --image-dir $IMAGE_DIR \
         --valid-split $VALID_SPLIT \
