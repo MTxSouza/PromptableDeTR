@@ -104,7 +104,7 @@ class PromptableDeTRDataLoader:
 
     # Static methods.
     @staticmethod
-    def convert_batch_into_tensor(batch, max_len = 100, pad_value = 0):
+    def convert_batch_into_tensor(batch, max_len = 500, pad_value = 0):
         """
         Convert a list of AlignerSample objects into tensors.
 
