@@ -4,6 +4,8 @@ This module stores the main logger object used to tracking the code.
 import logging
 from enum import Enum
 
+from torch.utils.tensorboard import SummaryWriter
+
 
 # Enums.
 class LevelName(Enum):
@@ -43,3 +45,18 @@ def get_logger(name, level = "info"):
     log.addHandler(hdlr=hdlr)
 
     return log
+
+
+# Classes.
+class Tensorboard:
+
+
+    # Special methods.
+    def __init__(self, log_dir):
+        """
+        Initializes the Tensorboard writer.
+        
+        Args:
+            log_dir (str): Directory where the logs will be saved.
+        """
+        self.writer = SummaryWriter(log_dir=log_dir)
