@@ -1,6 +1,5 @@
-<img src="figs/PromptableDeTR (Logo).png">
+![til](./figs/promptabledetr_logo.gif)
 
-# PromptableDeTR
 A deep learning model capable to localize multiple objects from an input prompt.
 
 ### Summary
