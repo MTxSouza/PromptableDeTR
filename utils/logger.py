@@ -95,21 +95,17 @@ class Tensorboard:
         image.
 
         Args:
-            samples (List[Tuple[torch.Tensor, torch.Tensor, torch.Tensor]]): List of tuples containing the image, label and prediction.
+            samples (List[Tuple[numpy.ndarray, numpy.ndarray, numpy.ndarray]]): List of tuples containing the image, label, and prediction.
             step (int): Step number.
         """
         # Prepare the images for Tensorboard.
         tb_samples = []
         for (img, label, prediction) in samples:
 
-            # Convert image.
-            img = img.permute(1, 2, 0).detach().cpu().numpy()
-            width, height = img.shape[:2]
+            # Get the image dimensions.
+            height, width = img.shape[:2]
 
             # Compute real coordinates.
-            label = label.detach().cpu().numpy()
-            prediction = prediction.detach().cpu().numpy()
-
             label[:, 0::2] *= width
             label[:, 1::2] *= height
             prediction[:, 0::2] *= width
