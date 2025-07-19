@@ -245,6 +245,9 @@ class PromptableDeTRDataLoader:
                 # Define sample.
                 sample = Sample(**raw_sample)
 
+                # Update the image path.
+                sample.image_path = os.path.join(self.image_directory, sample.image_path)
+
                 # Append the samples.
                 curr_samples.append(sample)
             
