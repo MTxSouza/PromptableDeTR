@@ -2,7 +2,12 @@
 This module stores the main logger object used to tracking the code.
 """
 import logging
+import os
 from enum import Enum
+
+import numpy as np
+from PIL import Image, ImageDraw
+from torch.utils.tensorboard import SummaryWriter
 
 
 # Enums.
@@ -43,3 +48,87 @@ def get_logger(name, level = "info"):
     log.addHandler(hdlr=hdlr)
 
     return log
+
+
+# Classes.
+class Tensorboard:
+
+
+    # Special methods.
+    def __init__(self, log_dir):
+        """
+        Initializes the Tensorboard writer.
+        
+        Args:
+            log_dir (str): Directory where the logs will be saved.
+        """
+        log_dir = os.path.abspath(log_dir, "tensorboard")
+        self.writer = SummaryWriter(log_dir=log_dir)
+
+
+    # Methods.
+    def add_train_loss(self, loss, step):
+        """
+        Adds the training loss to the Tensorboard writer.
+
+        Args:
+            loss (float): Training loss value.
+            step (int): Step number.
+        """
+        self.writer.add_scalar(tag="train_loss", scalar_value=loss, global_step=step)
+
+
+    def add_valid_loss(self, loss, step):
+        """
+        Adds the validation loss to the Tensorboard writer.
+
+        Args:
+            loss (float): Validation loss value.
+            step (int): Step number.
+        """
+        self.writer.add_scalar(tag="valid_loss", scalar_value=loss, global_step=step)
+
+
+    def add_image(self, samples, step):
+        """
+        Displays the predictions of the model on the target
+        image.
+
+        Args:
+            samples (List[Tuple[numpy.ndarray, numpy.ndarray, numpy.ndarray]]): List of tuples containing the image, label, and prediction.
+            step (int): Step number.
+        """
+        # Prepare the images for Tensorboard.
+        tb_samples = []
+        for (img, label, prediction) in samples:
+
+            # Get the image dimensions.
+            height, width = img.shape[:2]
+
+            # Compute real coordinates.
+            label[:, 0::2] *= width
+            label[:, 1::2] *= height
+            prediction[:, 0::2] *= width
+            prediction[:, 1::2] *= height
+
+            # Draw the rectangles on the image.
+            pil_img = Image.fromarray((img * 255).astype("uint8"))
+            draw = ImageDraw.Draw(im=pil_img)
+
+            for box in label:
+                draw.rectangle(xy=tuple(box), outline="green", width=2)
+            for box in prediction:
+                draw.rectangle(xy=tuple(box), outline="red", width=2)
+
+            # Append the image to the samples.
+            tb_samples.append(pil_img)
+
+        # Add the images to the Tensorboard writer.
+        for idx, sample in enumerate(iterable=tb_samples):
+            self.writer.add_image(tag=f"sample_{idx}", img_tensor=np.asarray(sample), global_step=step, dataformats="HWC")
+
+    def close(self):
+        """
+        Closes the Tensorboard writer.
+        """
+        self.writer.close()

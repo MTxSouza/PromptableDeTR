@@ -7,6 +7,7 @@ import time
 import torch
 
 from data.loader import PromptableDeTRDataLoader
+from utils.logger import Tensorboard
 
 
 # Classes.
@@ -70,6 +71,8 @@ class Trainer:
         self.__overfit_counter = 0
         self.__losses = []
 
+        self.__tensorboard = Tensorboard(log_dir=exp_dir)
+
 
     # Private methods.
     def __compile_model(self):
@@ -114,7 +117,7 @@ class Trainer:
             is_training (bool): Whether the model is training or not.
 
         Returns:
-            Tuple[torch.Tensor, torch.Tensor]: The logits and the labels.
+            Tuple[torch.Tensor, torch.Tensor, torch.Tensor]: The images, logits, and labels.
         """
         # Convert the batch into tensors.
         images, captions, mask, extra_data = PromptableDeTRDataLoader.convert_batch_into_tensor(batch=batch)
@@ -134,45 +137,46 @@ class Trainer:
         else:
             logits, labels = run_forward(model, images, captions, extra_data)
         
-        return logits, labels
+        return images, logits, labels
 
 
-    def __get_random_sample(self, logits, y):
+    def __get_random_sample(self, images, logits, y):
         """
         It gets a random sample from the logits and the true captions to be visualized further.
 
         Args:
+            images (torch.Tensor): The input images from the model.
             logits (torch.Tensor): The logits from the model.
             y (torch.Tensor): The true captions.
 
         Returns:
-            Tuple[str, str] | Tuple[List[int], List[int]]: The true and predicted captions or objects.
+            Tuple[np.ndarray, np.ndarray, np.ndarray]: The image, true objects, and predicted objects.
         """
         # Get random batch index.
         batch_index = torch.randint(low=0, high=y.size(0), size=(1,)).item()
 
         # Retrieve samples.
+        image = images[batch_index].permute(1, 2, 0).detach().cpu().numpy()
         logits_objs = logits[batch_index].cpu()
-        y_objs = y[batch_index].cpu().numpy()
+        y_objs = y[batch_index].detach().cpu().numpy()
 
         # Filter the objects.
         logits_max = logits_objs[:, 4:].argmax(dim=1)
         logits_objs = logits_objs[logits_max == 1]
         logits_objs[:, 4:] = logits_objs[:, 4:].softmax(dim=1)
-        logits_objs = logits_objs.numpy().tolist()
-        y_objs = y_objs[y_objs[:, 4] == 1][:, :4].tolist()
+        logits_objs = logits_objs.numpy()
+        y_objs = y_objs[y_objs[:, 4] == 1][:, :4]
 
-        return y_objs, logits_objs
+        return image, y_objs, logits_objs
     
 
-    def __save_model(self, valid_loss, valid_time, samples):
+    def __save_model(self, valid_loss, valid_time):
         """
         It saves the model if the validation loss is better than the previous one.
 
         Args:
             valid_loss (float): The validation loss.
             valid_time (float): The evaluation time.
-            samples (List[Tuple[str, str]]|List[Tuple[numpy.ndarray, numpy.ndarray]]): The samples to visualize.
         """
         # Save the model weights.
         is_best = False
@@ -195,8 +199,6 @@ class Trainer:
         self.model.save_model(
             dir_path=self.exp_dir, 
             ckpt_step=self.__current_iter, 
-            loss=valid_loss, 
-            samples=samples, 
             is_best=is_best
         )
         print("=" * 100)
@@ -228,6 +230,10 @@ class Trainer:
                 self.__losses.append(loss.cpu().detach().numpy().item())
                 if self.__current_iter % self.log_interval == 0:
                     current_loss = self.__compute_current_training_loss(reset=False)
+
+                    # Log the training loss.
+                    self.__tensorboard.add_train_loss(loss=current_loss, step=self.__current_iter)
+
                     print("Iteration [%d/%d]" % (self.__current_iter, self.max_iter))
                     print("Loss: %.4f" % current_loss)
                     print("-" * 100)
@@ -244,22 +250,28 @@ class Trainer:
                     for validation_batch in self.valid_dataset:
                         
                         # Run the forward pass.
-                        logits, y = self.__run_forward(model=self.model, batch=validation_batch, is_training=False)
+                        images, logits, y = self.__run_forward(model=self.model, batch=validation_batch, is_training=False)
 
                         # Compute the loss.
                         loss = self.model.compute_loss(logits=logits, labels=y)
                         total_loss += loss.cpu().numpy().item()
 
                         # Get a random sample.
-                        y_sample, logits_sample = self.__get_random_sample(logits=logits, y=y)
-                        samples.append((y_sample, logits_sample))
-                    
+                        image_sample, y_sample, logits_sample = self.__get_random_sample(images=images, logits=logits, y=y)
+                        samples.append((image_sample, y_sample, logits_sample))
+
                     total_loss /= len(self.valid_dataset)
                     end_time = (time.time() - init_time) / 60.0
 
                     # Save the model weights.
-                    self.__save_model(valid_loss=total_loss, valid_time=end_time, samples=samples)
-            
+                    self.__save_model(valid_loss=total_loss, valid_time=end_time)
+
+                    # Log the valid losses.
+                    self.__tensorboard.add_valid_loss(loss=total_loss, step=self.__current_iter)
+
+                    # Display the samples on Tensorboard.
+                    self.__tensorboard.add_image(samples=samples, step=self.__current_iter)
+
                 # Update the iteration.
                 self.__current_iter += 1
                 if self.__current_iter >= self.max_iter or self.__is_overfitting:
