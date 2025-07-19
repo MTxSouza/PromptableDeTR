@@ -116,7 +116,7 @@ class Tensorboard:
             prediction[:, 1::2] *= height
 
             # Draw the rectangles on the image.
-            pil_img = Image.fromarray(img.astype("uint8"))
+            pil_img = Image.fromarray((img * 255).astype("uint8"))
             draw = ImageDraw.Draw(im=pil_img)
 
             for box in label:
