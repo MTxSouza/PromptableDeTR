@@ -89,20 +89,18 @@ class Tensorboard:
         self.writer.add_scalar(tag="valid_loss", scalar_value=loss, global_step=step)
 
 
-    def add_image(self, images, labels, predictions, step):
+    def add_image(self, samples, step):
         """
         Displays the predictions of the model on the target
         image.
 
         Args:
-            images (List[torch.Tensor]): List of all images to be displayed with the shape CxHxW.
-            labels (List[torch.Tensor]): List of all labels with the shape Nx4.
-            predictions (List[torch.Tensor]): List of all predictions with the shape Nx4.
+            samples (List[Tuple[torch.Tensor, torch.Tensor, torch.Tensor]]): List of tuples containing the image, label and prediction.
             step (int): Step number.
         """
         # Prepare the images for Tensorboard.
-        samples = []
-        for img, label, prediction in zip(images, labels, predictions):
+        tb_samples = []
+        for (img, label, prediction) in samples:
 
             # Convert image.
             img = img.permute(1, 2, 0).detach().cpu().numpy()
