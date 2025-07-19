@@ -170,14 +170,13 @@ class Trainer:
         return image, y_objs, logits_objs
     
 
-    def __save_model(self, valid_loss, valid_time, samples):
+    def __save_model(self, valid_loss, valid_time):
         """
         It saves the model if the validation loss is better than the previous one.
 
         Args:
             valid_loss (float): The validation loss.
             valid_time (float): The evaluation time.
-            samples (List[Tuple[str, str]]|List[Tuple[numpy.ndarray, numpy.ndarray]]): The samples to visualize.
         """
         # Save the model weights.
         is_best = False
@@ -200,8 +199,6 @@ class Trainer:
         self.model.save_model(
             dir_path=self.exp_dir, 
             ckpt_step=self.__current_iter, 
-            loss=valid_loss, 
-            samples=samples, 
             is_best=is_best
         )
         print("=" * 100)

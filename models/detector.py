@@ -163,13 +163,12 @@ class PromptableDeTR(BasePromptableDeTR):
         return outputs
 
 
-    def save_model(self, dir_path, loss, ckpt_step = None, is_best = False):
+    def save_model(self, dir_path, ckpt_step = None, is_best = False):
         """
         Save the model weights.
 
         Args:
             dir_path (str): The path to the directory where the weights will be saved.
-            loss (float): The loss of the model at the checkpoint.
             ckpt_step (int): The checkpoint step. (Default: None)
             is_best (bool): Flag to indicate if the checkpoint is the best. (Default: False)
         """
