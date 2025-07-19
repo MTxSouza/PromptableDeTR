@@ -57,6 +57,13 @@ def custom_title():
         time.sleep(0.12)
 
 
+def sidebar_widget():
+
+    # Image upload widget.
+    with st.sidebar:
+        image_filepath = st.file_uploader(label="Image", type=[".jpg", ".jpeg", ".png"], help="Path to the image file.")
+        st.session_state["image"] = image_filepath
+
 @st.cache_resource()
 def get_model(model_weights):
     """
@@ -74,6 +81,20 @@ def get_model(model_weights):
     # Here you would load your model using the provided weights.
     # For demonstration, we just return a success message.
     return f"Model loaded successfully with weights from {model_weights.name}."
+
+
+def loaded_image():
+    """
+    Get the current image from the Streamlit session state.
+    """
+    return st.session_state.get("image", None)
+
+
+def get_predictions():
+    """
+    Get the predictions from the model based on the uploaded image and input text.
+    """
+    return st.session_state.get("predict", None)
 
 
 def load_image(image_file):
@@ -97,23 +118,33 @@ if __name__=="__main__":
     # Define title.
     custom_title()
 
-    # Model configuration.
-    weight_filepath = None
-    with st.expander("Model configuration"):
+    # Define sidebar widget.
+    sidebar_widget()
 
-        # Model weights.
-        weight_filepath = st.file_uploader(label="Model weights", type=[".pt", ".pth"], help="Path to the model weights file.")
-        if weight_filepath is not None:
-            with st.form(key="model_form"):
-                prompt = st.text_input(label="Prompt", help="Description of the target object to be detected.").strip().lower()
-                presence_threashold = st.slider(label="Presence threshold", min_value=0.0, max_value=1.0, value=0.5, step=0.01)
-                if st.form_submit_button(label="Set config"):
-                    if not prompt:
-                        st.error("Please provide a prompt.")
+    # Image viewer.
+    for _ in range(5):
+        st.text("")
+    with st.container(border=True):
 
-    if weight_filepath is not None:
-        st.divider()
-        image_filepath = st.file_uploader(label="Image", type=[".jpg", ".jpeg", ".png"], help="Path to the image file.")
-        if image_filepath is not None:
+        image_filepath = loaded_image()
+        if image_filepath is None:
+            st.warning("Please upload an image file to view.")
+        else:
+
+            # Load and display the image.
             img = load_image(image_file=image_filepath)
+
+            # Check if there is any predictions.
+            predictions = get_predictions()
+            if predictions is not None:
+                pass
+
             st.image(img, caption="Uploaded Image", use_container_width=True)
+
+            # Input text.
+            target_text = st.text_input(label="Prompt", max_chars=50)
+            if st.button(label="Detect"):
+                if target_text:
+                    st.rerun()
+                else:
+                    st.error("Please enter a prompt text.")
