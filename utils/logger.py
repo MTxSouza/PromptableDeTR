@@ -125,10 +125,10 @@ class Tensorboard:
                 draw.rectangle(xy=tuple(box), outline="red", width=2)
 
             # Append the image to the samples.
-            samples.append(pil_img)
+            tb_samples.append(pil_img)
 
         # Add the images to the Tensorboard writer.
-        for idx, sample in enumerate(iterable=samples):
+        for idx, sample in enumerate(iterable=tb_samples):
             self.writer.add_image(tag=f"sample_{idx}", img_tensor=np.asarray(sample), global_step=step, dataformats="HWC")
 
     def close(self):
