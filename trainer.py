@@ -2,6 +2,7 @@
 This module contains the main class used to train all models. It defines the training loop and the 
 evaluation loop.
 """
+import random
 import time
 
 import torch
@@ -66,6 +67,7 @@ class Trainer:
 
         # Training attributes.
         self.__total_samples = 16
+        self.__add_sample_threshold = 0.5
         self.__current_iter = 1
         self.__best_loss = float("inf")
         self.__is_overfitting = False
@@ -259,7 +261,7 @@ class Trainer:
                         total_loss += loss.cpu().numpy().item()
 
                         # Get a random sample.
-                        if n_samples < self.__total_samples:
+                        if n_samples < self.__total_samples and random.random() > self.__add_sample_threshold:
                             image_sample, y_sample, logits_sample = self.__get_random_sample(images=images, logits=logits, y=y)
                             samples.append((image_sample, y_sample, logits_sample))
                             n_samples += 1
