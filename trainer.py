@@ -65,6 +65,7 @@ class Trainer:
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
         # Training attributes.
+        self.__total_samples = 16
         self.__current_iter = 1
         self.__best_loss = float("inf")
         self.__is_overfitting = False
@@ -245,6 +246,7 @@ class Trainer:
 
                     # Loop over the validation data loader.
                     total_loss = 0.0
+                    n_samples = 0
                     samples = []
                     init_time = time.time()
                     for validation_batch in self.valid_dataset:
@@ -257,8 +259,10 @@ class Trainer:
                         total_loss += loss.cpu().numpy().item()
 
                         # Get a random sample.
-                        image_sample, y_sample, logits_sample = self.__get_random_sample(images=images, logits=logits, y=y)
-                        samples.append((image_sample, y_sample, logits_sample))
+                        if n_samples < self.__total_samples:
+                            image_sample, y_sample, logits_sample = self.__get_random_sample(images=images, logits=logits, y=y)
+                            samples.append((image_sample, y_sample, logits_sample))
+                            n_samples += 1
 
                     total_loss /= len(self.valid_dataset)
                     end_time = (time.time() - init_time) / 60.0
