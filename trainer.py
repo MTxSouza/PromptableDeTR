@@ -216,7 +216,7 @@ class Trainer:
             for training_batch in self.train_dataset:
 
                 # Run the forward pass.
-                logits, y = self.__run_forward(model=self.model, batch=training_batch, is_training=True)
+                images, logits, y = self.__run_forward(model=self.model, batch=training_batch, is_training=True)
 
                 # Compute the loss.
                 loss = self.model.compute_loss(logits=logits, labels=y)
