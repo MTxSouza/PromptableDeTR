@@ -62,7 +62,7 @@ class Tensorboard:
         Args:
             log_dir (str): Directory where the logs will be saved.
         """
-        log_dir = os.path.abspath(log_dir, "tensorboard")
+        log_dir = os.path.join(log_dir, "tensorboard")
         self.writer = SummaryWriter(log_dir=log_dir)
 
 
