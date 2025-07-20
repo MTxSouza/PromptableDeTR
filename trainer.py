@@ -313,6 +313,4 @@ class Trainer:
             print("=" * 100)
             print("🛑 Training interrupted by the user.")
             print("=" * 100)
-        except Exception as e:
-            print("😵 An error occurred during training.")
-            print(e)
+        print("🚀 Training finished.")
