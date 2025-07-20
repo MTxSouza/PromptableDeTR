@@ -8,6 +8,7 @@ import os
 import numpy as np
 import torch
 import torch.nn.functional as F
+from tqdm import tqdm
 
 from data.daug import PrepareSample
 from data.schemas import Sample
@@ -34,7 +35,7 @@ class PromptableDeTRDataLoader:
         """
         # Get the samples from the directory.
         samples = []
-        for file in os.listdir(path=dirpath):
+        for file in tqdm(iterable=os.listdir(path=dirpath), desc="Loading samples", unit="sample"):
 
             # Skip non-JSON files.
             if not file.endswith(".json"):
