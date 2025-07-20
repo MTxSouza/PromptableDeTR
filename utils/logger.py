@@ -130,7 +130,7 @@ class Tensorboard:
                     continue
 
             # Write the caption on the image.
-            font = ImageFont.load_default(12)
+            font = ImageFont.load_default()
             n_digits = len(caption)
             draw.rectangle(xy=(0, 0, 10 + n_digits * 7, 20), fill="black")
             draw.text((5, 2), caption, fill="white", font=font)
