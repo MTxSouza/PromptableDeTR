@@ -40,7 +40,7 @@ python train.py \
         --vocab-file $VOCAB_FILE \
         --imgw $IMG_ENC_WEIGHT \
         --txtw $TXT_ENC_WEIGHT \
-        --image-size $IMG_SIZE \
+        --image-size 640 \
         --max-iter $MAX_ITER \
         --batch-size $BATCH_SIZE \
         --log-interval $LOG_INTERVAL \
