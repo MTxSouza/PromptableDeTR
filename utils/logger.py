@@ -111,6 +111,11 @@ class Tensorboard:
             prediction[:, 0::2] *= width
             prediction[:, 1::2] *= height
 
+            prediction[:, 2] = prediction[:, 0] + prediction[:, 2]
+            prediction[:, 3] = prediction[:, 1] + prediction[:, 3]
+            label[:, 2] = label[:, 0] + label[:, 2]
+            label[:, 3] = label[:, 1] + label[:, 3]
+
             # Draw the rectangles on the image.
             pil_img = Image.fromarray((img * 255).astype("uint8"))
             draw = ImageDraw.Draw(im=pil_img)
@@ -118,7 +123,11 @@ class Tensorboard:
             for box in label:
                 draw.rectangle(xy=tuple(box), outline="green", width=2)
             for box in prediction:
-                draw.rectangle(xy=tuple(box), outline="red", width=2)
+                try:
+                    draw.rectangle(xy=tuple(box), outline="red", width=2)
+                except ValueError:
+                    # If the box is invalid, skip it.
+                    continue
 
             # Append the image to the samples.
             tb_samples.append(pil_img)
