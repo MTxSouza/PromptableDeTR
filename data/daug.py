@@ -94,6 +94,9 @@ class PrepareImage(BaseTransform):
 
         # Load the image.
         with Image.open(fp=sample.image_path, mode="r") as pil_img:
+            # Convert the image to RGB.
+            if pil_img.mode != "RGB":
+                pil_img = pil_img.convert("RGB")
             np_img = np.asarray(a=pil_img, dtype=np.float32)
         
         # Check if the image has three dimensions.
