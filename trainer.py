@@ -120,7 +120,7 @@ class Trainer:
             is_training (bool): Whether the model is training or not.
 
         Returns:
-            Tuple[torch.Tensor, torch.Tensor, torch.Tensor]: The images, logits, and labels.
+            Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]: The images, labels and logits.
         """
         # Convert the batch into tensors.
         images, captions, mask, extra_data = PromptableDeTRDataLoader.convert_batch_into_tensor(batch=batch)
@@ -140,37 +140,48 @@ class Trainer:
         else:
             logits, labels = run_forward(model, images, captions, extra_data)
         
-        return images, logits, labels
+        return images, captions, labels, logits
 
 
-    def __get_random_sample(self, images, logits, y):
+    def __get_random_sample(self, images, captions, y, logits, conf_threshold = 0.5):
         """
         It gets a random sample from the logits and the true captions to be visualized further.
 
         Args:
             images (torch.Tensor): The input images from the model.
-            logits (torch.Tensor): The logits from the model.
+            captions (torch.Tensor): The true captions.
             y (torch.Tensor): The true captions.
+            logits (torch.Tensor): The logits from the model.
+            conf_threshold (float): The confidence threshold to filter the objects. (Default: 0.5)
 
         Returns:
-            Tuple[np.ndarray, np.ndarray, np.ndarray]: The image, true objects, and predicted objects.
+            Tuple[np.ndarray, str, np.ndarray, np.ndarray]: The image, input caption, true objects, and predicted objects.
         """
         # Get random batch index.
         batch_index = torch.randint(low=0, high=y.size(0), size=(1,)).item()
 
         # Retrieve samples.
         image = images[batch_index].permute(1, 2, 0).detach().cpu().numpy()
+        caption = captions[batch_index].detach().cpu().numpy()
         logits_objs = logits[batch_index].cpu()
         y_objs = y[batch_index].detach().cpu().numpy()
+
+        # Decode the caption.
+        caption = self.valid_dataset.get_tokenizer().decode(caption.tolist())
+        caption = caption[0]
 
         # Filter the objects.
         logits_max = logits_objs[:, 4:].argmax(dim=1)
         logits_objs = logits_objs[logits_max == 1]
         logits_objs[:, 4:] = logits_objs[:, 4:].softmax(dim=1)
+
+        logits_objs = logits_objs[logits_objs[:, 5] > conf_threshold]
+        logits_objs = logits_objs[:, :4]
+
         logits_objs = logits_objs.numpy()
         y_objs = y_objs[y_objs[:, 4] == 1][:, :4]
 
-        return image, y_objs, logits_objs
+        return image, caption, y_objs, logits_objs
     
 
     def __save_model(self, valid_loss, valid_time):
@@ -219,7 +230,7 @@ class Trainer:
             for training_batch in self.train_dataset:
 
                 # Run the forward pass.
-                images, logits, y = self.__run_forward(model=self.model, batch=training_batch, is_training=True)
+                _, _, y, logits = self.__run_forward(model=self.model, batch=training_batch, is_training=True)
 
                 # Compute the loss.
                 loss = self.model.compute_loss(logits=logits, labels=y)
@@ -254,7 +265,7 @@ class Trainer:
                     for validation_batch in self.valid_dataset:
                         
                         # Run the forward pass.
-                        images, logits, y = self.__run_forward(model=self.model, batch=validation_batch, is_training=False)
+                        images, captions, y, logits = self.__run_forward(model=self.model, batch=validation_batch, is_training=False)
 
                         # Compute the loss.
                         loss = self.model.compute_loss(logits=logits, labels=y)
@@ -262,8 +273,8 @@ class Trainer:
 
                         # Get a random sample.
                         if n_samples < self.__total_samples and random.random() > self.__add_sample_threshold:
-                            image_sample, y_sample, logits_sample = self.__get_random_sample(images=images, logits=logits, y=y)
-                            samples.append((image_sample, y_sample, logits_sample))
+                            image_sample, caption_sample, y_sample, logits_sample = self.__get_random_sample(images=images, captions=captions, y=y, logits=logits)
+                            samples.append((image_sample, caption_sample, y_sample, logits_sample))
                             n_samples += 1
 
                     total_loss /= len(self.valid_dataset)

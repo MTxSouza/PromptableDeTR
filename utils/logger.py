@@ -6,7 +6,7 @@ import os
 from enum import Enum
 
 import numpy as np
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFont
 from torch.utils.tensorboard import SummaryWriter
 
 
@@ -100,7 +100,7 @@ class Tensorboard:
         """
         # Prepare the images for Tensorboard.
         tb_samples = []
-        for (img, label, prediction) in samples:
+        for (img, caption, label, prediction) in samples:
 
             # Get the image dimensions.
             height, width = img.shape[:2]
@@ -116,10 +116,10 @@ class Tensorboard:
             label[:, 2] = label[:, 0] + label[:, 2]
             label[:, 3] = label[:, 1] + label[:, 3]
 
-            # Draw the rectangles on the image.
             pil_img = Image.fromarray((img * 255).astype("uint8"))
             draw = ImageDraw.Draw(im=pil_img)
 
+            # Draw the rectangles on the image.
             for box in label:
                 draw.rectangle(xy=tuple(box), outline="green", width=2)
             for box in prediction:
@@ -128,6 +128,12 @@ class Tensorboard:
                 except ValueError:
                     # If the box is invalid, skip it.
                     continue
+
+            # Write the caption on the image.
+            font = ImageFont.load_default(size=12)
+            n_digits = len(caption)
+            draw.rectangle(xy=(0, 0, 10 + n_digits * 7, 20), fill="black")
+            draw.text((5, 2), caption, fill="white", font=font)
 
             # Append the image to the samples.
             tb_samples.append(pil_img)
