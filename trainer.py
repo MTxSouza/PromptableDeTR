@@ -6,6 +6,7 @@ import random
 import time
 
 import torch
+from tqdm import tqdm
 
 from data.loader import PromptableDeTRDataLoader
 from utils.logger import Tensorboard
@@ -262,7 +263,7 @@ class Trainer:
                     n_samples = 0
                     samples = []
                     init_time = time.time()
-                    for validation_batch in self.valid_dataset:
+                    for validation_batch in tqdm(iterable=self.valid_dataset, desc="Validating", unit="batch"):
                         
                         # Run the forward pass.
                         images, captions, y, logits = self.__run_forward(model=self.model, batch=validation_batch, is_training=False)
