@@ -8,15 +8,13 @@ SEED=${SEED:-"42"}
 
 # Dataset params.
 TRAIN_DATASET_DIR=${TRAIN_DATASET_DIR}
-VALID_DATASET_DIR=${VALID_DATASET_DIR:-"${DATASET_DIR}"}
+VALID_DATASET_DIR=${VALID_DATASET_DIR:-"${TRAIN_DATASET_DIR}"}
 IMAGE_DIR=${IMAGE_DIR}
-MASK_RATIO=${MASK_RATIO:-"0.8"}
 
 # Model params.
 VOCAB_FILE=${VOCAB_FILE}
 IMG_ENC_WEIGHT=${IMG_ENC_WEIGHT}
 TXT_ENC_WEIGHT=${TXT_ENC_WEIGHT}
-NUM_JOINER_LAYERS=${NUM_JOINER_LAYERS:-"4"}
 
 # Training params.
 MAX_ITER=${MAX_ITER:-"10000"}
@@ -42,14 +40,7 @@ python train.py \
         --vocab-file $VOCAB_FILE \
         --imgw $IMG_ENC_WEIGHT \
         --txtw $TXT_ENC_WEIGHT \
-        --image-size $IMG_SIZE \
-        --image-tokens 400 100 \
-        --emb-dim 128 \
-        --proj-dim 512 \
-        --emb-dropout-rate 0.1 \
-        --heads 8 \
-        --ff-dim 2048 \
-        --num-joiner-layers $NUM_JOINER_LAYERS \
+        --image-size 640 \
         --max-iter $MAX_ITER \
         --batch-size $BATCH_SIZE \
         --log-interval $LOG_INTERVAL \

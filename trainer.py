@@ -2,11 +2,14 @@
 This module contains the main class used to train all models. It defines the training loop and the 
 evaluation loop.
 """
+import random
 import time
 
 import torch
+from tqdm import tqdm
 
 from data.loader import PromptableDeTRDataLoader
+from utils.logger import Tensorboard
 
 
 # Classes.
@@ -64,11 +67,15 @@ class Trainer:
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
         # Training attributes.
+        self.__total_samples = 16
+        self.__add_sample_threshold = 0.5
         self.__current_iter = 1
         self.__best_loss = float("inf")
         self.__is_overfitting = False
         self.__overfit_counter = 0
         self.__losses = []
+
+        self.__tensorboard = Tensorboard(log_dir=exp_dir)
 
 
     # Private methods.
@@ -114,7 +121,7 @@ class Trainer:
             is_training (bool): Whether the model is training or not.
 
         Returns:
-            Tuple[torch.Tensor, torch.Tensor]: The logits and the labels.
+            Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]: The images, labels and logits.
         """
         # Convert the batch into tensors.
         images, captions, mask, extra_data = PromptableDeTRDataLoader.convert_batch_into_tensor(batch=batch)
@@ -134,45 +141,57 @@ class Trainer:
         else:
             logits, labels = run_forward(model, images, captions, extra_data)
         
-        return logits, labels
+        return images, captions, labels, logits
 
 
-    def __get_random_sample(self, logits, y):
+    def __get_random_sample(self, images, captions, y, logits, conf_threshold = 0.5):
         """
         It gets a random sample from the logits and the true captions to be visualized further.
 
         Args:
-            logits (torch.Tensor): The logits from the model.
+            images (torch.Tensor): The input images from the model.
+            captions (torch.Tensor): The true captions.
             y (torch.Tensor): The true captions.
+            logits (torch.Tensor): The logits from the model.
+            conf_threshold (float): The confidence threshold to filter the objects. (Default: 0.5)
 
         Returns:
-            Tuple[str, str] | Tuple[List[int], List[int]]: The true and predicted captions or objects.
+            Tuple[np.ndarray, str, np.ndarray, np.ndarray]: The image, input caption, true objects, and predicted objects.
         """
         # Get random batch index.
         batch_index = torch.randint(low=0, high=y.size(0), size=(1,)).item()
 
         # Retrieve samples.
+        image = images[batch_index].permute(1, 2, 0).detach().cpu().numpy()
+        caption = captions[batch_index].detach().cpu().numpy()
         logits_objs = logits[batch_index].cpu()
-        y_objs = y[batch_index].cpu().numpy()
+        y_objs = y[batch_index].detach().cpu().numpy()
+
+        # Decode the caption.
+        caption = self.valid_dataset.get_tokenizer().decode(caption.tolist())
+        caption = caption[0]
 
         # Filter the objects.
         logits_max = logits_objs[:, 4:].argmax(dim=1)
         logits_objs = logits_objs[logits_max == 1]
         logits_objs[:, 4:] = logits_objs[:, 4:].softmax(dim=1)
-        logits_objs = logits_objs.numpy().tolist()
-        y_objs = y_objs[y_objs[:, 4] == 1][:, :4].tolist()
 
-        return y_objs, logits_objs
+        logits_objs = logits_objs[logits_objs[:, 5] > conf_threshold]
+        logits_objs = logits_objs[:, :4]
+
+        logits_objs = logits_objs.numpy()
+        y_objs = y_objs[y_objs[:, 4] == 1][:, :4]
+
+        return image, caption, y_objs, logits_objs
     
 
-    def __save_model(self, valid_loss, valid_time, samples):
+    def __save_model(self, valid_loss, valid_time):
         """
         It saves the model if the validation loss is better than the previous one.
 
         Args:
             valid_loss (float): The validation loss.
             valid_time (float): The evaluation time.
-            samples (List[Tuple[str, str]]|List[Tuple[numpy.ndarray, numpy.ndarray]]): The samples to visualize.
         """
         # Save the model weights.
         is_best = False
@@ -195,8 +214,6 @@ class Trainer:
         self.model.save_model(
             dir_path=self.exp_dir, 
             ckpt_step=self.__current_iter, 
-            loss=valid_loss, 
-            samples=samples, 
             is_best=is_best
         )
         print("=" * 100)
@@ -214,7 +231,7 @@ class Trainer:
             for training_batch in self.train_dataset:
 
                 # Run the forward pass.
-                logits, y = self.__run_forward(model=self.model, batch=training_batch, is_training=True)
+                _, _, y, logits = self.__run_forward(model=self.model, batch=training_batch, is_training=True)
 
                 # Compute the loss.
                 loss = self.model.compute_loss(logits=logits, labels=y)
@@ -228,6 +245,10 @@ class Trainer:
                 self.__losses.append(loss.cpu().detach().numpy().item())
                 if self.__current_iter % self.log_interval == 0:
                     current_loss = self.__compute_current_training_loss(reset=False)
+
+                    # Log the training loss.
+                    self.__tensorboard.add_train_loss(loss=current_loss, step=self.__current_iter)
+
                     print("Iteration [%d/%d]" % (self.__current_iter, self.max_iter))
                     print("Loss: %.4f" % current_loss)
                     print("-" * 100)
@@ -239,27 +260,36 @@ class Trainer:
 
                     # Loop over the validation data loader.
                     total_loss = 0.0
+                    n_samples = 0
                     samples = []
                     init_time = time.time()
-                    for validation_batch in self.valid_dataset:
+                    for validation_batch in tqdm(iterable=self.valid_dataset, desc="Validating", unit="batch"):
                         
                         # Run the forward pass.
-                        logits, y = self.__run_forward(model=self.model, batch=validation_batch, is_training=False)
+                        images, captions, y, logits = self.__run_forward(model=self.model, batch=validation_batch, is_training=False)
 
                         # Compute the loss.
                         loss = self.model.compute_loss(logits=logits, labels=y)
                         total_loss += loss.cpu().numpy().item()
 
                         # Get a random sample.
-                        y_sample, logits_sample = self.__get_random_sample(logits=logits, y=y)
-                        samples.append((y_sample, logits_sample))
-                    
+                        if n_samples < self.__total_samples and random.random() > self.__add_sample_threshold:
+                            image_sample, caption_sample, y_sample, logits_sample = self.__get_random_sample(images=images, captions=captions, y=y, logits=logits)
+                            samples.append((image_sample, caption_sample, y_sample, logits_sample))
+                            n_samples += 1
+
                     total_loss /= len(self.valid_dataset)
                     end_time = (time.time() - init_time) / 60.0
 
                     # Save the model weights.
-                    self.__save_model(valid_loss=total_loss, valid_time=end_time, samples=samples)
-            
+                    self.__save_model(valid_loss=total_loss, valid_time=end_time)
+
+                    # Log the valid losses.
+                    self.__tensorboard.add_valid_loss(loss=total_loss, step=self.__current_iter)
+
+                    # Display the samples on Tensorboard.
+                    self.__tensorboard.add_image(samples=samples, step=self.__current_iter)
+
                 # Update the iteration.
                 self.__current_iter += 1
                 if self.__current_iter >= self.max_iter or self.__is_overfitting:
@@ -284,6 +314,4 @@ class Trainer:
             print("=" * 100)
             print("🛑 Training interrupted by the user.")
             print("=" * 100)
-        except Exception as e:
-            print("😵 An error occurred during training.")
-            print(e)
+        print("🚀 Training finished.")

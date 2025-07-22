@@ -94,7 +94,14 @@ class PrepareImage(BaseTransform):
 
         # Load the image.
         with Image.open(fp=sample.image_path, mode="r") as pil_img:
+            # Convert the image to RGB.
+            if pil_img.mode != "RGB":
+                pil_img = pil_img.convert("RGB")
             np_img = np.asarray(a=pil_img, dtype=np.float32)
+        
+        # Check if the image has three dimensions.
+        if len(np_img.shape) == 2:
+            np_img = np.expand_dims(np_img, axis=-1)
         sample.image = torch.from_numpy(np_img).permute(2, 0, 1)
 
         # Normalize the image.

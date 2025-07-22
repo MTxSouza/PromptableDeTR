@@ -50,13 +50,6 @@ def get_args():
         help="The path to the image directory."
     )
     dataset_parser.add_argument(
-        "--mask-ratio",
-        "-mr",
-        type=float,
-        default=0.1,
-        help="The ratio of masked tokens."
-    )
-    dataset_parser.add_argument(
         "--shuffle",
         action="store_true",
         help="Whether to shuffle the dataset."

@@ -163,14 +163,12 @@ class PromptableDeTR(BasePromptableDeTR):
         return outputs
 
 
-    def save_model(self, dir_path, loss, samples, ckpt_step = None, is_best = False):
+    def save_model(self, dir_path, ckpt_step = None, is_best = False):
         """
         Save the model weights.
 
         Args:
             dir_path (str): The path to the directory where the weights will be saved.
-            loss (float): The loss of the model at the checkpoint.
-            samples (List[Tuple[str, str]]): The validation results at the checkpoint.
             ckpt_step (int): The checkpoint step. (Default: None)
             is_best (bool): Flag to indicate if the checkpoint is the best. (Default: False)
         """
@@ -192,31 +190,6 @@ class PromptableDeTR(BasePromptableDeTR):
 
         # Save the weights.
         torch.save(obj=self.state_dict(), f=ckpt_fp)
-
-        # Save the log.
-        with open(file=log_fp, mode="w") as f:
-            f.write("Detector results:\n")
-            f.write("Loss: %s\n\n" % loss)
-            f.write("Samples:\n")
-            f.write("=" * 50 + "\n")
-            for (y_sample, y_pred) in samples:
-                f.write("True:\n")
-                for idx, (x1, y1, x2, y2) in enumerate(iterable=y_sample):
-                    x1 = round(x1, 4)
-                    y1 = round(y1, 4)
-                    x2 = round(x2, 4)
-                    y2 = round(y2, 4)
-                    f.write("\t%dº Object : (%f, %f, %f, %f)\n" % (idx, x1, y1, x2, y2))
-                f.write("Pred:\n")
-                for idx, (x1, y1, x2, y2, no_obj_conf, obj_conf) in enumerate(iterable=y_pred):
-                    x1 = round(x1, 4)
-                    y1 = round(y1, 4)
-                    x2 = round(x2, 4)
-                    y2 = round(y2, 4)
-                    no_obj_conf = round(no_obj_conf * 100, 2)
-                    obj_conf = round(obj_conf * 100, 2)
-                    f.write("\t%dº Object : (%f, %f, %f, %f) | Prob : (No: %f%% - Present: %f%%)\n" % (idx, x1, y1, x2, y2, no_obj_conf, obj_conf))
-                f.write("=" * 50 + "\n")
 
 
     def load_base_model(self, base_model_weights):

@@ -8,6 +8,7 @@ import os
 import numpy as np
 import torch
 import torch.nn.functional as F
+from tqdm import tqdm
 
 from data.daug import PrepareSample
 from data.schemas import Sample
@@ -34,7 +35,7 @@ class PromptableDeTRDataLoader:
         """
         # Get the samples from the directory.
         samples = []
-        for file in os.listdir(path=dirpath):
+        for file in tqdm(iterable=os.listdir(path=dirpath), desc="Loading samples", unit="sample"):
 
             # Skip non-JSON files.
             if not file.endswith(".json"):
@@ -104,7 +105,7 @@ class PromptableDeTRDataLoader:
 
     # Static methods.
     @staticmethod
-    def convert_batch_into_tensor(batch, max_len = 100, pad_value = 0):
+    def convert_batch_into_tensor(batch, max_len = 500, pad_value = 0):
         """
         Convert a list of AlignerSample objects into tensors.
 
@@ -244,6 +245,9 @@ class PromptableDeTRDataLoader:
 
                 # Define sample.
                 sample = Sample(**raw_sample)
+
+                # Update the image path.
+                sample.image_path = os.path.join(self.image_directory, sample.image_path)
 
                 # Append the samples.
                 curr_samples.append(sample)
