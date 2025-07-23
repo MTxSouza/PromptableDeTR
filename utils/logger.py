@@ -89,6 +89,50 @@ class Tensorboard:
         self.writer.add_scalar(tag="valid_loss", scalar_value=loss, global_step=step)
 
 
+    def add_valid_l1_loss(self, loss, step):
+        """
+        Adds the validation L1 loss to the Tensorboard writer.
+
+        Args:
+            loss (float): Validation L1 loss value.
+            step (int): Step number.
+        """
+        self.writer.add_scalar(tag="valid_l1_loss", scalar_value=loss, global_step=step)
+
+
+    def add_valid_giou_loss(self, loss, step):
+        """
+        Adds the validation GIoU loss to the Tensorboard writer.
+
+        Args:
+            loss (float): Validation GIoU loss value.
+            step (int): Step number.
+        """
+        self.writer.add_scalar(tag="valid_giou_loss", scalar_value=loss, global_step=step)
+
+
+    def add_valid_presence_loss(self, loss, step):
+        """
+        Adds the validation presence loss to the Tensorboard writer.
+
+        Args:
+            loss (float): Validation presence loss value.
+            step (int): Step number.
+        """
+        self.writer.add_scalar(tag="valid_presence_loss", scalar_value=loss, global_step=step)
+
+
+    def add_valid_accuracy(self, acc, step):
+        """
+        Adds the validation accuracy to the Tensorboard writer.
+
+        Args:
+            acc (float): Validation accuracy value.
+            step (int): Step number.
+        """
+        self.writer.add_scalar(tag="valid_accuracy", scalar_value=acc, global_step=step)
+
+
     def add_image(self, samples, step):
         """
         Displays the predictions of the model on the target
