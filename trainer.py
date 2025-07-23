@@ -74,6 +74,10 @@ class Trainer:
         self.__is_overfitting = False
         self.__overfit_counter = 0
         self.__losses = []
+        self.__l1_losses = []
+        self.__giou_losses = []
+        self.__presence_losses = []
+        self.__accuracies = []
 
         self.__tensorboard = Tensorboard(log_dir=exp_dir)
 
@@ -94,22 +98,29 @@ class Trainer:
         self.model.to(device=self.device)
 
 
-    def __compute_current_training_loss(self, reset = True):
+    def __compute_current_training_metrics(self, reset = True):
         """
-        It computes the current training loss.
+        It computes the current training metrics.
 
         Args:
-            reset (bool): Whether to reset the loss or not. (Default: True)
+            reset (bool): Whether to reset the metrics or not. (Default: True)
 
         Returns:
-            float: The current training loss.
+            Tuple[float, float, float, float, float]: The current training metrics.
         """
         # Compute mean loss.
         mean_loss = sum(self.__losses) / len(self.__losses)
+        mean_l1_loss = sum(self.__l1_losses) / len(self.__l1_losses)
+        mean_giou_loss = sum(self.__giou_losses) / len(self.__giou_losses)
+        mean_presence_loss = sum(self.__presence_losses) / len(self.__presence_losses)
+        mean_acc = sum(self.__accuracies) / len(self.__accuracies)
         if reset:
             self.__losses.clear()
-        return mean_loss
-    
+            self.__l1_losses.clear()
+            self.__giou_losses.clear()
+            self.__presence_losses.clear()
+            self.__accuracies.clear()
+        return mean_loss, mean_l1_loss, mean_giou_loss, mean_presence_loss, mean_acc
 
     def __run_forward(self, model, batch, is_training = True):
         """
@@ -185,17 +196,21 @@ class Trainer:
         return image, caption, y_objs, logits_objs
     
 
-    def __save_model(self, valid_loss, valid_time):
+    def __save_model(self, valid_loss, valid_l1_loss, valid_giou_loss, valid_presence_loss, valid_acc, valid_time):
         """
         It saves the model if the validation loss is better than the previous one.
 
         Args:
             valid_loss (float): The validation loss.
+            valid_l1_loss (float): The validation L1 loss.
+            valid_giou_loss (float): The validation GIoU loss.
+            valid_presence_loss (float): The validation presence loss.
+            valid_acc (float): The validation accuracy.
             valid_time (float): The evaluation time.
         """
         # Save the model weights.
         is_best = False
-        current_train_loss = self.__compute_current_training_loss()
+        current_train_loss, _, _, _, _ = self.__compute_current_training_metrics()
         if self.__best_loss > valid_loss:
             self.__best_loss = valid_loss
             is_best = True
@@ -210,7 +225,7 @@ class Trainer:
 
         print("Validation time: %.2f minutes" % valid_time)
         print("Overfit counter: %d" % self.__overfit_counter)
-        print("Validation loss: %.4f" % valid_loss)
+        print("Validation loss: %.4f - L1 Loss: %.4f - GIoU Loss: %.4f - Presence Loss: %.4f - Accuracy: %.4f" % (valid_loss, valid_l1_loss, valid_giou_loss, valid_presence_loss, valid_acc))
         self.model.save_model(
             dir_path=self.exp_dir, 
             ckpt_step=self.__current_iter, 
@@ -243,14 +258,27 @@ class Trainer:
 
                 # Check if it is time to log the loss.
                 self.__losses.append(loss.cpu().detach().numpy().item())
+                self.__l1_losses.append(final_l1_loss.cpu().detach().numpy().item())
+                self.__giou_losses.append(final_giou_loss.cpu().detach().numpy().item())
+                self.__presence_losses.append(final_presence_loss.cpu().detach().numpy().item())
+                self.__accuracies.append(acc.cpu().detach().numpy().item())
                 if self.__current_iter % self.log_interval == 0:
-                    current_loss = self.__compute_current_training_loss(reset=False)
+                    current_loss, current_l1_loss, current_giou_loss, current_presence_loss, current_acc = self.__compute_current_training_metrics(reset=False)
 
                     # Log the training loss.
-                    self.__tensorboard.add_train_loss(loss=current_loss, step=self.__current_iter)
+                    self.__tensorboard.add_train_losses(
+                        loss=current_loss, 
+                        l1_loss=current_l1_loss, 
+                        giou_loss=current_giou_loss, 
+                        presence_loss=current_presence_loss, 
+                        step=self.__current_iter
+                    )
+
+                    # Log the training accuracy.
+                    self.__tensorboard.add_train_accuracy(acc=current_acc, step=self.__current_iter)
 
                     print("Iteration [%d/%d]" % (self.__current_iter, self.max_iter))
-                    print("Loss: %.4f" % current_loss)
+                    print("Loss: %.4f - L1 Loss: %.4f - GIoU Loss: %.4f - Presence Loss: %.4f - Accuracy: %.4f" % (current_loss, current_l1_loss, current_giou_loss, current_presence_loss, current_acc))
                     print("-" * 100)
 
                 # Check if it is time to validate the model.
@@ -297,10 +325,15 @@ class Trainer:
                     self.__save_model(valid_loss=total_loss, valid_time=end_time)
 
                     # Log the valid losses.
-                    self.__tensorboard.add_valid_loss(loss=total_loss, step=self.__current_iter)
-                    self.__tensorboard.add_valid_l1_loss(loss=total_l1_loss, step=self.__current_iter)
-                    self.__tensorboard.add_valid_giou_loss(loss=total_giou_loss, step=self.__current_iter)
-                    self.__tensorboard.add_valid_presence_loss(loss=total_presence_loss, step=self.__current_iter)
+                    self.__tensorboard.add_valid_losses(
+                        loss=total_loss, 
+                        l1_loss=total_l1_loss, 
+                        giou_loss=total_giou_loss, 
+                        presence_loss=total_presence_loss, 
+                        step=self.__current_iter
+                    )
+
+                    # Log the valid accuracy.
                     self.__tensorboard.add_valid_accuracy(acc=total_acc, step=self.__current_iter)
 
                     # Display the samples on Tensorboard.
