@@ -206,16 +206,17 @@ class PromptableDeTR(BasePromptableDeTR):
         super().load_full_weights(base_model_weights=base_model_weights)
 
 
-    def compute_loss(self, logits, labels):
+    def compute_loss_and_accuracy(self, logits, labels):
         """
-        Compute the loss needed to train the detector model.
+        Compute the loss needed to train the detector model and
+        it also computes the accuracy of the model.
 
         Args:
             logits torch.Tensor): The predicted tensor.
             labels (torch.Tensor): The true tensor.
 
         Returns:
-            torch.Tensor: The loss value.
+            Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, float]: The losses of model and the accuracy.
         """
         logger.info(msg="Computing the detector loss.")
 
@@ -268,13 +269,17 @@ class PromptableDeTR(BasePromptableDeTR):
         bbox_loss = bbox_loss.sum() / num_boxes
         logger.debug(msg="- Bounding box loss: %s." % bbox_loss)
 
-        giou_loss = 1 - torch.diag(generalized_iou(sorted_pred_boxes, sorted_true_boxes))
+        acc = torch.diag(generalized_iou(sorted_pred_boxes, sorted_true_boxes))
+        giou_loss = 1 - acc
         giou_loss = giou_loss.sum() / num_boxes
         logger.debug(msg="- GIoU loss: %s." % giou_loss)
 
         # Compute the total loss.
-        loss = self.__l1_weight * bbox_loss + self.__presence_weight * presence_loss + self.__giou_weight * giou_loss
+        final_l1_loss = self.__l1_weight * bbox_loss
+        final_giou_loss = self.__giou_weight * giou_loss
+        final_presence_loss = self.__presence_weight * presence_loss
+        loss = final_l1_loss + final_presence_loss + final_giou_loss
         logger.debug(msg="- Total loss: %s." % loss)
         logger.info(msg="Returning the loss value.")
 
-        return loss
+        return loss, final_l1_loss, final_giou_loss, final_presence_loss, acc
