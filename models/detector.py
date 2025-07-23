@@ -216,7 +216,7 @@ class PromptableDeTR(BasePromptableDeTR):
             labels (torch.Tensor): The true tensor.
 
         Returns:
-            Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, float]: The losses of model and the accuracy.
+            Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]: The losses of model and the accuracy.
         """
         logger.info(msg="Computing the detector loss.")
 
