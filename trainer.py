@@ -264,7 +264,6 @@ class Trainer:
                     total_giou_loss = 0.0
                     total_presence_loss = 0.0
                     total_acc = 0.0
-                    n_samples = 0
                     samples = []
                     init_time = time.time()
                     for validation_batch in tqdm(iterable=self.valid_dataset, desc="Validating", unit="batch"):
@@ -281,10 +280,11 @@ class Trainer:
                         total_acc += acc.cpu().numpy().item()
 
                         # Get a random sample.
-                        if n_samples < self.__total_samples and random.random() > self.__add_sample_threshold:
-                            image_sample, caption_sample, y_sample, logits_sample = self.__get_random_sample(images=images, captions=captions, y=y, logits=logits)
-                            samples.append((image_sample, caption_sample, y_sample, logits_sample))
-                            n_samples += 1
+                        image_sample, caption_sample, y_sample, logits_sample = self.__get_random_sample(images=images, captions=captions, y=y, logits=logits)
+                        samples.append((image_sample, caption_sample, y_sample, logits_sample))
+                    
+                    # Filter the samples.
+                    samples = random.sample(samples, k=min(self.__total_samples, len(samples)))
 
                     total_loss /= len(self.valid_dataset)
                     total_l1_loss /= len(self.valid_dataset)
@@ -298,6 +298,10 @@ class Trainer:
 
                     # Log the valid losses.
                     self.__tensorboard.add_valid_loss(loss=total_loss, step=self.__current_iter)
+                    self.__tensorboard.add_valid_l1_loss(loss=total_l1_loss, step=self.__current_iter)
+                    self.__tensorboard.add_valid_giou_loss(loss=total_giou_loss, step=self.__current_iter)
+                    self.__tensorboard.add_valid_presence_loss(loss=total_presence_loss, step=self.__current_iter)
+                    self.__tensorboard.add_valid_accuracy(acc=total_acc, step=self.__current_iter)
 
                     # Display the samples on Tensorboard.
                     self.__tensorboard.add_image(samples=samples, step=self.__current_iter)
