@@ -234,7 +234,7 @@ class Trainer:
                 _, _, y, logits = self.__run_forward(model=self.model, batch=training_batch, is_training=True)
 
                 # Compute the loss.
-                loss = self.model.compute_loss(logits=logits, labels=y)
+                loss, final_l1_loss, final_giou_loss, final_presence_loss, acc = self.model.compute_loss_and_accuracy(logits=logits, labels=y)
 
                 # Backward pass.
                 self.optimizer.zero_grad()
@@ -260,6 +260,10 @@ class Trainer:
 
                     # Loop over the validation data loader.
                     total_loss = 0.0
+                    total_l1_loss = 0.0
+                    total_giou_loss = 0.0
+                    total_presence_loss = 0.0
+                    total_acc = 0.0
                     n_samples = 0
                     samples = []
                     init_time = time.time()
@@ -269,8 +273,12 @@ class Trainer:
                         images, captions, y, logits = self.__run_forward(model=self.model, batch=validation_batch, is_training=False)
 
                         # Compute the loss.
-                        loss = self.model.compute_loss(logits=logits, labels=y)
+                        loss, final_l1_loss, final_giou_loss, final_presence_loss, acc = self.model.compute_loss_and_accuracy(logits=logits, labels=y)
                         total_loss += loss.cpu().numpy().item()
+                        total_l1_loss += final_l1_loss.cpu().numpy().item()
+                        total_giou_loss += final_giou_loss.cpu().numpy().item()
+                        total_presence_loss += final_presence_loss.cpu().numpy().item()
+                        total_acc += acc.cpu().numpy().item()
 
                         # Get a random sample.
                         if n_samples < self.__total_samples and random.random() > self.__add_sample_threshold:
@@ -279,6 +287,10 @@ class Trainer:
                             n_samples += 1
 
                     total_loss /= len(self.valid_dataset)
+                    total_l1_loss /= len(self.valid_dataset)
+                    total_giou_loss /= len(self.valid_dataset)
+                    total_presence_loss /= len(self.valid_dataset)
+                    total_acc /= len(self.valid_dataset)
                     end_time = (time.time() - init_time) / 60.0
 
                     # Save the model weights.
