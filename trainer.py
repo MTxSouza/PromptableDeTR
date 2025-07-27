@@ -6,12 +6,12 @@ import random
 import time
 
 import torch
-from torchvision.ops.boxes import box_iou
 from tqdm import tqdm
 
 from data.loader import PromptableDeTRDataLoader
 from utils.data import xywh_to_xyxy
 from utils.logger import Tensorboard
+from utils.metrics import iou_accuracy
 
 
 # Classes.
@@ -120,36 +120,6 @@ class Trainer:
             self.__giou_losses.clear()
             self.__presence_losses.clear()
         return mean_loss, mean_l1_loss, mean_giou_loss, mean_presence_loss
-
-
-    def __compute_accuracy(self, labels, logits):
-        """
-        It computes the accuracy of the model.
-
-        Args:
-            labels (numpy.ndarray): The true labels.
-            logits (numpy.ndarray): The logits from the model.
-
-        Returns:
-            float: The accuracy of the model.
-        """
-        # Check if the labels and logits are empty.
-        if not labels.shape[0] and not logits.shape[0]:
-            return 1.0
-        elif labels.shape[0] and not logits.shape[0]:
-            return 0.0
-        elif not labels.shape[0] and logits.shape[0]:
-            return 0.0
-
-        # Compute the accuracy.
-        iou_score = box_iou(
-            torch.from_numpy(labels),
-            torch.from_numpy(logits)
-        )
-        iou_score = iou_score[iou_score > 0.0]
-        iou_score = iou_score.float().mean().item()
-
-        return iou_score
 
 
     def __run_forward(self, model, batch, is_training = True):
@@ -355,7 +325,7 @@ class Trainer:
                         samples += [self.__get_sample(images=images[idx_batch], captions=captions[idx_batch], y=y[idx_batch], logits=logits[idx_batch]) for idx_batch in range(images.size(0))]
 
                     # Compute final accuracy.
-                    total_acc = [self.__compute_accuracy(labels=y_objs, logits=logits_objs) for (_, _, y_objs, logits_objs) in samples]
+                    total_acc = [iou_accuracy(labels=y_objs, logits=logits_objs) for (_, _, y_objs, logits_objs) in samples]
                     total_acc = sum(total_acc) / len(total_acc) if total_acc else 0.0
 
                     # Filter the samples to be visualized.
