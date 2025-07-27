@@ -144,6 +144,10 @@ def xywh_to_xyxy(boxes, width=640, height=640):
     Returns:
         torch.Tensor: The bounding boxes in (x_min, y_min, x_max, y_max) format.
     """
+    # Check boxes type.
+    if not isinstance(boxes, torch.Tensor):
+        boxes = torch.tensor(boxes, dtype=torch.float32)
+
     # Check if the batch channel is present.
     if boxes.dim() == 2:
         boxes = boxes.unsqueeze(dim=0)
