@@ -43,7 +43,7 @@ python train.py \
         --imgw $IMG_ENC_WEIGHT \
         --txtw $TXT_ENC_WEIGHT \
         --image-size 640 \
-        --n-joiner-layers $N_JOINT_LAYERS \
+        --num-joiner-layers $N_JOINT_LAYERS \
         --max-iter $MAX_ITER \
         --batch-size $BATCH_SIZE \
         --log-interval $LOG_INTERVAL \
