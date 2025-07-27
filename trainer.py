@@ -6,9 +6,11 @@ import random
 import time
 
 import torch
+from torchvision.ops.boxes import box_iou
 from tqdm import tqdm
 
 from data.loader import PromptableDeTRDataLoader
+from utils.data import xywh_to_xyxy
 from utils.logger import Tensorboard
 
 
@@ -122,6 +124,36 @@ class Trainer:
             self.__accuracies.clear()
         return mean_loss, mean_l1_loss, mean_giou_loss, mean_presence_loss, mean_acc
 
+
+    def __compute_accuracy(self, labels, logits):
+        """
+        It computes the accuracy of the model.
+
+        Args:
+            labels (torch.Tensor): The true labels.
+            logits (torch.Tensor): The logits from the model.
+
+        Returns:
+            float: The accuracy of the model.
+        """
+        # Check if the labels and logits are empty.
+        if not labels.shape[0] and not logits.shape[0]:
+            return 1.0
+        elif labels.shape[0] and not logits.shape[0]:
+            return 0.0
+        elif not labels.shape[0] and logits.shape[0]:
+            return 0.0
+
+        # Compute the accuracy.
+        iou_score = box_iou(
+            torch.from_numpy(ndarray=labels),
+            torch.from_numpy(ndarray=logits)
+        )
+        iou_score = (iou_score.diag() > self.__add_sample_threshold).float().mean().item()
+
+        return iou_score
+
+
     def __run_forward(self, model, batch, is_training = True):
         """
         It runs the forward pass of the model.
@@ -155,9 +187,9 @@ class Trainer:
         return images, captions, labels, logits
 
 
-    def __get_random_sample(self, images, captions, y, logits, conf_threshold = 0.5):
+    def __get_sample(self, images, captions, y, logits, conf_threshold = 0.5):
         """
-        It gets a random sample from the logits and the true captions to be visualized further.
+        It gets a sample from the logits and the true captions to be visualized further.
 
         Args:
             images (torch.Tensor): The input images from the model.
@@ -169,14 +201,11 @@ class Trainer:
         Returns:
             Tuple[np.ndarray, str, np.ndarray, np.ndarray]: The image, input caption, true objects, and predicted objects.
         """
-        # Get random batch index.
-        batch_index = torch.randint(low=0, high=y.size(0), size=(1,)).item()
-
         # Retrieve samples.
-        image = images[batch_index].permute(1, 2, 0).detach().cpu().numpy()
-        caption = captions[batch_index].detach().cpu().numpy()
-        logits_objs = logits[batch_index].cpu()
-        y_objs = y[batch_index].detach().cpu().numpy()
+        image = images.permute(1, 2, 0).detach().cpu().numpy()
+        caption = captions.detach().cpu().numpy()
+        logits_objs = logits.cpu()
+        y_objs = y.detach().cpu().numpy()
 
         # Decode the caption.
         caption = self.valid_dataset.get_tokenizer().decode(caption.tolist())
@@ -300,25 +329,26 @@ class Trainer:
                         images, captions, y, logits = self.__run_forward(model=self.model, batch=validation_batch, is_training=False)
 
                         # Compute the loss.
-                        loss, final_l1_loss, final_giou_loss, final_presence_loss, acc = self.model.compute_loss_and_accuracy(logits=logits, labels=y)
+                        loss, final_l1_loss, final_giou_loss, final_presence_loss, _ = self.model.compute_loss_and_accuracy(logits=logits, labels=y)
                         total_loss += loss.cpu().numpy().item()
                         total_l1_loss += final_l1_loss.cpu().numpy().item()
                         total_giou_loss += final_giou_loss.cpu().numpy().item()
                         total_presence_loss += final_presence_loss.cpu().numpy().item()
-                        total_acc += acc.cpu().numpy().item()
 
                         # Get a random sample.
-                        image_sample, caption_sample, y_sample, logits_sample = self.__get_random_sample(images=images, captions=captions, y=y, logits=logits)
-                        samples.append((image_sample, caption_sample, y_sample, logits_sample))
-                    
-                    # Filter the samples.
+                        samples += [self.__get_sample(images=images[idx_batch], captions=captions[idx_batch], y=y[idx_batch], logits=logits[idx_batch]) for idx_batch in range(images.size(0))]
+
+                    # Compute final accuracy.
+                    total_acc = [self.__compute_accuracy(labels=y_objs, logits=logits_objs) for (_, _, y_objs, logits_objs) in samples]
+                    total_acc = sum(total_acc) / len(total_acc) if total_acc else 0.0
+
+                    # Filter the samples to be visualized.
                     samples = random.sample(samples, k=min(self.__total_samples, len(samples)))
 
                     total_loss /= len(self.valid_dataset)
                     total_l1_loss /= len(self.valid_dataset)
                     total_giou_loss /= len(self.valid_dataset)
                     total_presence_loss /= len(self.valid_dataset)
-                    total_acc /= len(self.valid_dataset)
                     end_time = (time.time() - init_time) / 60.0
 
                     # Save the model weights.
