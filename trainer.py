@@ -79,7 +79,6 @@ class Trainer:
         self.__l1_losses = []
         self.__giou_losses = []
         self.__presence_losses = []
-        self.__accuracies = []
 
         self.__tensorboard = Tensorboard(log_dir=exp_dir)
 
@@ -115,14 +114,12 @@ class Trainer:
         mean_l1_loss = sum(self.__l1_losses) / len(self.__l1_losses)
         mean_giou_loss = sum(self.__giou_losses) / len(self.__giou_losses)
         mean_presence_loss = sum(self.__presence_losses) / len(self.__presence_losses)
-        mean_acc = sum(self.__accuracies) / len(self.__accuracies)
         if reset:
             self.__losses.clear()
             self.__l1_losses.clear()
             self.__giou_losses.clear()
             self.__presence_losses.clear()
-            self.__accuracies.clear()
-        return mean_loss, mean_l1_loss, mean_giou_loss, mean_presence_loss, mean_acc
+        return mean_loss, mean_l1_loss, mean_giou_loss, mean_presence_loss
 
 
     def __compute_accuracy(self, labels, logits):
@@ -278,7 +275,7 @@ class Trainer:
                 _, _, y, logits = self.__run_forward(model=self.model, batch=training_batch, is_training=True)
 
                 # Compute the loss.
-                loss, final_l1_loss, final_giou_loss, final_presence_loss, acc = self.model.compute_loss_and_accuracy(logits=logits, labels=y)
+                loss, final_l1_loss, final_giou_loss, final_presence_loss = self.model.compute_loss_and_accuracy(logits=logits, labels=y)
 
                 # Backward pass.
                 self.optimizer.zero_grad()
@@ -290,9 +287,8 @@ class Trainer:
                 self.__l1_losses.append(final_l1_loss.cpu().detach().numpy().item())
                 self.__giou_losses.append(final_giou_loss.cpu().detach().numpy().item())
                 self.__presence_losses.append(final_presence_loss.cpu().detach().numpy().item())
-                self.__accuracies.append(acc.cpu().detach().numpy().item())
                 if self.__current_iter % self.log_interval == 0:
-                    current_loss, current_l1_loss, current_giou_loss, current_presence_loss, current_acc = self.__compute_current_training_metrics(reset=False)
+                    current_loss, current_l1_loss, current_giou_loss, current_presence_loss = self.__compute_current_training_metrics(reset=False)
 
                     # Log the training loss.
                     self.__tensorboard.add_train_losses(
@@ -303,11 +299,8 @@ class Trainer:
                         step=self.__current_iter
                     )
 
-                    # Log the training accuracy.
-                    self.__tensorboard.add_train_accuracy(acc=current_acc, step=self.__current_iter)
-
                     print("Iteration [%d/%d]" % (self.__current_iter, self.max_iter))
-                    print("Loss: %.4f - L1 Loss: %.4f - GIoU Loss: %.4f - Presence Loss: %.4f - Accuracy: %.4f" % (current_loss, current_l1_loss, current_giou_loss, current_presence_loss, current_acc))
+                    print("Loss: %.4f - L1 Loss: %.4f - GIoU Loss: %.4f - Presence Loss: %.4f" % (current_loss, current_l1_loss, current_giou_loss, current_presence_loss))
                     print("-" * 100)
 
                 # Check if it is time to validate the model.
@@ -329,7 +322,7 @@ class Trainer:
                         images, captions, y, logits = self.__run_forward(model=self.model, batch=validation_batch, is_training=False)
 
                         # Compute the loss.
-                        loss, final_l1_loss, final_giou_loss, final_presence_loss, _ = self.model.compute_loss_and_accuracy(logits=logits, labels=y)
+                        loss, final_l1_loss, final_giou_loss, final_presence_loss = self.model.compute_loss_and_accuracy(logits=logits, labels=y)
                         total_loss += loss.cpu().numpy().item()
                         total_l1_loss += final_l1_loss.cpu().numpy().item()
                         total_giou_loss += final_giou_loss.cpu().numpy().item()
