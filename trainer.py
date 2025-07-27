@@ -146,7 +146,8 @@ class Trainer:
             torch.from_numpy(labels),
             torch.from_numpy(logits)
         )
-        iou_score = (iou_score.diag() > self.__add_sample_threshold).float().mean().item()
+        iou_score = iou_score[iou_score > 0.0]
+        iou_score = iou_score.float().mean().item()
 
         return iou_score
 
