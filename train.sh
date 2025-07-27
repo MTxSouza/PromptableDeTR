@@ -31,6 +31,8 @@ GIOU_WEIGHT=${GIOU_WEIGHT:-"1.0"}
 PRESENCE_WEIGHT=${PRESENCE_WEIGHT:-"1.0"}
 L1_WEIGHT=${L1_WEIGHT:-"1.0"}
 
+N_JOINER_LAYERS=${N_JOINER_LAYERS:-"6"}
+
 python install_utilities.py
 python train.py \
         --train-dataset-dir $TRAIN_DATASET_DIR \
@@ -41,6 +43,7 @@ python train.py \
         --imgw $IMG_ENC_WEIGHT \
         --txtw $TXT_ENC_WEIGHT \
         --image-size 640 \
+        --n-joiner-layers $N_JOINT_LAYERS \
         --max-iter $MAX_ITER \
         --batch-size $BATCH_SIZE \
         --log-interval $LOG_INTERVAL \
