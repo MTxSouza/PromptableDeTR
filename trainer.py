@@ -127,8 +127,8 @@ class Trainer:
         It computes the accuracy of the model.
 
         Args:
-            labels (torch.Tensor): The true labels.
-            logits (torch.Tensor): The logits from the model.
+            labels (numpy.ndarray): The true labels.
+            logits (numpy.ndarray): The logits from the model.
 
         Returns:
             float: The accuracy of the model.
@@ -143,8 +143,8 @@ class Trainer:
 
         # Compute the accuracy.
         iou_score = box_iou(
-            torch.from_numpy(ndarray=labels),
-            torch.from_numpy(ndarray=logits)
+            torch.from_numpy(labels),
+            torch.from_numpy(logits)
         )
         iou_score = (iou_score.diag() > self.__add_sample_threshold).float().mean().item()
 
