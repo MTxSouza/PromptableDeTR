@@ -136,19 +136,19 @@ class Tensorboard:
         tb_samples = []
         for (img, caption, label, prediction) in samples:
 
-            # Get the image dimensions.
-            height, width = img.shape[:2]
+            # # Get the image dimensions.
+            # height, width = img.shape[:2]
 
-            # Compute real coordinates.
-            label[:, 0::2] *= width
-            label[:, 1::2] *= height
-            prediction[:, 0::2] *= width
-            prediction[:, 1::2] *= height
+            # # Compute real coordinates.
+            # label[:, 0::2] *= width
+            # label[:, 1::2] *= height
+            # prediction[:, 0::2] *= width
+            # prediction[:, 1::2] *= height
 
-            prediction[:, 2] = prediction[:, 0] + prediction[:, 2]
-            prediction[:, 3] = prediction[:, 1] + prediction[:, 3]
-            label[:, 2] = label[:, 0] + label[:, 2]
-            label[:, 3] = label[:, 1] + label[:, 3]
+            # prediction[:, 2] = prediction[:, 0] + prediction[:, 2]
+            # prediction[:, 3] = prediction[:, 1] + prediction[:, 3]
+            # label[:, 2] = label[:, 0] + label[:, 2]
+            # label[:, 3] = label[:, 1] + label[:, 3]
 
             pil_img = Image.fromarray((img * 255).astype("uint8"))
             draw = ImageDraw.Draw(im=pil_img)

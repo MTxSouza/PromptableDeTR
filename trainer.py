@@ -258,6 +258,28 @@ class Trainer:
             is_best=is_best
         )
         print("=" * 100)
+    
+
+    def __fix_bbox(self, sample):
+        """
+        It fixes the bounding boxes in the sample.
+
+        Args:
+            sample (Tuple[np.ndarray, str, np.ndarray, np.ndarray]): The sample containing the image, caption, true objects, and predicted objects.
+
+        Returns:
+            Tuple[np.ndarray, str, np.ndarray, np.ndarray]: The fixed sample.
+        """
+        img, caption, y_objs, logits_objs = sample
+
+        # Get the image dimensions.
+        height, width = img.shape[:2]
+
+        # Convert the bounding boxes from xywh to xyxy format.
+        y_objs = xywh_to_xyxy(boxes=y_objs, height=height, width=width)
+        logits_objs = xywh_to_xyxy(boxes=logits_objs, height=height, width=width)
+
+        return img, caption, y_objs, logits_objs
 
 
     def __main_loop(self):
@@ -337,6 +359,7 @@ class Trainer:
 
                     # Filter the samples to be visualized.
                     samples = random.sample(samples, k=min(self.__total_samples, len(samples)))
+                    samples = [self.__fix_bbox(sample=sample) for sample in samples]
 
                     total_loss /= len(self.valid_dataset)
                     total_l1_loss /= len(self.valid_dataset)
