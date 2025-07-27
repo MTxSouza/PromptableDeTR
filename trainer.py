@@ -236,7 +236,7 @@ class Trainer:
         """
         # Save the model weights.
         is_best = False
-        current_train_loss, _, _, _, _ = self.__compute_current_training_metrics()
+        current_train_loss, _, _, _ = self.__compute_current_training_metrics()
         if self.__best_loss > valid_loss:
             self.__best_loss = valid_loss
             is_best = True
