@@ -322,7 +322,14 @@ class Trainer:
                     end_time = (time.time() - init_time) / 60.0
 
                     # Save the model weights.
-                    self.__save_model(valid_loss=total_loss, valid_time=end_time)
+                    self.__save_model(
+                        valid_loss=total_loss,
+                        valid_l1_loss=total_l1_loss,
+                        valid_giou_loss=total_giou_loss,
+                        valid_presence_loss=total_presence_loss,
+                        valid_acc=total_acc,
+                        valid_time=end_time
+                    )
 
                     # Log the valid losses.
                     self.__tensorboard.add_valid_losses(
