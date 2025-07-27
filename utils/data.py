@@ -164,4 +164,6 @@ def xywh_to_xyxy(boxes, width=640, height=640):
     new_boxes[:, :, 0::2] = torch.clamp(new_boxes[:, :, 0::2], min=0, max=width)
     new_boxes[:, :, 1::2] = torch.clamp(new_boxes[:, :, 1::2], min=0, max=height)
 
+    new_boxes = new_boxes.numpy()
+
     return new_boxes
