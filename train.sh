@@ -42,7 +42,6 @@ python train.py \
         --vocab-file $VOCAB_FILE \
         --imgw $IMG_ENC_WEIGHT \
         --txtw $TXT_ENC_WEIGHT \
-        --image-size 640 \
         --num-joiner-layers $N_JOINER_LAYERS \
         --max-iter $MAX_ITER \
         --batch-size $BATCH_SIZE \
