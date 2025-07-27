@@ -17,9 +17,9 @@ IMG_ENC_WEIGHT=${IMG_ENC_WEIGHT}
 TXT_ENC_WEIGHT=${TXT_ENC_WEIGHT}
 
 # Training params.
-MAX_ITER=${MAX_ITER:-"10000"}
+MAX_ITER=${MAX_ITER:-"50000"}
 BATCH_SIZE=${BATCH_SIZE:-"32"}
-LR=${LR:-"1e-4"}
+LR=${LR:-"5e-5"}
 EVAL_INTERVAL=${EVAL_INTERVAL:-"100"}
 LOG_INTERVAL=${LOG_INTERVAL:-"10"}
 OVERFIT_THRESHOLD=${OVERFIT_THRESHOLD:-"1e-3"}
@@ -31,6 +31,8 @@ GIOU_WEIGHT=${GIOU_WEIGHT:-"1.0"}
 PRESENCE_WEIGHT=${PRESENCE_WEIGHT:-"1.0"}
 L1_WEIGHT=${L1_WEIGHT:-"1.0"}
 
+N_JOINER_LAYERS=${N_JOINER_LAYERS:-"6"}
+
 python install_utilities.py
 python train.py \
         --train-dataset-dir $TRAIN_DATASET_DIR \
@@ -40,7 +42,7 @@ python train.py \
         --vocab-file $VOCAB_FILE \
         --imgw $IMG_ENC_WEIGHT \
         --txtw $TXT_ENC_WEIGHT \
-        --image-size 640 \
+        --num-joiner-layers $N_JOINER_LAYERS \
         --max-iter $MAX_ITER \
         --batch-size $BATCH_SIZE \
         --log-interval $LOG_INTERVAL \

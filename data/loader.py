@@ -199,7 +199,7 @@ class PromptableDeTRDataLoader:
         """
 
         # Compute the number of batches.
-        self.num_batches = len(sample_file_paths) // batch_size + (len(sample_file_paths) % batch_size)
+        self.num_batches = len(sample_file_paths) // batch_size + 1
 
         # Check transformations.
         if transformations is None:

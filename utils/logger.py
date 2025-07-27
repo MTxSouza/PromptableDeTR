@@ -67,26 +67,60 @@ class Tensorboard:
 
 
     # Methods.
-    def add_train_loss(self, loss, step):
+    def add_train_losses(self, loss, l1_loss, giou_loss, presence_loss, step):
         """
         Adds the training loss to the Tensorboard writer.
 
         Args:
-            loss (float): Training loss value.
+            loss (float): Total training loss value.
+            l1_loss (float): Training L1 loss value.
+            giou_loss (float): Training GIoU loss value.
+            presence_loss (float): Training presence loss value.
             step (int): Step number.
         """
         self.writer.add_scalar(tag="train_loss", scalar_value=loss, global_step=step)
+        self.writer.add_scalar(tag="train_l1_loss", scalar_value=l1_loss, global_step=step)
+        self.writer.add_scalar(tag="train_giou_loss", scalar_value=giou_loss, global_step=step)
+        self.writer.add_scalar(tag="train_presence_loss", scalar_value=presence_loss, global_step=step)
 
 
-    def add_valid_loss(self, loss, step):
+    def add_train_accuracy(self, acc, step):
+        """
+        Adds the training accuracy to the Tensorboard writer.
+
+        Args:
+            acc (float): Total training accuracy value.
+            step (int): Step number.
+        """
+        self.writer.add_scalar(tag="train_giou_accuracy", scalar_value=acc, global_step=step)
+
+
+    def add_valid_losses(self, loss, l1_loss, giou_loss, presence_loss, step):
         """
         Adds the validation loss to the Tensorboard writer.
 
         Args:
-            loss (float): Validation loss value.
+            loss (float): Total validation loss value.
+            l1_loss (float): Validation L1 loss value.
+            giou_loss (float): Validation GIoU loss value.
+            presence_loss (float): Validation presence loss value.
             step (int): Step number.
         """
         self.writer.add_scalar(tag="valid_loss", scalar_value=loss, global_step=step)
+        self.writer.add_scalar(tag="valid_l1_loss", scalar_value=l1_loss, global_step=step)
+        self.writer.add_scalar(tag="valid_giou_loss", scalar_value=giou_loss, global_step=step)
+        self.writer.add_scalar(tag="valid_presence_loss", scalar_value=presence_loss, global_step=step)
+
+
+    def add_valid_accuracy(self, acc, step):
+        """
+        Adds the validation accuracy to the Tensorboard writer.
+
+        Args:
+            acc (float): Total validation accuracy value.
+            step (int): Step number.
+        """
+        self.writer.add_scalar(tag="valid_giou_accuracy", scalar_value=acc, global_step=step)
 
 
     def add_image(self, samples, step):
@@ -102,19 +136,19 @@ class Tensorboard:
         tb_samples = []
         for (img, caption, label, prediction) in samples:
 
-            # Get the image dimensions.
-            height, width = img.shape[:2]
+            # # Get the image dimensions.
+            # height, width = img.shape[:2]
 
-            # Compute real coordinates.
-            label[:, 0::2] *= width
-            label[:, 1::2] *= height
-            prediction[:, 0::2] *= width
-            prediction[:, 1::2] *= height
+            # # Compute real coordinates.
+            # label[:, 0::2] *= width
+            # label[:, 1::2] *= height
+            # prediction[:, 0::2] *= width
+            # prediction[:, 1::2] *= height
 
-            prediction[:, 2] = prediction[:, 0] + prediction[:, 2]
-            prediction[:, 3] = prediction[:, 1] + prediction[:, 3]
-            label[:, 2] = label[:, 0] + label[:, 2]
-            label[:, 3] = label[:, 1] + label[:, 3]
+            # prediction[:, 2] = prediction[:, 0] + prediction[:, 2]
+            # prediction[:, 3] = prediction[:, 1] + prediction[:, 3]
+            # label[:, 2] = label[:, 0] + label[:, 2]
+            # label[:, 3] = label[:, 1] + label[:, 3]
 
             pil_img = Image.fromarray((img * 255).astype("uint8"))
             draw = ImageDraw.Draw(im=pil_img)

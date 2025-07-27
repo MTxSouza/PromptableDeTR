@@ -9,7 +9,9 @@ import torch
 from tqdm import tqdm
 
 from data.loader import PromptableDeTRDataLoader
+from utils.data import xywh_to_xyxy
 from utils.logger import Tensorboard
+from utils.metrics import iou_accuracy
 
 
 # Classes.
@@ -74,6 +76,9 @@ class Trainer:
         self.__is_overfitting = False
         self.__overfit_counter = 0
         self.__losses = []
+        self.__l1_losses = []
+        self.__giou_losses = []
+        self.__presence_losses = []
 
         self.__tensorboard = Tensorboard(log_dir=exp_dir)
 
@@ -94,22 +99,28 @@ class Trainer:
         self.model.to(device=self.device)
 
 
-    def __compute_current_training_loss(self, reset = True):
+    def __compute_current_training_metrics(self, reset = True):
         """
-        It computes the current training loss.
+        It computes the current training metrics.
 
         Args:
-            reset (bool): Whether to reset the loss or not. (Default: True)
+            reset (bool): Whether to reset the metrics or not. (Default: True)
 
         Returns:
-            float: The current training loss.
+            Tuple[float, float, float, float, float]: The current training metrics.
         """
         # Compute mean loss.
         mean_loss = sum(self.__losses) / len(self.__losses)
+        mean_l1_loss = sum(self.__l1_losses) / len(self.__l1_losses)
+        mean_giou_loss = sum(self.__giou_losses) / len(self.__giou_losses)
+        mean_presence_loss = sum(self.__presence_losses) / len(self.__presence_losses)
         if reset:
             self.__losses.clear()
-        return mean_loss
-    
+            self.__l1_losses.clear()
+            self.__giou_losses.clear()
+            self.__presence_losses.clear()
+        return mean_loss, mean_l1_loss, mean_giou_loss, mean_presence_loss
+
 
     def __run_forward(self, model, batch, is_training = True):
         """
@@ -144,9 +155,9 @@ class Trainer:
         return images, captions, labels, logits
 
 
-    def __get_random_sample(self, images, captions, y, logits, conf_threshold = 0.5):
+    def __get_sample(self, images, captions, y, logits, conf_threshold = 0.5):
         """
-        It gets a random sample from the logits and the true captions to be visualized further.
+        It gets a sample from the logits and the true captions to be visualized further.
 
         Args:
             images (torch.Tensor): The input images from the model.
@@ -158,14 +169,11 @@ class Trainer:
         Returns:
             Tuple[np.ndarray, str, np.ndarray, np.ndarray]: The image, input caption, true objects, and predicted objects.
         """
-        # Get random batch index.
-        batch_index = torch.randint(low=0, high=y.size(0), size=(1,)).item()
-
         # Retrieve samples.
-        image = images[batch_index].permute(1, 2, 0).detach().cpu().numpy()
-        caption = captions[batch_index].detach().cpu().numpy()
-        logits_objs = logits[batch_index].cpu()
-        y_objs = y[batch_index].detach().cpu().numpy()
+        image = images.permute(1, 2, 0).detach().cpu().numpy()
+        caption = captions.detach().cpu().numpy()
+        logits_objs = logits.cpu()
+        y_objs = y.detach().cpu().numpy()
 
         # Decode the caption.
         caption = self.valid_dataset.get_tokenizer().decode(caption.tolist())
@@ -185,17 +193,21 @@ class Trainer:
         return image, caption, y_objs, logits_objs
     
 
-    def __save_model(self, valid_loss, valid_time):
+    def __save_model(self, valid_loss, valid_l1_loss, valid_giou_loss, valid_presence_loss, valid_acc, valid_time):
         """
         It saves the model if the validation loss is better than the previous one.
 
         Args:
             valid_loss (float): The validation loss.
+            valid_l1_loss (float): The validation L1 loss.
+            valid_giou_loss (float): The validation GIoU loss.
+            valid_presence_loss (float): The validation presence loss.
+            valid_acc (float): The validation accuracy.
             valid_time (float): The evaluation time.
         """
         # Save the model weights.
         is_best = False
-        current_train_loss = self.__compute_current_training_loss()
+        current_train_loss, _, _, _ = self.__compute_current_training_metrics()
         if self.__best_loss > valid_loss:
             self.__best_loss = valid_loss
             is_best = True
@@ -210,13 +222,35 @@ class Trainer:
 
         print("Validation time: %.2f minutes" % valid_time)
         print("Overfit counter: %d" % self.__overfit_counter)
-        print("Validation loss: %.4f" % valid_loss)
+        print("Validation loss: %.4f - L1 Loss: %.4f - GIoU Loss: %.4f - Presence Loss: %.4f - Accuracy: %.4f" % (valid_loss, valid_l1_loss, valid_giou_loss, valid_presence_loss, valid_acc))
         self.model.save_model(
             dir_path=self.exp_dir, 
             ckpt_step=self.__current_iter, 
             is_best=is_best
         )
         print("=" * 100)
+    
+
+    def __fix_bbox(self, sample):
+        """
+        It fixes the bounding boxes in the sample.
+
+        Args:
+            sample (Tuple[np.ndarray, str, np.ndarray, np.ndarray]): The sample containing the image, caption, true objects, and predicted objects.
+
+        Returns:
+            Tuple[np.ndarray, str, np.ndarray, np.ndarray]: The fixed sample.
+        """
+        img, caption, y_objs, logits_objs = sample
+
+        # Get the image dimensions.
+        height, width = img.shape[:2]
+
+        # Convert the bounding boxes from xywh to xyxy format.
+        y_objs = xywh_to_xyxy(boxes=y_objs, height=height, width=width)
+        logits_objs = xywh_to_xyxy(boxes=logits_objs, height=height, width=width)
+
+        return img, caption, y_objs, logits_objs
 
 
     def __main_loop(self):
@@ -234,7 +268,7 @@ class Trainer:
                 _, _, y, logits = self.__run_forward(model=self.model, batch=training_batch, is_training=True)
 
                 # Compute the loss.
-                loss = self.model.compute_loss(logits=logits, labels=y)
+                loss, final_l1_loss, final_giou_loss, final_presence_loss = self.model.compute_loss_and_accuracy(logits=logits, labels=y)
 
                 # Backward pass.
                 self.optimizer.zero_grad()
@@ -243,14 +277,23 @@ class Trainer:
 
                 # Check if it is time to log the loss.
                 self.__losses.append(loss.cpu().detach().numpy().item())
+                self.__l1_losses.append(final_l1_loss.cpu().detach().numpy().item())
+                self.__giou_losses.append(final_giou_loss.cpu().detach().numpy().item())
+                self.__presence_losses.append(final_presence_loss.cpu().detach().numpy().item())
                 if self.__current_iter % self.log_interval == 0:
-                    current_loss = self.__compute_current_training_loss(reset=False)
+                    current_loss, current_l1_loss, current_giou_loss, current_presence_loss = self.__compute_current_training_metrics(reset=False)
 
                     # Log the training loss.
-                    self.__tensorboard.add_train_loss(loss=current_loss, step=self.__current_iter)
+                    self.__tensorboard.add_train_losses(
+                        loss=current_loss, 
+                        l1_loss=current_l1_loss, 
+                        giou_loss=current_giou_loss, 
+                        presence_loss=current_presence_loss, 
+                        step=self.__current_iter
+                    )
 
                     print("Iteration [%d/%d]" % (self.__current_iter, self.max_iter))
-                    print("Loss: %.4f" % current_loss)
+                    print("Loss: %.4f - L1 Loss: %.4f - GIoU Loss: %.4f - Presence Loss: %.4f" % (current_loss, current_l1_loss, current_giou_loss, current_presence_loss))
                     print("-" * 100)
 
                 # Check if it is time to validate the model.
@@ -260,7 +303,10 @@ class Trainer:
 
                     # Loop over the validation data loader.
                     total_loss = 0.0
-                    n_samples = 0
+                    total_l1_loss = 0.0
+                    total_giou_loss = 0.0
+                    total_presence_loss = 0.0
+                    total_acc = 0.0
                     samples = []
                     init_time = time.time()
                     for validation_batch in tqdm(iterable=self.valid_dataset, desc="Validating", unit="batch"):
@@ -269,23 +315,50 @@ class Trainer:
                         images, captions, y, logits = self.__run_forward(model=self.model, batch=validation_batch, is_training=False)
 
                         # Compute the loss.
-                        loss = self.model.compute_loss(logits=logits, labels=y)
+                        loss, final_l1_loss, final_giou_loss, final_presence_loss = self.model.compute_loss_and_accuracy(logits=logits, labels=y)
                         total_loss += loss.cpu().numpy().item()
+                        total_l1_loss += final_l1_loss.cpu().numpy().item()
+                        total_giou_loss += final_giou_loss.cpu().numpy().item()
+                        total_presence_loss += final_presence_loss.cpu().numpy().item()
 
                         # Get a random sample.
-                        if n_samples < self.__total_samples and random.random() > self.__add_sample_threshold:
-                            image_sample, caption_sample, y_sample, logits_sample = self.__get_random_sample(images=images, captions=captions, y=y, logits=logits)
-                            samples.append((image_sample, caption_sample, y_sample, logits_sample))
-                            n_samples += 1
+                        samples += [self.__get_sample(images=images[idx_batch], captions=captions[idx_batch], y=y[idx_batch], logits=logits[idx_batch]) for idx_batch in range(images.size(0))]
+
+                    # Compute final accuracy.
+                    total_acc = [iou_accuracy(labels=y_objs, logits=logits_objs) for (_, _, y_objs, logits_objs) in samples]
+                    total_acc = sum(total_acc) / len(total_acc) if total_acc else 0.0
+
+                    # Filter the samples to be visualized.
+                    samples = random.sample(samples, k=min(self.__total_samples, len(samples)))
+                    samples = [self.__fix_bbox(sample=sample) for sample in samples]
 
                     total_loss /= len(self.valid_dataset)
+                    total_l1_loss /= len(self.valid_dataset)
+                    total_giou_loss /= len(self.valid_dataset)
+                    total_presence_loss /= len(self.valid_dataset)
                     end_time = (time.time() - init_time) / 60.0
 
                     # Save the model weights.
-                    self.__save_model(valid_loss=total_loss, valid_time=end_time)
+                    self.__save_model(
+                        valid_loss=total_loss,
+                        valid_l1_loss=total_l1_loss,
+                        valid_giou_loss=total_giou_loss,
+                        valid_presence_loss=total_presence_loss,
+                        valid_acc=total_acc,
+                        valid_time=end_time
+                    )
 
                     # Log the valid losses.
-                    self.__tensorboard.add_valid_loss(loss=total_loss, step=self.__current_iter)
+                    self.__tensorboard.add_valid_losses(
+                        loss=total_loss, 
+                        l1_loss=total_l1_loss, 
+                        giou_loss=total_giou_loss, 
+                        presence_loss=total_presence_loss, 
+                        step=self.__current_iter
+                    )
+
+                    # Log the valid accuracy.
+                    self.__tensorboard.add_valid_accuracy(acc=total_acc, step=self.__current_iter)
 
                     # Display the samples on Tensorboard.
                     self.__tensorboard.add_image(samples=samples, step=self.__current_iter)
