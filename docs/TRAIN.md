@@ -13,7 +13,7 @@ You can use the bash script `train.sh` to deploy the training, this script has a
 
 You can easily run the script using the command below:
 ```bash
-$ bash TRAIN_DATASET_DIR=<...> IMAGE_DIR=<...> IMG_ENC_WEIGHT=<...> TXT_ENC_WEIGHT=<...> VOCAB_FILE=<...> train.sh
+$ TRAIN_DATASET_DIR=<...> IMAGE_DIR=<...> IMG_ENC_WEIGHT=<...> TXT_ENC_WEIGHT=<...> VOCAB_FILE=<...> bash train.sh
 ```
 > The `.sh` script will first run the `install_utilities.py` script to install all dependencies for training, and after training is over, it'll delete all weight files stored at experiment directory, keeping only the best weights for you, whereas the `.py` will only run the main training script.
 
