@@ -216,7 +216,7 @@ class PromptableDeTR(BasePromptableDeTR):
             labels (torch.Tensor): The true tensor.
 
         Returns:
-            Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]: The losses of model and the accuracy.
+            Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]: The losses of model.
         """
         logger.info(msg="Computing the detector loss.")
 
@@ -274,10 +274,6 @@ class PromptableDeTR(BasePromptableDeTR):
         giou_loss = giou_loss.sum() / num_boxes
         logger.debug(msg="- GIoU loss: %s." % giou_loss)
 
-        giou_thresh = 0.5
-        giou_accuracy = (diag_acc > giou_thresh).float().mean() / num_boxes
-        logger.debug(msg="- GIoU Accuracy: %s." % giou_accuracy)
-
         # Compute the total loss.
         final_l1_loss = self.__l1_weight * bbox_loss
         final_giou_loss = self.__giou_weight * giou_loss
@@ -286,4 +282,4 @@ class PromptableDeTR(BasePromptableDeTR):
         logger.debug(msg="- Total loss: %s." % loss)
         logger.info(msg="Returning the loss value.")
 
-        return loss, final_l1_loss, final_giou_loss, final_presence_loss, giou_accuracy
+        return loss, final_l1_loss, final_giou_loss, final_presence_loss
