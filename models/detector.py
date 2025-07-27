@@ -269,12 +269,14 @@ class PromptableDeTR(BasePromptableDeTR):
         bbox_loss = bbox_loss.sum() / num_boxes
         logger.debug(msg="- Bounding box loss: %s." % bbox_loss)
 
-        diag_acc = torch.diag(generalized_iou(sorted_pred_boxes, sorted_true_boxes))
+        diag_acc = torch.diag(input=generalized_iou(sorted_pred_boxes, sorted_true_boxes))
         giou_loss = 1 - diag_acc
         giou_loss = giou_loss.sum() / num_boxes
-        accuracy = diag_acc.sum() / num_boxes
         logger.debug(msg="- GIoU loss: %s." % giou_loss)
-        logger.debug(msg="- Accuracy: %s." % accuracy)
+
+        giou_thresh = 0.5
+        giou_accuracy = (diag_acc > giou_thresh).float().mean() / num_boxes
+        logger.debug(msg="- GIoU Accuracy: %s." % giou_accuracy)
 
         # Compute the total loss.
         final_l1_loss = self.__l1_weight * bbox_loss
@@ -284,4 +286,4 @@ class PromptableDeTR(BasePromptableDeTR):
         logger.debug(msg="- Total loss: %s." % loss)
         logger.info(msg="Returning the loss value.")
 
-        return loss, final_l1_loss, final_giou_loss, final_presence_loss, accuracy
+        return loss, final_l1_loss, final_giou_loss, final_presence_loss, giou_accuracy
