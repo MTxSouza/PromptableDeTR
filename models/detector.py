@@ -272,7 +272,7 @@ class PromptableDeTR(BasePromptableDeTR):
         diag_acc = torch.diag(generalized_iou(sorted_pred_boxes, sorted_true_boxes))
         giou_loss = 1 - diag_acc
         giou_loss = giou_loss.sum() / num_boxes
-        accuracy = diag_acc.mean()
+        accuracy = diag_acc.sum() / num_boxes
         logger.debug(msg="- GIoU loss: %s." % giou_loss)
         logger.debug(msg="- Accuracy: %s." % accuracy)
 
