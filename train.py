@@ -8,7 +8,7 @@ from data.daug import PrepareSample, ReshapeImage
 from data.loader import PromptableDeTRDataLoader
 from models.detector import PromptableDeTR
 from params import get_args
-from trainer import Trainer
+from utils.trainer import Trainer
 
 
 # Functions.
