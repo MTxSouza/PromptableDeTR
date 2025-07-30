@@ -2,13 +2,14 @@
 This module contains the main data loader class used to load the data 
 to be used in the training process.
 """
+import itertools
 import json
+import multiprocessing
 import os
 
 import numpy as np
 import torch
 import torch.nn.functional as F
-from tqdm import tqdm
 
 from data.daug import PrepareSample
 from data.schemas import Sample
@@ -33,26 +34,45 @@ class PromptableDeTRDataLoader:
         Returns:
             list: A list of valid sample file paths.
         """
-        # Get the samples from the directory.
-        samples = []
-        for file in tqdm(iterable=os.listdir(path=dirpath), desc="Loading samples", unit="sample"):
+        def get_samples(data):
+            samples = []
+            for file in data:
 
-            # Skip non-JSON files.
-            if not file.endswith(".json"):
-                continue
+                # Skip non-JSON files.
+                if not file.endswith(".json"):
+                    continue
 
-            # Load the samples.
-            sample_file = os.path.join(dirpath, file)
-            with open(file=sample_file, mode="r") as f:
-                raw_sample = json.load(fp=f)
+                # Load the samples.
+                sample_file = os.path.join(dirpath, file)
+                with open(file=sample_file, mode="r") as f:
+                    raw_sample = json.load(fp=f)
 
-            # Check if the samples are valid.
-            Sample(**raw_sample)
-            del raw_sample
+                # Check if the samples are valid.
+                Sample(**raw_sample)
+                del raw_sample
 
-            # Append the samples.
-            samples.append(sample_file)
-            
+                # Append the samples.
+                samples.append(sample_file)
+                
+            return samples
+
+        # Get contento of directory.
+        dir_data = os.listdir(path=dirpath)
+
+        # Create chunk to load samples in parallel.
+        n_cpu = os.cpu_count()
+        dir_data = np.array_split(ary=dir_data, indices_or_sections=n_cpu)
+        dir_data = [chunk.tolist() for chunk in dir_data]
+
+        # Create pool to load samples in parallel.
+        pool = multiprocessing.Pool(processes=n_cpu)
+        samples = pool.map(get_samples, dir_data)
+        pool.close()
+        pool.join()
+
+        # Flatten the list of samples.
+        samples = itertools.chain.from_iterable(iterable=samples)
+
         return samples
 
 
