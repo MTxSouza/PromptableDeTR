@@ -343,15 +343,21 @@ class Trainer:
                         total_presence_loss += final_presence_loss.cpu().numpy().item()
 
                         # Get a random sample.
-                        samples += [self.__get_sample(images=images[idx_batch], captions=captions[idx_batch], y=y[idx_batch], logits=logits[idx_batch]) for idx_batch in range(images.size(0))]
+                        small_samples = [self.__get_sample(images=images[idx_batch], captions=captions[idx_batch], y=y[idx_batch], logits=logits[idx_batch]) for idx_batch in range(images.size(0))]
+                        for sample in small_samples:
+                            if self.__total_samples > len(samples):
+                                samples.append(sample)
+                            else:
+                                i = random.randint(0, self.__total_samples - 1)
+                                j = random.randint(0, self.__total_samples - 1)
+                                if i > j:
+                                    samples[i] = sample
+                        del small_samples
 
                     # Compute final accuracy.
                     samples = [self.__fix_bbox(sample=sample) for sample in samples]
                     total_acc = [iou_accuracy(labels=y_objs, logits=logits_objs) for (_, _, y_objs, logits_objs) in samples]
                     total_acc = sum(total_acc) / len(total_acc) if total_acc else 0.0
-
-                    # Filter the samples to be visualized.
-                    samples = random.sample(samples, k=min(self.__total_samples, len(samples)))
 
                     total_loss /= len(self.valid_dataset)
                     total_l1_loss /= len(self.valid_dataset)
