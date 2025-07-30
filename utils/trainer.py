@@ -195,7 +195,7 @@ class Trainer:
         logits_objs = logits_objs[logits_objs[:, 5] > conf_threshold]
         logits_objs = logits_objs[:, :4]
 
-        logits_objs = logits_objs.numpy()
+        logits_objs = logits_objs.detach().cpu().numpy()
         y_objs = y_objs[y_objs[:, 4] == 1][:, :4]
 
         return image, caption, y_objs, logits_objs
