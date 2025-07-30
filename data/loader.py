@@ -34,30 +34,9 @@ class PromptableDeTRDataLoader:
         Returns:
             list: A list of valid sample file paths.
         """
-        def get_samples(data):
-            samples = []
-            for file in data:
-
-                # Skip non-JSON files.
-                if not file.endswith(".json"):
-                    continue
-
-                # Load the samples.
-                sample_file = os.path.join(dirpath, file)
-                with open(file=sample_file, mode="r") as f:
-                    raw_sample = json.load(fp=f)
-
-                # Check if the samples are valid.
-                Sample(**raw_sample)
-                del raw_sample
-
-                # Append the samples.
-                samples.append(sample_file)
-                
-            return samples
-
         # Get contento of directory.
         dir_data = os.listdir(path=dirpath)
+        dir_data = [os.path.join(dirpath, filename) for filename in dir_data]
 
         # Create chunk to load samples in parallel.
         n_cpu = os.cpu_count()
@@ -66,7 +45,7 @@ class PromptableDeTRDataLoader:
 
         # Create pool to load samples in parallel.
         pool = multiprocessing.Pool(processes=n_cpu)
-        samples = pool.map(get_samples, dir_data)
+        samples = pool.map(PromptableDeTRDataLoader.get_samples, dir_data)
         pool.close()
         pool.join()
 
@@ -124,6 +103,29 @@ class PromptableDeTRDataLoader:
 
 
     # Static methods.
+    @staticmethod
+    def get_samples(data):
+        samples = []
+        for sample_file in data:
+
+            # Skip non-JSON files.
+            if not sample_file.endswith(".json"):
+                continue
+
+            # Load the samples.
+            with open(file=sample_file, mode="r") as f:
+                raw_sample = json.load(fp=f)
+
+            # Check if the samples are valid.
+            Sample(**raw_sample)
+            del raw_sample
+
+            # Append the samples.
+            samples.append(sample_file)
+            
+        return samples
+
+
     @staticmethod
     def convert_batch_into_tensor(batch, max_len = 500, pad_value = 0):
         """
