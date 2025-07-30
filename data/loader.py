@@ -51,6 +51,7 @@ class PromptableDeTRDataLoader:
 
         # Flatten the list of samples.
         samples = itertools.chain.from_iterable(samples)
+        samples = list(samples)
 
         return samples
 
