@@ -117,8 +117,8 @@ class Trainer:
         mean_presence_loss = sum(self.__presence_losses) / len(self.__presence_losses)
 
         # Compute mean accuracy.
-        self.__samples = [self.__fix_bbox(sample=sample) for sample in self.__samples]
-        mean_giou_acc = [iou_accuracy(labels=y_objs, logits=logits_objs) for (_, _, y_objs, logits_objs) in self.__samples]
+        samples = [self.__fix_bbox(sample=sample) for sample in self.__samples]
+        mean_giou_acc = [iou_accuracy(labels=y_objs, logits=logits_objs) for (_, _, y_objs, logits_objs) in samples]
         mean_giou_acc = sum(mean_giou_acc) / len(mean_giou_acc) if mean_giou_acc else 0.0
 
         if reset:
