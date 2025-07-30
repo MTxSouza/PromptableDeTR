@@ -50,7 +50,7 @@ class PromptableDeTRDataLoader:
         pool.join()
 
         # Flatten the list of samples.
-        samples = itertools.chain.from_iterable(iterable=samples)
+        samples = itertools.chain.from_iterable(samples)
 
         return samples
 
