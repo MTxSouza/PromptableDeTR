@@ -325,12 +325,12 @@ class Trainer:
                         samples += [self.__get_sample(images=images[idx_batch], captions=captions[idx_batch], y=y[idx_batch], logits=logits[idx_batch]) for idx_batch in range(images.size(0))]
 
                     # Compute final accuracy.
+                    samples = [self.__fix_bbox(sample=sample) for sample in samples]
                     total_acc = [iou_accuracy(labels=y_objs, logits=logits_objs) for (_, _, y_objs, logits_objs) in samples]
                     total_acc = sum(total_acc) / len(total_acc) if total_acc else 0.0
 
                     # Filter the samples to be visualized.
                     samples = random.sample(samples, k=min(self.__total_samples, len(samples)))
-                    samples = [self.__fix_bbox(sample=sample) for sample in samples]
 
                     total_loss /= len(self.valid_dataset)
                     total_l1_loss /= len(self.valid_dataset)
