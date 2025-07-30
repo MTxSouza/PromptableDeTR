@@ -79,7 +79,6 @@ class Trainer:
         self.__l1_losses = []
         self.__giou_losses = []
         self.__presence_losses = []
-        self.__samples = []
 
         self.__tensorboard = Tensorboard(log_dir=exp_dir)
 
@@ -116,18 +115,13 @@ class Trainer:
         mean_giou_loss = sum(self.__giou_losses) / len(self.__giou_losses)
         mean_presence_loss = sum(self.__presence_losses) / len(self.__presence_losses)
 
-        # Compute mean accuracy.
-        samples = [self.__fix_bbox(sample=sample) for sample in self.__samples]
-        mean_giou_acc = [iou_accuracy(labels=y_objs, logits=logits_objs) for (_, _, y_objs, logits_objs) in samples]
-        mean_giou_acc = sum(mean_giou_acc) / len(mean_giou_acc) if mean_giou_acc else 0.0
-
         if reset:
             self.__losses.clear()
             self.__l1_losses.clear()
             self.__giou_losses.clear()
             self.__presence_losses.clear()
-            self.__samples.clear()
-        return mean_loss, mean_l1_loss, mean_giou_loss, mean_presence_loss, mean_giou_acc
+
+        return mean_loss, mean_l1_loss, mean_giou_loss, mean_presence_loss
 
 
     def __run_forward(self, model, batch, is_training = True):
@@ -215,7 +209,7 @@ class Trainer:
         """
         # Save the model weights.
         is_best = False
-        current_train_loss, _, _, _, _ = self.__compute_current_training_metrics()
+        current_train_loss, _, _, _ = self.__compute_current_training_metrics()
         if self.__best_loss > valid_loss:
             self.__best_loss = valid_loss
             is_best = True
@@ -283,9 +277,6 @@ class Trainer:
                 loss.backward()
                 self.optimizer.step()
 
-                # Get a random sample.
-                self.__samples += [self.__get_sample(images=images[idx_batch], captions=captions[idx_batch], y=y[idx_batch], logits=logits[idx_batch]) for idx_batch in range(images.size(0))]
-
                 # Store the losses.
                 self.__losses.append(loss.cpu().detach().numpy().item())
                 self.__l1_losses.append(final_l1_loss.cpu().detach().numpy().item())
@@ -294,7 +285,7 @@ class Trainer:
 
                 # Check if it is time to log the loss.
                 if self.__current_iter % self.log_interval == 0:
-                    current_loss, current_l1_loss, current_giou_loss, current_presence_loss, current_giou_acc = self.__compute_current_training_metrics(reset=False)
+                    current_loss, current_l1_loss, current_giou_loss, current_presence_loss = self.__compute_current_training_metrics(reset=False)
 
                     # Log the training loss.
                     self.__tensorboard.add_train_losses(
@@ -305,11 +296,8 @@ class Trainer:
                         step=self.__current_iter
                     )
 
-                    # Log the training accuracy.
-                    self.__tensorboard.add_train_accuracy(acc=current_giou_acc, step=self.__current_iter)
-
                     print("Iteration [%d/%d]" % (self.__current_iter, self.max_iter))
-                    print("Loss: %.4f - L1 Loss: %.4f - GIoU Loss: %.4f - Presence Loss: %.4f - GIoU Acc: %.4f" % (current_loss, current_l1_loss, current_giou_loss, current_presence_loss, current_giou_acc))
+                    print("Loss: %.4f - L1 Loss: %.4f - GIoU Loss: %.4f - Presence Loss: %.4f" % (current_loss, current_l1_loss, current_giou_loss, current_presence_loss))
                     print("-" * 100)
 
                 # Check if it is time to validate the model.
