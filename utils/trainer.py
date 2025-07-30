@@ -153,9 +153,11 @@ class Trainer:
 
         # Run the forward pass.
         if not is_training:
+            model.eval()
             with torch.no_grad():
                 logits, labels = run_forward(model, images, captions, extra_data)
         else:
+            model.train()
             logits, labels = run_forward(model, images, captions, extra_data)
         
         return images, captions, labels, logits
