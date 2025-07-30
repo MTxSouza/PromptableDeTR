@@ -314,6 +314,9 @@ class Trainer:
                     print("Iteration [%d/%d]" % (self.__current_iter, self.max_iter))
                     print("Loss: %.4f - L1 Loss: %.4f - GIoU Loss: %.4f - Presence Loss: %.4f - GIoU Acc: %.4f" % (current_loss, current_l1_loss, current_giou_loss, current_presence_loss, current_giou_acc))
                     print("-" * 100)
+                
+                else:
+                    print("Iteration [%d/%d]" % (self.__current_iter, self.max_iter))
 
                 # Check if it is time to validate the model.
                 if self.__current_iter % self.eval_interval == 0:
