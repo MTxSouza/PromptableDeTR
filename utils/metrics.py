@@ -34,4 +34,8 @@ def iou_accuracy(labels, logits):
     iou_score = iou_score[iou_score > 0.0]
     iou_score = iou_score.float().mean().item()
 
+    # Check if the IoU score is NaN.
+    if torch.isnan(iou_score):
+        iou_score = 0.0
+
     return iou_score
