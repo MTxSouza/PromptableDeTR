@@ -296,6 +296,7 @@ class Trainer:
                 self.__presence_losses.append(final_presence_loss.cpu().detach().numpy().item())
 
                 # Check if it is time to log the loss.
+                print("Iteration [%d/%d]" % (self.__current_iter, self.max_iter))
                 if self.__current_iter % self.log_interval == 0:
                     current_loss, current_l1_loss, current_giou_loss, current_presence_loss, current_giou_acc = self.__compute_current_training_metrics(reset=False)
 
@@ -311,12 +312,8 @@ class Trainer:
                     # Log the training accuracy.
                     self.__tensorboard.add_train_accuracy(acc=current_giou_acc, step=self.__current_iter)
 
-                    print("Iteration [%d/%d]" % (self.__current_iter, self.max_iter))
                     print("Loss: %.4f - L1 Loss: %.4f - GIoU Loss: %.4f - Presence Loss: %.4f - GIoU Acc: %.4f" % (current_loss, current_l1_loss, current_giou_loss, current_presence_loss, current_giou_acc))
                     print("-" * 100)
-                
-                else:
-                    print("Iteration [%d/%d]" % (self.__current_iter, self.max_iter))
 
                 # Check if it is time to validate the model.
                 if self.__current_iter % self.eval_interval == 0:
