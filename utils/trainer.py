@@ -381,6 +381,7 @@ class Trainer:
 
                     # Display the samples on Tensorboard.
                     self.__tensorboard.add_image(samples=samples, step=self.__current_iter)
+                    del samples
 
                 # Update the iteration.
                 self.__current_iter += 1
