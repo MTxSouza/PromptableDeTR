@@ -161,6 +161,12 @@ def get_args():
         help="The learning rate for the optimizer."
     )
     training_parser.add_argument(
+        "--lr-factor",
+        type=float,
+        default=0.1,
+        help="The factor to reduce the learning rate."
+    )
+    training_parser.add_argument(
         "--warmup-steps",
         type=int,
         default=1000,
