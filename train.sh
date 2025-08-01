@@ -17,13 +17,16 @@ IMG_ENC_WEIGHT=${IMG_ENC_WEIGHT}
 TXT_ENC_WEIGHT=${TXT_ENC_WEIGHT}
 
 # Training params.
-MAX_ITER=${MAX_ITER:-"50000"}
 BATCH_SIZE=${BATCH_SIZE:-"32"}
-LR=${LR:-"5e-5"}
+LR=${LR:-"1e-4"}
+LR_FACTOR=${LR_FACTOR:-"0.1"}
+WARMUP_STEPS=${WARMUP_STEPS:-"500"}
+FROZEN_STEPS=${FROZEN_STEPS:-"5000"}
+MAX_ITER=${MAX_ITER:-"50000"}
 EVAL_INTERVAL=${EVAL_INTERVAL:-"100"}
 LOG_INTERVAL=${LOG_INTERVAL:-"10"}
 OVERFIT_THRESHOLD=${OVERFIT_THRESHOLD:-"1e-3"}
-OVERFIT_PATIENTE=${OVERFIT_PATIENTE:-"5"}
+OVERFIT_PATIENCE=${OVERFIT_PATIENCE:-"5"}
 
 EXP_DIR=${EXP_DIR:-"./promptable_detr_exp"}
 
@@ -48,12 +51,16 @@ python train.py \
         --log-interval $LOG_INTERVAL \
         --eval-interval $EVAL_INTERVAL \
         --lr $LR \
+        --lr-factor $LR_FACTOR \
+        --warmup-steps $WARMUP_STEPS \
+        --frozen-steps $FROZEN_STEPS \
         --overfit-threshold $OVERFIT_THRESHOLD \
-        --overfit-patience $OVERFIT_PATIENTE \
+        --overfit-patience $OVERFIT_PATIENCE \
         --exp-dir $EXP_DIR \
         --giou-weight $GIOU_WEIGHT \
         --presence-weight $PRESENCE_WEIGHT \
-        --l1-weight $L1_WEIGHT
+        --l1-weight $L1_WEIGHT \
+        --seed $SEED
 
 # Get the best model.
 BEST_MODEL=$(ls "$EXP_DIR"/*-best-*.pth | sort -t '-' -k5,5nr | head -1)
