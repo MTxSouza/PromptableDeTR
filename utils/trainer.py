@@ -6,6 +6,7 @@ import random
 import time
 
 import torch
+import torch.optim as optim
 from tqdm import tqdm
 
 from data.loader import PromptableDeTRDataLoader
@@ -27,6 +28,9 @@ class Trainer:
             train_dataset, 
             valid_dataset, 
             lr,
+            lr_factor,
+            warmup_steps,
+            frozen_steps,
             log_interval,
             eval_interval,
             max_iter, 
@@ -44,6 +48,9 @@ class Trainer:
             train_dataset (PromptableDeTRDataLoader): The training dataset.
             valid_dataset (PromptableDeTRDataLoader): The validation dataset.
             lr (float): The learning rate.
+            lr_factor (float): The factor to reduce the learning rate.
+            warmup_steps (int): The number of warmup steps for the learning rate scheduler.
+            frozen_steps (int): The number of steps to freeze the learning rate.
             log_interval (int): Period to log the training status.
             eval_interval (int): Period to evaluate the model.
             max_iter (int): The maximum number of iterations.
@@ -58,6 +65,9 @@ class Trainer:
         self.train_dataset = train_dataset
         self.valid_dataset = valid_dataset
         self.lr = lr
+        self.lr_factor = lr_factor
+        self.warmup_steps = warmup_steps
+        self.frozen_steps = frozen_steps
         self.log_interval = log_interval
         self.eval_interval = eval_interval
         self.max_iter = max_iter
@@ -94,7 +104,19 @@ class Trainer:
         # self.model = torch.compile(model=self.model)
 
         # Define the optimizer.
-        self.optimizer = self.optimizer(params=self.model.parameters(), lr=self.lr)
+        def lr_curve(step):
+            new_lr = self.lr * self.lr_factor
+            if step < self.warmup_steps:
+                new_lr = self.lr * step / self.warmup_steps
+            else:
+                new_lr = self.lr
+                if step > self.frozen_steps:
+                    new_lr = new_lr * (1 - (step - self.frozen_steps) / (self.max_iter - self.frozen_steps)) ** 2
+            return new_lr
+        self.optimizer = optim.lr_scheduler.LambdaLR(
+            optimizer=self.optimizer(params=self.model.parameters(), lr=self.lr),
+            lr_lambda=lr_curve
+        )
 
         # Move the model to the device.
         self.model.to(device=self.device)
