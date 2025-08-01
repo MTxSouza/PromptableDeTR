@@ -161,6 +161,18 @@ def get_args():
         help="The learning rate for the optimizer."
     )
     training_parser.add_argument(
+        "--warmup-steps",
+        type=int,
+        default=1000,
+        help="The number of warmup steps for the learning rate scheduler."
+    )
+    training_parser.add_argument(
+        "--frozen-steps",
+        type=int,
+        default=2000,
+        help="The number of frozen steps that the lr will not change."
+    )
+    training_parser.add_argument(
         "--eval-interval",
         type=int,
         default=100,
