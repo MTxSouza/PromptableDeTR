@@ -130,6 +130,10 @@ def main():
         overfit_patience=args.overfit_patience,
         exp_dir=args.exp_dir
     )
+
+    # Resume training if a checkpoint is provided.
+    if args.resume_checkpoint:
+        trainer.resume_training(checkpoint_path=args.resume_checkpoint)
     trainer.train()
 
 
