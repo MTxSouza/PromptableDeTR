@@ -56,53 +56,6 @@ class PromptableDeTRDataLoader:
         return samples
 
 
-    @classmethod
-    def get_train_val_split(cls, sample_directory, val_split = 0.2, shuffle_samples = True, seed = 42):
-        """
-        Get the train and validation split from the sample directory.
-
-        Args:
-            sample_directory (str): The path to the sample directory.
-            val_split (float): The validation split. (Default: 0.2)
-            shuffle_samples (bool): Whether to shuffle the samples. (Default: True)
-            seed (int): The seed for the random number generator. (Default: 42)
-
-        Returns:
-            list, list: The train and validation samples.
-        """
-        # Get the samples from the directory.
-        samples = []
-        for file in os.listdir(path=sample_directory):
-
-            # Skip non-JSON files.
-            if not file.endswith(".json"):
-                continue
-
-            # Load the samples.
-            sample_file = os.path.join(sample_directory, file)
-            with open(file=sample_file, mode="r") as f:
-                raw_sample = json.load(fp=f)
-
-            # Check if the samples are valid.
-            Sample(**raw_sample)
-            del raw_sample
-
-            # Append the samples.
-            samples.append(sample_file)
-        
-        # Shuffle the samples.
-        if shuffle_samples:
-            np.random.seed(seed=seed)
-            samples = np.random.permutation(samples).tolist()
-        
-        # Get the split index.
-        split_index = int(len(samples) * val_split)
-        val_samples = samples[:split_index]
-        train_samples = samples[split_index:]
-
-        return train_samples, val_samples
-
-
     # Static methods.
     @staticmethod
     def get_samples(data):

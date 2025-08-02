@@ -2,27 +2,13 @@
 This module stores all data schemas.
 """
 from dataclasses import dataclass
-from typing import List, Optional
-
-try:
-    from typing import LiteralString
-except ImportError:
-    from typing_extensions import LiteralString
+from typing import Optional
 
 import numpy as np
 import torch
 
 
 # Structures.
-@dataclass
-class ObjectAnnotation:
-    """
-    Object structure that stores all annotation of a specific object.
-    """
-    caption: LiteralString
-    bbox: List[List[int]]
-
-
 @dataclass
 class Sample:
     """
