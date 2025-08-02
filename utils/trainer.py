@@ -443,3 +443,24 @@ class Trainer:
             print("🛑 Training interrupted by the user.")
             print("=" * 100)
         print("🚀 Training finished.")
+
+
+    def resume_training(self, checkpoint_path):
+        """
+        Resume training from a checkpoint.
+
+        Args:
+            checkpoint_path (str): The path to the checkpoint file.
+        """
+        print("Resuming training from checkpoint from path: %s" % checkpoint_path)
+
+        # Load the checkpoint.
+        checkpoint = torch.load(f=checkpoint_path)
+
+        # Load the model state.
+        self.model.load_state_dict(checkpoint["model_state_dict"])
+        self.optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+        self.scheduler.load_state_dict(checkpoint["scheduler_state_dict"])
+
+        # Restore the training step.
+        self.__current_iter = checkpoint["step"]
