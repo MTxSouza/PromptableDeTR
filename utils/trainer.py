@@ -106,14 +106,14 @@ class Trainer:
 
         # Define the optimizer.
         def lr_curve(step):
-            new_lr = self.lr * self.lr_factor
+            min_lr_factor = self.lr_factor
             if step < self.warmup_steps:
-                new_lr = self.lr * step / self.warmup_steps
-            else:
-                new_lr = self.lr
-                if step > self.frozen_steps:
-                    new_lr = new_lr * (1 - (step - self.frozen_steps) / (self.max_iter - self.frozen_steps)) ** 2
-            return new_lr
+                return min_lr_factor + (1.0 - min_lr_factor) * step / self.warmup_steps
+            elif step <= self.frozen_steps:
+                return 1.0
+            decay_progress = (step - self.frozen_steps) / (self.max_iter - self.frozen_steps)
+            decay_factor = (1 - decay_progress) ** 2
+            return min_lr_factor + (1.0 - min_lr_factor) * decay_factor
         self.optimizer = self.optimizer(params=self.model.parameters(), lr=self.lr)
         self.scheduler = optim.lr_scheduler.LambdaLR(optimizer=self.optimizer, lr_lambda=lr_curve)
 
