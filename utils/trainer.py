@@ -36,7 +36,8 @@ class Trainer:
             max_iter, 
             overfit_threshold,
             overfit_patience,
-            exp_dir
+            exp_dir,
+            device
         ):
         """
         Initializes the Trainer class used to train models.
@@ -57,6 +58,7 @@ class Trainer:
             overfit_threshold (float): The threshold to consider overfitting.
             overfit_patience (int): The number of iterations to wait before considering overfitting.
             exp_dir (str): The directory to save the experiment.
+            device (torch.device): The device to use for training.
         """
         # Attributes.
         self.trainer_name = trainer_name
@@ -77,11 +79,10 @@ class Trainer:
         self.exp_dir = exp_dir
         self.tokenizer = None
     
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.device = device
 
         # Training attributes.
         self.__total_samples = 16
-        self.__add_sample_threshold = 0.5
         self.__current_iter = 1
         self.__best_loss = float("inf")
         self.__is_overfitting = False
