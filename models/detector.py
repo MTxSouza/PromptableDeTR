@@ -229,7 +229,7 @@ class PromptableDeTRTrainer(PromptableDeTR):
         gamma = 2.0
         ce_loss = F.cross_entropy(input=pred_presence.view(B * N, C), target=new_scores.view(-1), weight=presence_weight, reduction="none")
 
-        probs = torch.softmax(pred_presence.view(B * N, C))[:, 1]
+        probs = torch.softmax(pred_presence.view(B * N, C), dim=1)[:, 1]
 
         p_t = probs * new_scores.view(-1) + (1 - probs) * (1 - new_scores.view(-1))
         mod_factor = (1 - p_t) ** gamma
