@@ -230,7 +230,7 @@ class PromptableDeTRTrainer(PromptableDeTR):
         gamma = 2.0
 
         probs = torch.softmax(predictions, dim=1)
-        targets_one_hot = F.one_hot(tensor=targets, num_classes=2).float()
+        targets_one_hot = F.one_hot(targets, num_classes=2).float()
         ce_loss = F.cross_entropy(input=predictions, target=targets, weight=presence_weight, reduction="none")
 
         p_t = torch.sum(probs * targets_one_hot, dim=1)
