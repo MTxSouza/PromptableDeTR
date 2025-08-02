@@ -11,6 +11,7 @@ import torch.nn.functional as F
 from logger import Logger
 from models.base import BasePromptableDeTR
 from models.matcher import HuggarianMatcher, generalized_iou
+from utils.metrics import average_precision_open_vocab
 
 # Logger.
 logger = Logger(name="model")
@@ -174,7 +175,7 @@ class PromptableDeTRTrainer(PromptableDeTR):
             labels (torch.Tensor): The true tensor.
 
         Returns:
-            Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]: The losses of model.
+            Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]: The losses of model and it AP.
         """
         logger.info(msg="Computing the detector loss.")
 
@@ -202,6 +203,9 @@ class PromptableDeTRTrainer(PromptableDeTR):
         logger.debug(msg="- Sorted predicted boxes shape: %s." % (sorted_pred_boxes.shape,))
         logger.debug(msg="- Sorted true presence shape: %s." % (sorted_true_presence.shape,))
         logger.debug(msg="- Sorted true boxes shape: %s." % (sorted_true_boxes.shape,))
+
+        # Compute average precision.
+        ap = average_precision_open_vocab(labels=sorted_true_boxes, logits=sorted_pred_boxes)
 
         # Define new scores labels.
         new_scores = torch.full(size=pred_presence.shape[:2], fill_value=0, device=sorted_pred_presence.device).long()
@@ -239,7 +243,7 @@ class PromptableDeTRTrainer(PromptableDeTR):
         logger.debug(msg="- Total loss: %s." % loss)
         logger.info(msg="Returning the loss value.")
 
-        return loss, final_l1_loss, final_giou_loss, final_presence_loss
+        return loss, final_l1_loss, final_giou_loss, final_presence_loss, ap
 
 
     def save_checkpoint(self, model, optimizer, scheduler, dir_path, step):
