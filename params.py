@@ -142,6 +142,13 @@ def get_args():
     # Training arguments.
     training_parser = parser.add_argument_group(title="Training")
     training_parser.add_argument(
+        "--resume-checkpoint",
+        "--ckpt",
+        type=str,
+        default=None,
+        help="The path to the checkpoint to resume training."
+    )
+    training_parser.add_argument(
         "--max-iter",
         type=int,
         default=10000,
