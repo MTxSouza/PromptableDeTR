@@ -56,11 +56,18 @@ def average_precision_open_vocab(labels, logits, iou_threshold=0.5):
     Returns:
         float: The average precision score.
     """
+    # Check types.
+    if isinstance(labels, torch.Tensor):
+        labels = labels.detach().cpu().numpy()
+    if isinstance(logits, torch.Tensor):
+        logits = logits.detach().cpu().numpy()
+
     # Check number of dimensions.
     if labels.ndim == 2:
         labels = labels[None, :, :]
     if logits.ndim == 2:
         logits = logits[None, :, :]
+
     labels = labels.reshape((-1, 4))
     logits = logits.reshape((-1, 4))
 
