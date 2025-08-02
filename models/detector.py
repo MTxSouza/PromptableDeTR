@@ -219,12 +219,23 @@ class PromptableDeTRTrainer(PromptableDeTR):
         num_boxes = obj_idx.sum()
         logger.debug(msg="- Number of boxes: %s." % num_boxes)
 
-        # Compute presence loss.
+        # Compute presence loss with focal loss.
         presence_weight = None
         if self.__presence_weight != 1.0:
             presence_weight = torch.tensor([1.0, self.__presence_weight], device=pred_presence.device)
         B, N, C = pred_presence.shape
-        presence_loss = F.cross_entropy(input=pred_presence.view(B * N, C), target=new_scores.view(-1), weight=presence_weight, reduction="mean")
+
+        alpha = 0.25
+        gamma = 2.0
+        ce_loss = F.cross_entropy(input=pred_presence.view(B * N, C), target=new_scores.view(-1), weight=presence_weight, reduction="none")
+
+        probs = torch.softmax(pred_presence.view(B * N, C))[:, 1]
+
+        p_t = probs * new_scores.view(-1) + (1 - probs) * (1 - new_scores.view(-1))
+        mod_factor = (1 - p_t) ** gamma
+        a_fac = new_scores.view(-1) * alpha + (1 - new_scores.view(-1)) * (1 - alpha)
+
+        presence_loss = (a_fac * mod_factor * ce_loss).mean()
         logger.debug(msg="- Presence loss: %s." % presence_loss)
 
         # Compute bounding box loss.
