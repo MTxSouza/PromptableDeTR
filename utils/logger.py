@@ -145,7 +145,7 @@ class Tensorboard:
         self.writer.add_scalar(tag="valid_giou_accuracy", scalar_value=acc, global_step=step)
 
 
-    def add_valid_app_accuracy(self, acc, step):
+    def add_valid_ap_accuracy(self, acc, step):
         """
         Adds the validation AP accuracy to the Tensorboard writer.
 
