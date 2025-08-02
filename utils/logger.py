@@ -95,15 +95,26 @@ class Tensorboard:
         self.writer.add_scalar(tag="train_presence_loss", scalar_value=presence_loss, global_step=step)
 
 
-    def add_train_accuracy(self, acc, step):
+    def add_train_giou_accuracy(self, acc, step):
         """
-        Adds the training accuracy to the Tensorboard writer.
+        Adds the training GIoU accuracy to the Tensorboard writer.
 
         Args:
             acc (float): Total training accuracy value.
             step (int): Step number.
         """
         self.writer.add_scalar(tag="train_giou_accuracy", scalar_value=acc, global_step=step)
+
+
+    def add_train_app_accuracy(self, acc, step):
+        """
+        Adds the training AP accuracy to the Tensorboard writer.
+
+        Args:
+            acc (float): Total training accuracy value.
+            step (int): Step number.
+        """
+        self.writer.add_scalar(tag="train_ap_accuracy", scalar_value=acc, global_step=step)
 
 
     def add_valid_losses(self, loss, l1_loss, giou_loss, presence_loss, step):
@@ -123,15 +134,26 @@ class Tensorboard:
         self.writer.add_scalar(tag="valid_presence_loss", scalar_value=presence_loss, global_step=step)
 
 
-    def add_valid_accuracy(self, acc, step):
+    def add_valid_giou_accuracy(self, acc, step):
         """
-        Adds the validation accuracy to the Tensorboard writer.
+        Adds the validation GIoU accuracy to the Tensorboard writer.
 
         Args:
             acc (float): Total validation accuracy value.
             step (int): Step number.
         """
         self.writer.add_scalar(tag="valid_giou_accuracy", scalar_value=acc, global_step=step)
+
+
+    def add_valid_app_accuracy(self, acc, step):
+        """
+        Adds the validation AP accuracy to the Tensorboard writer.
+
+        Args:
+            acc (float): Total validation accuracy value.
+            step (int): Step number.
+        """
+        self.writer.add_scalar(tag="valid_ap_accuracy", scalar_value=acc, global_step=step)
 
 
     def add_image(self, samples, step):
