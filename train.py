@@ -6,7 +6,7 @@ import torch.optim as optim
 
 from data.daug import PrepareSample, ReshapeImage
 from data.loader import PromptableDeTRDataLoader
-from models.detector import PromptableDeTR
+from models.detector import PromptableDeTRTrainer
 from params import get_args
 from utils.trainer import Trainer
 
@@ -76,7 +76,7 @@ def get_model(args, data_loader):
     vocab_size = len(tokenizer)
 
     # Get the model.
-    model = PromptableDeTR(
+    model = PromptableDeTRTrainer(
         image_tokens=args.image_tokens,
         vocab_size=vocab_size,
         emb_dim=args.emb_dim,
@@ -84,9 +84,7 @@ def get_model(args, data_loader):
         num_heads=args.heads,
         ff_dim=args.ff_dim,
         emb_dropout_rate=args.emb_dropout_rate,
-        num_joiner_layers=args.num_joiner_layers
-    )
-    model.define_matcher(
+        num_joiner_layers=args.num_joiner_layers,
         presence_loss_weight=args.presence_weight,
         l1_loss_weight=args.l1_weight,
         giou_loss_weight=args.giou_weight

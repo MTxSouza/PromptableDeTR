@@ -70,12 +70,6 @@ class PromptableDeTR(BasePromptableDeTR):
         # Initialize weights.
         self.__initialize_weights()
 
-        # Matcher.
-        self.__presence_weight = None
-        self.__l1_weight = None
-        self.__giou_weight = None
-        self.matcher = None
-
 
     # Private methods.
     def __initialize_weights(self):
@@ -93,27 +87,6 @@ class PromptableDeTR(BasePromptableDeTR):
 
 
     # Methods.
-    def define_matcher(self, presence_loss_weight = 1.0, l1_loss_weight = 1.0, giou_loss_weight = 1.0):
-        """
-        Define the matcher used to align the bounding boxes with the respective label. It is only 
-        defined during the training phase.
-
-        Args:
-            presence_loss_weight (float): The weight for the presence loss. (Default: 1.0)
-            l1_loss_weight (float): The weight for the L1 loss. (Default: 1.0)
-            giou_loss_weight (float): The weight for the GIoU loss. (Default: 1.0)
-        """
-        logger.info(msg="Defining the matcher for the detector.")
-        self.__presence_weight = presence_loss_weight
-        self.__l1_weight = l1_loss_weight
-        self.__giou_weight = giou_loss_weight
-        self.matcher = HuggarianMatcher(
-            presence_loss_weight=presence_loss_weight,
-            l1_loss_weight=l1_loss_weight,
-            giou_loss_weight=giou_loss_weight
-        )
-
-
     def forward(self, image, prompt, prompt_mask = None):
         """
         Forward pass of the detector.
@@ -154,35 +127,6 @@ class PromptableDeTR(BasePromptableDeTR):
         return outputs
 
 
-    def save_model(self, dir_path, ckpt_step = None, is_best = False):
-        """
-        Save the model weights.
-
-        Args:
-            dir_path (str): The path to the directory where the weights will be saved.
-            ckpt_step (int): The checkpoint step. (Default: None)
-            is_best (bool): Flag to indicate if the checkpoint is the best. (Default: False)
-        """
-        logger.info(msg="Saving the model weights.")
-        
-        # Define the checkpoint path.
-        name = "promptable-detr"
-
-        # Check if the model is the best.
-        if is_best:
-            name += "-best"
-        
-        if ckpt_step is not None:
-            name += "-ckpt-%d" % ckpt_step
-        
-        os.makedirs(name=dir_path, exist_ok=True)
-        ckpt_fp = os.path.join(dir_path, name + ".pth")
-        log_fp = os.path.join(dir_path, name + ".log")
-
-        # Save the weights.
-        torch.save(obj=self.state_dict(), f=ckpt_fp)
-
-
     def load_base_model(self, base_model_weights):
         """
         Load the weights of the base model only.
@@ -197,6 +141,29 @@ class PromptableDeTR(BasePromptableDeTR):
         super().load_full_weights(base_model_weights=base_model_weights)
 
 
+class PromptableDeTRTrainer(PromptableDeTR):
+    """
+    A subclass of PromptableDeTR that is used for training the model.
+    It inherits from PromptableDeTR and adds the functionality to compute
+    the loss and accuracy of the model.
+    """
+
+    # Special methods.
+    def __init__(self, presence_loss_weight=1.0, l1_loss_weight=1.0, giou_loss_weight=1.0, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        # Matcher.
+        self.__presence_weight = presence_loss_weight
+        self.__l1_weight = l1_loss_weight
+        self.__giou_weight = giou_loss_weight
+        self.matcher = HuggarianMatcher(
+            presence_loss_weight=self.__presence_weight,
+            l1_loss_weight=self.__l1_weight,
+            giou_loss_weight=self.__giou_weight
+        )
+
+
+    # Methods.
     def compute_loss_and_accuracy(self, logits, labels):
         """
         Compute the loss needed to train the detector model and
@@ -273,3 +240,31 @@ class PromptableDeTR(BasePromptableDeTR):
         logger.info(msg="Returning the loss value.")
 
         return loss, final_l1_loss, final_giou_loss, final_presence_loss
+
+
+    def save_model(self, dir_path, ckpt_step = None, is_best = False):
+        """
+        Save the model weights.
+
+        Args:
+            dir_path (str): The path to the directory where the weights will be saved.
+            ckpt_step (int): The checkpoint step. (Default: None)
+            is_best (bool): Flag to indicate if the checkpoint is the best. (Default: False)
+        """
+        logger.info(msg="Saving the model weights.")
+        
+        # Define the checkpoint path.
+        name = "promptable-detr"
+
+        # Check if the model is the best.
+        if is_best:
+            name += "-best"
+        
+        if ckpt_step is not None:
+            name += "-ckpt-%d" % ckpt_step
+        
+        os.makedirs(name=dir_path, exist_ok=True)
+        ckpt_fp = os.path.join(dir_path, name + ".pth")
+
+        # Save the weights.
+        torch.save(obj=self.state_dict(), f=ckpt_fp)
