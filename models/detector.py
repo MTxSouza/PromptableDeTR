@@ -223,8 +223,7 @@ class PromptableDeTRTrainer(PromptableDeTR):
         presence_weight = None
         if self.__presence_weight != 1.0:
             presence_weight = torch.tensor([1.0, self.__presence_weight], device=pred_presence.device)
-        B, N, C = pred_presence.shape
-        predictions = sorted_pred_presence.view(B * N, C)
+        predictions = sorted_pred_presence
         targets = new_scores.view(-1)
 
         alpha = 0.25
