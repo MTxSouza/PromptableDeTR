@@ -116,7 +116,7 @@ class HuggarianMatcher(nn.Module):
             boxes (torch.Tensor): The ground truth boxes with shape (B, M, 4).
 
         Returns:
-            List[Tuple[torch.Tensor, torch.Tensor]]: The best matching between the predicted and ground truth boxes.
+            Tuple[torch.Tensor, torch.Tensor, torch.Tensor]: The batch, source, and target indices.
         """
         # Get the batch size and number of predicted objects.
         B, N = predict_scores.size()[:2]
@@ -150,4 +150,8 @@ class HuggarianMatcher(nn.Module):
 
         indices = [(torch.as_tensor(i, dtype=torch.int64), torch.as_tensor(j, dtype=torch.int64)) for i, j in indices]
 
-        return indices
+        # Get the batch index, source index and target index.
+        batch_idx = torch.cat([torch.full_like(src, i) for i, (src, _) in enumerate(indices)])
+        src_idx = torch.cat([src for (src, _) in indices])
+        tgt_idx = torch.cat([tgt for (_, tgt) in indices])
+        return batch_idx, src_idx, tgt_idx

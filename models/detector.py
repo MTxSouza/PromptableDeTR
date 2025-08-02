@@ -92,22 +92,6 @@ class PromptableDeTR(BasePromptableDeTR):
         self.presence_predictor.apply(init_weights)
 
 
-    def __get_indices(self, matcher_indices):
-        """
-        Organize the indices to be used in the loss computation.
-
-        Args:
-            matcher_indices (List[Tuple[torch.Tensor, torch.Tensor]]): The indices from the matcher.
-
-        Returns:
-            Tuple[torch.Tensor, torch.Tensor, torch.Tensor]: The batch, source, and target indices.
-        """
-        batch_idx = torch.cat([torch.full_like(src, i) for i, (src, _) in enumerate(matcher_indices)])
-        src_idx = torch.cat([src for (src, _) in matcher_indices])
-        tgt_idx = torch.cat([tgt for (_, tgt) in matcher_indices])
-        return batch_idx, src_idx, tgt_idx
-
-
     # Methods.
     def define_matcher(self, presence_loss_weight = 1.0, l1_loss_weight = 1.0, giou_loss_weight = 1.0):
         """
@@ -238,8 +222,7 @@ class PromptableDeTR(BasePromptableDeTR):
         logger.debug(msg="- Predicted boxes shape: %s." % (pred_boxes.shape,))
         logger.debug(msg="- True presence shape: %s." % (true_presence.shape,))
         logger.debug(msg="- True boxes shape: %s." % (true_boxes.shape,))
-        indices = self.matcher(predict_scores=pred_presence, predict_boxes=pred_boxes, scores=true_presence, boxes=true_boxes)
-        batch_idx, src_idx, tgt_idx = self.__get_indices(matcher_indices=indices)
+        batch_idx, src_idx, tgt_idx = self.matcher(predict_scores=pred_presence, predict_boxes=pred_boxes, scores=true_presence, boxes=true_boxes)
         logger.debug(msg="- Batch index shape: %s." % (batch_idx.shape,))
         logger.debug(msg="- Source index shape: %s." % (src_idx.shape,))
         logger.debug(msg="- Target index shape: %s." % (tgt_idx.shape,))
