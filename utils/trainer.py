@@ -254,7 +254,7 @@ class Trainer:
 
         print("Validation time: %.2f minutes" % valid_time)
         print("Overfit counter: %d" % self.__overfit_counter)
-        print("Validation loss: %.4f - L1 Loss: %.4f - GIoU Loss: %.4f - Presence Loss: %.4f - GIoU Accuracy: %.4f - AP@0.5: %.4f" % (valid_loss, valid_l1_loss, valid_giou_loss, valid_presence_loss, valid_giou_acc, valid_ap_acc))
+        print("Validation loss: %.4f - L1 Loss: %.4f - GIoU Loss: %.4f - Presence Loss: %.4f | GIoU@0.5: %.4f - AP@0.5: %.4f" % (valid_loss, valid_l1_loss, valid_giou_loss, valid_presence_loss, valid_giou_acc, valid_ap_acc))
         self.model.save_checkpoint(
             model=self.model,
             optimizer=self.optimizer,
@@ -346,7 +346,7 @@ class Trainer:
                     self.__tensorboard.add_train_giou_accuracy(acc=current_giou_acc, step=self.__current_iter)
                     self.__tensorboard.add_train_app_accuracy(acc=current_ap_acc, step=self.__current_iter)
 
-                    print("Loss: %.4f - L1 Loss: %.4f - GIoU Loss: %.4f - Presence Loss: %.4f - GIoU Acc: %.4f - AP@0.5: %.4f" % (current_loss, current_l1_loss, current_giou_loss, current_presence_loss, current_giou_acc, current_ap_acc))
+                    print("Loss: %.4f - L1 Loss: %.4f - GIoU Loss: %.4f - Presence Loss: %.4f | GIoU@0.5: %.4f - AP@0.5: %.4f" % (current_loss, current_l1_loss, current_giou_loss, current_presence_loss, current_giou_acc, current_ap_acc))
                     print("-" * 100)
 
                 # Check if it is time to validate the model.
