@@ -62,6 +62,7 @@ class Trainer:
         self.trainer_name = trainer_name
         self.model = model
         self.optimizer = optimizer
+        self.scheduler = None
         self.train_dataset = train_dataset
         self.valid_dataset = valid_dataset
         self.lr = lr
@@ -113,10 +114,8 @@ class Trainer:
                 if step > self.frozen_steps:
                     new_lr = new_lr * (1 - (step - self.frozen_steps) / (self.max_iter - self.frozen_steps)) ** 2
             return new_lr
-        self.optimizer = optim.lr_scheduler.LambdaLR(
-            optimizer=self.optimizer(params=self.model.parameters(), lr=self.lr),
-            lr_lambda=lr_curve
-        )
+        self.optimizer = self.optimizer(params=self.model.parameters(), lr=self.lr)
+        self.scheduler = optim.lr_scheduler.LambdaLR(optimizer=self.optimizer, lr_lambda=lr_curve)
 
         # Move the model to the device.
         self.model.to(device=self.device)
@@ -303,7 +302,7 @@ class Trainer:
                 # Backward pass.
                 self.optimizer.zero_grad()
                 loss.backward()
-                self.optimizer.step()
+                self.scheduler.step()
 
                 # Store accuracy.
                 samples = [self.__get_sample(images=images[idx_batch], captions=captions[idx_batch], y=y[idx_batch], logits=logits[idx_batch]) for idx_batch in range(images.size(0))]
