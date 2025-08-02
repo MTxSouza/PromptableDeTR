@@ -210,7 +210,7 @@ class PromptableDeTRTrainer(PromptableDeTR):
         logger.debug(msg="- Average precision: %s." % (ap,))
 
         # Define new scores labels and predicted labels.
-        new_scores = torch.full(size=sorted_pred_presence.shape, fill_value=0, device=sorted_pred_presence.device).long()
+        new_scores = torch.full(size=sorted_pred_presence.shape[0], fill_value=0, device=sorted_pred_presence.device).long()
         logger.debug(msg="- New scores shape: %s." % (new_scores.shape,))
         new_scores[(batch_idx, tgt_idx)] = sorted_true_presence
 
