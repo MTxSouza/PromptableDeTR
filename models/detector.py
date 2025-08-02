@@ -205,8 +205,9 @@ class PromptableDeTRTrainer(PromptableDeTR):
         logger.debug(msg="- Sorted true boxes shape: %s." % (sorted_true_boxes.shape,))
 
         # Compute average precision.
-        ap = average_precision_open_vocab(labels=sorted_true_boxes, logits=sorted_pred_boxes)
+        ap = average_precision_open_vocab(labels=sorted_true_boxes, logits=sorted_pred_boxes, fix_boxes=True, height=640, width=640) # Hardcoded for now.
         ap = torch.tensor(ap)
+        logger.debug(msg="- Average precision: %s." % (ap,))
 
         # Define new scores labels.
         new_scores = torch.full(size=pred_presence.shape[:2], fill_value=0, device=sorted_pred_presence.device).long()
