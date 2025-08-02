@@ -4,7 +4,7 @@ This module contains all evaluation metrics used to validate the PromptableDeTR 
 import torch
 from torchvision.ops.boxes import box_iou
 
-from models.matcher import HuggarianMatcher
+from utils.data import xywh_to_xyxy
 
 
 # Functions.
@@ -43,7 +43,7 @@ def iou_accuracy(labels, logits):
     return iou_score.item()
 
 
-def average_precision_open_vocab(labels, logits, iou_threshold=0.5):
+def average_precision_open_vocab(labels, logits, iou_threshold=0.5, fix_boxes=False, height=None, width=None):
     """
     Computes the average precision for open vocabulary object detection. The metric
     is based on the paper https://arxiv.org/pdf/2102.01066.
@@ -52,6 +52,9 @@ def average_precision_open_vocab(labels, logits, iou_threshold=0.5):
         labels (numpy.ndarray): The true labels with shape (N, 4).
         logits (numpy.ndarray): The logits from the model with shape (N, 4).
         iou_threshold (float): The IoU threshold for positive samples. (Default: 0.5)
+        fix_boxes (bool): Whether to fix the boxes before computing the average precision. (Default: False)
+        height (int): The height of the image. Used only if fix_boxes is True. (Default: None)
+        width (int): The width of the image. Used only if fix_boxes is True. (Default: None)
 
     Returns:
         float: The average precision score.
@@ -70,6 +73,15 @@ def average_precision_open_vocab(labels, logits, iou_threshold=0.5):
 
     labels = labels.reshape((-1, 4))
     logits = logits.reshape((-1, 4))
+
+    # Fix the boxes if needed.
+    if fix_boxes:
+
+        assert height is not None and width is not None, "Height and width must be provided if fix_boxes is True."
+
+        # Convert the bounding boxes from xywh to xyxy format.
+        labels = xywh_to_xyxy(boxes=labels, height=height, width=width)
+        logits = xywh_to_xyxy(boxes=logits, height=height, width=width)
 
     # Compute the IoU between the predicted and true boxes.
     iou_matrix = box_iou(
