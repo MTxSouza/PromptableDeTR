@@ -230,8 +230,8 @@ class PromptableDeTRTrainer(PromptableDeTR):
         predictions = new_pred_scores.view(-1, 2)
         targets = new_scores.view(-1)
 
-        alpha = 0.25
-        gamma = 2.0
+        alpha = torch.tensor(0.25)
+        gamma = torch.tensor(2.0)
 
         probs = torch.softmax(predictions, dim=1)
         targets_one_hot = F.one_hot(targets, num_classes=2).float()
