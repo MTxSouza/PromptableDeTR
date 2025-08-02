@@ -305,6 +305,9 @@ class Trainer:
                 self.optimizer.step()
                 self.scheduler.step()
 
+                # Store current LR
+                self.__tensorboard.add_current_lr(lr=self.scheduler.get_last_lr()[0], step=self.__current_iter)
+
                 # Store accuracy.
                 samples = [self.__get_sample(images=images[idx_batch], captions=captions[idx_batch], y=y[idx_batch], logits=logits[idx_batch]) for idx_batch in range(images.size(0))]
                 samples = [self.__fix_bbox(sample=sample) for sample in samples]
