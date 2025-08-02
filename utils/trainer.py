@@ -319,6 +319,7 @@ class Trainer:
                 total_acc = [iou_accuracy(labels=y_objs, logits=logits_objs) for (_, _, y_objs, logits_objs) in samples]
                 total_acc = sum(total_acc) / len(total_acc) if total_acc else 0.0
                 self.__giou_accuracies.append(total_acc)
+                self.__ap_accuracies.append(ap.cpu().detach().numpy().item())
                 del samples
 
                 # Store the losses.
