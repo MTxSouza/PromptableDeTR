@@ -252,10 +252,12 @@ class Trainer:
         print("Validation time: %.2f minutes" % valid_time)
         print("Overfit counter: %d" % self.__overfit_counter)
         print("Validation loss: %.4f - L1 Loss: %.4f - GIoU Loss: %.4f - Presence Loss: %.4f - Accuracy: %.4f" % (valid_loss, valid_l1_loss, valid_giou_loss, valid_presence_loss, valid_acc))
-        self.model.save_model(
-            dir_path=self.exp_dir, 
-            ckpt_step=self.__current_iter, 
-            is_best=is_best
+        self.model.save_checkpoint(
+            model=self.model,
+            optimizer=self.optimizer,
+            scheduler=self.scheduler,
+            dir_path=self.exp_dir,
+            step=self.__current_iter
         )
         print("=" * 100)
     

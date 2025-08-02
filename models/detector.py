@@ -242,29 +242,26 @@ class PromptableDeTRTrainer(PromptableDeTR):
         return loss, final_l1_loss, final_giou_loss, final_presence_loss
 
 
-    def save_model(self, dir_path, ckpt_step = None, is_best = False):
+    def save_checkpoint(self, model, optimizer, scheduler, dir_path, step):
         """
-        Save the model weights.
+        Save the model and optimizer state.
 
         Args:
-            dir_path (str): The path to the directory where the weights will be saved.
-            ckpt_step (int): The checkpoint step. (Default: None)
-            is_best (bool): Flag to indicate if the checkpoint is the best. (Default: False)
+            model (PromptableDeTRTrainer): The model to save.
+            optimizer (torch.optim.Optimizer): The optimizer to save.
+            scheduler (torch.optim.lr_scheduler._LRScheduler): The learning rate scheduler to save.
+            dir_path (str): The path to the directory where the checkpoint will be saved.
+            step (int): The current training step.
         """
-        logger.info(msg="Saving the model weights.")
+        logger.info(msg="Saving the model and optimizer state.")
         
         # Define the checkpoint path.
-        name = "promptable-detr"
+        ckpt_fp = os.path.join(dir_path, "step-%d.ckpt" % step)
 
-        # Check if the model is the best.
-        if is_best:
-            name += "-best"
-        
-        if ckpt_step is not None:
-            name += "-ckpt-%d" % ckpt_step
-        
-        os.makedirs(name=dir_path, exist_ok=True)
-        ckpt_fp = os.path.join(dir_path, name + ".pth")
-
-        # Save the weights.
-        torch.save(obj=self.state_dict(), f=ckpt_fp)
+        # Save the model and optimizer state.
+        torch.save(obj={
+            "model_state_dict": model.state_dict(),
+            "optimizer_state_dict": optimizer.state_dict(),
+            "scheduler_state_dict": scheduler.state_dict(),
+            "step": step
+        }, f=ckpt_fp)
