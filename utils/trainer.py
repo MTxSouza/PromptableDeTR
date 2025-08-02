@@ -302,6 +302,7 @@ class Trainer:
                 # Backward pass.
                 self.optimizer.zero_grad()
                 loss.backward()
+                self.optimizer.step()
                 self.scheduler.step()
 
                 # Store accuracy.
