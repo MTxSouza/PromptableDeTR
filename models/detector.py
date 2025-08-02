@@ -244,7 +244,7 @@ class PromptableDeTRTrainer(PromptableDeTR):
         ce_loss = alpha_t.unsqueeze(1) * ce_loss
 
         presence_loss = focal_weight.unsqueeze(1) * ce_loss
-        presence_loss = presence_loss.mean()
+        presence_loss = presence_loss.mean().cpu()
         logger.debug(msg="- Presence loss: %s." % presence_loss)
 
         # Compute bounding box loss.
