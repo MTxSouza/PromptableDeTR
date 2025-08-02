@@ -67,6 +67,17 @@ class Tensorboard:
 
 
     # Methods.
+    def add_current_lr(self, lr, step):
+        """
+        Adds the current learning rate to the Tensorboard writer.
+
+        Args:
+            lr (float): Current learning rate value.
+            step (int): Step number.
+        """
+        self.writer.add_scalar(tag="lr", scalar_value=lr, global_step=step)
+
+
     def add_train_losses(self, loss, l1_loss, giou_loss, presence_loss, step):
         """
         Adds the training loss to the Tensorboard writer.
