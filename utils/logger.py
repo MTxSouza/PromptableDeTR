@@ -95,15 +95,17 @@ class Tensorboard:
         self.writer.add_scalar(tag="train_presence_loss", scalar_value=presence_loss, global_step=step)
 
 
-    def add_train_giou_accuracy(self, acc, step):
+    def add_train_giou_accuracy(self, acc, step, th):
         """
         Adds the training GIoU accuracy to the Tensorboard writer.
 
         Args:
             acc (float): Total training accuracy value.
             step (int): Step number.
+            th (float): Threshold used for the GIoU accuracy.
         """
-        self.writer.add_scalar(tag="train_giou_accuracy", scalar_value=acc, global_step=step)
+        tag = "train_GIoU@%f" % th
+        self.writer.add_scalar(tag=tag, scalar_value=acc, global_step=step)
 
 
     def add_train_app_accuracy(self, acc, step):
