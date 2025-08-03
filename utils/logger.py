@@ -174,14 +174,14 @@ class Tensorboard:
             step (int): Step number.
         """
         # Prepare the images for Tensorboard.
-        tb_samples = []
         for (img, caption, label, prediction_50, prediction_75, prediction_90) in samples:
 
-            pil_img = Image.fromarray((img * 255).astype("uint8"))
-            draw = ImageDraw.Draw(im=pil_img)
-
             # Draw the rectangles on the image.
+            tb_samples = []
             for tag, prediction in zip(["@0.50", "@0.75", "@0.90"], [prediction_50, prediction_75, prediction_90]):
+
+                pil_img = Image.fromarray((img * 255).astype("uint8"))
+                draw = ImageDraw.Draw(im=pil_img)
 
                 for box in label:
                     draw.rectangle(xy=tuple(box), outline="green", width=2)
@@ -201,9 +201,9 @@ class Tensorboard:
                 # Append the image to the samples.
                 tb_samples.append(pil_img)
 
-                # Add the images to the Tensorboard writer.
-                for idx, sample in enumerate(iterable=tb_samples):
-                    self.writer.add_image(tag=f"sample_{idx}{tag}", img_tensor=np.asarray(sample), global_step=step, dataformats="HWC")
+            # Add the images to the Tensorboard writer.
+            for idx, sample in enumerate(iterable=tb_samples):
+                self.writer.add_image(tag=f"sample_{idx}{tag}", img_tensor=np.asarray(sample), global_step=step, dataformats="HWC")
 
     def close(self):
         """
