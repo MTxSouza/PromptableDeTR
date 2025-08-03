@@ -82,7 +82,7 @@ class Trainer:
         self.device = device
 
         # Training attributes.
-        self.__total_samples = 16
+        self.__total_samples = 8
         self.__current_iter = 1
         self.__best_loss = float("inf")
         self.__is_overfitting = False
@@ -94,7 +94,9 @@ class Trainer:
         self.__giou_50_accuracies = []
         self.__giou_75_accuracies = []
         self.__giou_90_accuracies = []
-        self.__ap_accuracies = []
+        self.__ap_50_accuracies = []
+        self.__ap_75_accuracies = []
+        self.__ap_90_accuracies = []
 
         self.__tensorboard = Tensorboard(log_dir=exp_dir)
 
@@ -145,7 +147,9 @@ class Trainer:
         mean_giou_50_acc = sum(self.__giou_50_accuracies) / len(self.__giou_50_accuracies)
         mean_giou_75_acc = sum(self.__giou_75_accuracies) / len(self.__giou_75_accuracies)
         mean_giou_90_acc = sum(self.__giou_90_accuracies) / len(self.__giou_90_accuracies)
-        mean_ap_acc = sum(self.__ap_accuracies) / len(self.__ap_accuracies)
+        mean_ap_50_acc = sum(self.__ap_50_accuracies) / len(self.__ap_50_accuracies)
+        mean_ap_75_acc = sum(self.__ap_75_accuracies) / len(self.__ap_75_accuracies)
+        mean_ap_90_acc = sum(self.__ap_90_accuracies) / len(self.__ap_90_accuracies)
 
         if reset:
             self.__losses.clear()
@@ -155,7 +159,9 @@ class Trainer:
             self.__giou_50_accuracies.clear()
             self.__giou_75_accuracies.clear()
             self.__giou_90_accuracies.clear()
-            self.__ap_accuracies.clear()
+            self.__ap_50_accuracies.clear()
+            self.__ap_75_accuracies.clear()
+            self.__ap_90_accuracies.clear()
 
         metrics = {
             "mean_loss": mean_loss,
@@ -165,7 +171,9 @@ class Trainer:
             "mean_giou_50_acc": mean_giou_50_acc,
             "mean_giou_75_acc": mean_giou_75_acc,
             "mean_giou_90_acc": mean_giou_90_acc,
-            "mean_ap_acc": mean_ap_acc
+            "mean_ap_50_acc": mean_ap_50_acc,
+            "mean_ap_75_acc": mean_ap_75_acc,
+            "mean_ap_90_acc": mean_ap_90_acc
         }
 
         return metrics
@@ -319,7 +327,14 @@ class Trainer:
                 images, captions, y, logits = self.__run_forward(model=self.model, batch=training_batch, is_training=True)
 
                 # Compute the loss.
-                loss, final_l1_loss, final_giou_loss, final_presence_loss, ap = self.model.compute_loss_and_accuracy(logits=logits, labels=y)
+                metrics = self.model.compute_loss_and_accuracy(logits=logits, labels=y)
+                loss = metrics["loss"]
+                final_l1_loss = metrics["l1_loss"]
+                final_giou_loss = metrics["giou_loss"]
+                final_presence_loss = metrics["presence_loss"]
+                ap_50 = metrics["ap_50"]
+                ap_75 = metrics["ap_75"]
+                ap_90 = metrics["ap_90"]
 
                 # Backward pass.
                 self.optimizer.zero_grad()
@@ -342,8 +357,12 @@ class Trainer:
                 total_75_acc = sum(total_75_acc) / len(total_75_acc) if total_75_acc else 0.0
                 total_90_acc = sum(total_90_acc) / len(total_90_acc) if total_90_acc else 0.0
 
-                self.__giou_accuracies.append(total_50_acc)
-                self.__ap_accuracies.append(ap.cpu().detach().numpy().item())
+                self.__giou_50_accuracies.append(total_50_acc)
+                self.__giou_75_accuracies.append(total_75_acc)
+                self.__giou_90_accuracies.append(total_90_acc)
+                self.__ap_50_accuracies.append(ap_50.cpu().detach().numpy().item())
+                self.__ap_75_accuracies.append(ap_75.cpu().detach().numpy().item())
+                self.__ap_90_accuracies.append(ap_90.cpu().detach().numpy().item())
                 del samples
 
                 # Store the losses.
@@ -363,7 +382,9 @@ class Trainer:
                     current_giou_50_acc = metrics["mean_giou_50_acc"]
                     current_giou_75_acc = metrics["mean_giou_75_acc"]
                     current_giou_90_acc = metrics["mean_giou_90_acc"]
-                    current_ap_acc = metrics["mean_ap_acc"]
+                    current_ap_50_acc = metrics["mean_ap_50_acc"]
+                    current_ap_75_acc = metrics["mean_ap_75_acc"]
+                    current_ap_90_acc = metrics["mean_ap_90_acc"]
 
                     # Log the training loss.
                     self.__tensorboard.add_train_losses(
@@ -378,10 +399,12 @@ class Trainer:
                     self.__tensorboard.add_train_giou_accuracy(acc=current_giou_50_acc, step=self.__current_iter, th=0.5)
                     self.__tensorboard.add_train_giou_accuracy(acc=current_giou_75_acc, step=self.__current_iter, th=0.75)
                     self.__tensorboard.add_train_giou_accuracy(acc=current_giou_90_acc, step=self.__current_iter, th=0.9)
-                    self.__tensorboard.add_train_app_accuracy(acc=current_ap_acc, step=self.__current_iter)
+                    self.__tensorboard.add_train_ap_accuracy(acc=current_ap_50_acc, step=self.__current_iter, th=0.5)
+                    self.__tensorboard.add_train_ap_accuracy(acc=current_ap_75_acc, step=self.__current_iter, th=0.75)
+                    self.__tensorboard.add_train_ap_accuracy(acc=current_ap_90_acc, step=self.__current_iter, th=0.9)
 
                     print("Loss: %.4f - L1 Loss: %.4f - GIoU Loss: %.4f - Presence Loss: %.4f" % (current_loss, current_l1_loss, current_giou_loss, current_presence_loss))
-                    print("GIoU@0.5: %.4f - GIoU@0.75: %.4f - GIoU@0.90: %.4f - AP@0.5: %.4f" % (current_giou_50_acc, current_giou_75_acc, current_giou_90_acc, current_ap_acc))
+                    print("GIoU@0.5: %.4f - GIoU@0.75: %.4f - GIoU@0.90: %.4f | AP@0.5: %.4f - AP@0.75: %.4f - AP@0.90: %.4f" % (current_giou_50_acc, current_giou_75_acc, current_giou_90_acc, current_ap_50_acc, current_ap_75_acc, current_ap_90_acc))
                     print("-" * 100)
 
                 # Check if it is time to validate the model.
@@ -394,8 +417,9 @@ class Trainer:
                     total_l1_loss = 0.0
                     total_giou_loss = 0.0
                     total_presence_loss = 0.0
-                    total_ap_acc = 0.0
-                    total_giou_acc = 0.0
+                    total_ap_50_acc = 0.0
+                    total_ap_75_acc = 0.0
+                    total_ap_90_acc = 0.0
                     samples = []
                     init_time = time.time()
                     for validation_batch in tqdm(iterable=self.valid_dataset, desc="Validating", unit="batch"):
@@ -404,12 +428,14 @@ class Trainer:
                         images, captions, y, logits = self.__run_forward(model=self.model, batch=validation_batch, is_training=False)
 
                         # Compute the loss.
-                        loss, final_l1_loss, final_giou_loss, final_presence_loss, final_ap_acc = self.model.compute_loss_and_accuracy(logits=logits, labels=y)
-                        total_loss += loss.cpu().numpy().item()
-                        total_l1_loss += final_l1_loss.cpu().numpy().item()
-                        total_giou_loss += final_giou_loss.cpu().numpy().item()
-                        total_presence_loss += final_presence_loss.cpu().numpy().item()
-                        total_ap_acc += final_ap_acc.cpu().numpy().item()
+                        metrics = self.model.compute_loss_and_accuracy(logits=logits, labels=y)
+                        total_loss += metrics["loss"]
+                        total_l1_loss += metrics["l1_loss"]
+                        total_giou_loss += metrics["giou_loss"]
+                        total_presence_loss += metrics["presence_loss"]
+                        total_ap_50_acc += metrics["ap_50"]
+                        total_ap_75_acc += metrics["ap_75"]
+                        total_ap_90_acc += metrics["ap_90"]
 
                         # Get a random sample.
                         small_samples = [self.__get_sample(images=images[idx_batch], captions=captions[idx_batch], y=y[idx_batch], logits=logits[idx_batch]) for idx_batch in range(images.size(0))]
@@ -439,7 +465,9 @@ class Trainer:
                     total_l1_loss /= len(self.valid_dataset)
                     total_giou_loss /= len(self.valid_dataset)
                     total_presence_loss /= len(self.valid_dataset)
-                    total_ap_acc /= len(self.valid_dataset)
+                    total_ap_50_acc /= len(self.valid_dataset)
+                    total_ap_75_acc /= len(self.valid_dataset)
+                    total_ap_90_acc /= len(self.valid_dataset)
                     end_time = (time.time() - init_time) / 60.0
 
                     # Save the model weights.
@@ -455,8 +483,12 @@ class Trainer:
                     )
 
                     # Log the valid accuracy.
-                    self.__tensorboard.add_valid_giou_accuracy(acc=total_giou_acc, step=self.__current_iter)
-                    self.__tensorboard.add_valid_ap_accuracy(acc=total_ap_acc, step=self.__current_iter)
+                    self.__tensorboard.add_valid_giou_accuracy(acc=total_giou_50_acc, step=self.__current_iter, th=0.5)
+                    self.__tensorboard.add_valid_giou_accuracy(acc=total_giou_75_acc, step=self.__current_iter, th=0.75)
+                    self.__tensorboard.add_valid_giou_accuracy(acc=total_giou_90_acc, step=self.__current_iter, th=0.90)
+                    self.__tensorboard.add_valid_ap_accuracy(acc=total_ap_50_acc, step=self.__current_iter, th=0.5)
+                    self.__tensorboard.add_valid_ap_accuracy(acc=total_ap_75_acc, step=self.__current_iter, th=0.75)
+                    self.__tensorboard.add_valid_ap_accuracy(acc=total_ap_90_acc, step=self.__current_iter, th=0.90)
 
                     # Display the samples on Tensorboard.
                     self.__tensorboard.add_image(samples=samples, step=self.__current_iter)
@@ -465,7 +497,7 @@ class Trainer:
                     print("Validation time: %.2f minutes" % end_time)
                     print("Overfit counter: %d" % self.__overfit_counter)
                     print("Validation loss: %.4f - L1 Loss: %.4f - GIoU Loss: %.4f - Presence Loss: %.4f" % (total_loss, total_l1_loss, total_giou_loss, total_presence_loss))
-                    print("GIoU@0.5: %.4f - GIoU@0.75: %.4f - GIoU@0.90: %.4f - AP@0.5: %.4f" % (total_giou_50_acc, total_giou_75_acc, total_giou_90_acc, total_ap_acc))
+                    print("GIoU@0.5: %.4f - GIoU@0.75: %.4f - GIoU@0.90: %.4f | AP@0.5: %.4f - AP@0.75: %.4f - AP@0.90: %.4f" % (total_giou_50_acc, total_giou_75_acc, total_giou_90_acc, total_ap_50_acc, total_ap_75_acc, total_ap_90_acc))
                     print("=" * 100)
 
                 # Update the iteration.

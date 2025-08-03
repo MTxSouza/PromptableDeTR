@@ -108,15 +108,17 @@ class Tensorboard:
         self.writer.add_scalar(tag=tag, scalar_value=acc, global_step=step)
 
 
-    def add_train_app_accuracy(self, acc, step):
+    def add_train_ap_accuracy(self, acc, step, th):
         """
         Adds the training AP accuracy to the Tensorboard writer.
 
         Args:
             acc (float): Total training accuracy value.
             step (int): Step number.
+            th (float): Threshold used for the AP accuracy.
         """
-        self.writer.add_scalar(tag="train_ap_accuracy", scalar_value=acc, global_step=step)
+        tag = "train_AP@%f" % th
+        self.writer.add_scalar(tag=tag, scalar_value=acc, global_step=step)
 
 
     def add_valid_losses(self, loss, l1_loss, giou_loss, presence_loss, step):
@@ -136,26 +138,30 @@ class Tensorboard:
         self.writer.add_scalar(tag="valid_presence_loss", scalar_value=presence_loss, global_step=step)
 
 
-    def add_valid_giou_accuracy(self, acc, step):
+    def add_valid_giou_accuracy(self, acc, step, th):
         """
         Adds the validation GIoU accuracy to the Tensorboard writer.
 
         Args:
             acc (float): Total validation accuracy value.
             step (int): Step number.
+            th (float): Threshold used for the GIoU accuracy.
         """
-        self.writer.add_scalar(tag="valid_giou_accuracy", scalar_value=acc, global_step=step)
+        tag = "valid_GIoU@%f" % th
+        self.writer.add_scalar(tag=tag, scalar_value=acc, global_step=step)
 
 
-    def add_valid_ap_accuracy(self, acc, step):
+    def add_valid_ap_accuracy(self, acc, step, th):
         """
         Adds the validation AP accuracy to the Tensorboard writer.
 
         Args:
             acc (float): Total validation accuracy value.
             step (int): Step number.
+            th (float): Threshold used for the AP accuracy.
         """
-        self.writer.add_scalar(tag="valid_ap_accuracy", scalar_value=acc, global_step=step)
+        tag = "valid_AP@%f" % th
+        self.writer.add_scalar(tag=tag, scalar_value=acc, global_step=step)
 
 
     def add_image(self, samples, step):
@@ -169,47 +175,35 @@ class Tensorboard:
         """
         # Prepare the images for Tensorboard.
         tb_samples = []
-        for (img, caption, label, prediction) in samples:
-
-            # # Get the image dimensions.
-            # height, width = img.shape[:2]
-
-            # # Compute real coordinates.
-            # label[:, 0::2] *= width
-            # label[:, 1::2] *= height
-            # prediction[:, 0::2] *= width
-            # prediction[:, 1::2] *= height
-
-            # prediction[:, 2] = prediction[:, 0] + prediction[:, 2]
-            # prediction[:, 3] = prediction[:, 1] + prediction[:, 3]
-            # label[:, 2] = label[:, 0] + label[:, 2]
-            # label[:, 3] = label[:, 1] + label[:, 3]
+        for (img, caption, label, prediction_50, prediction_75, prediction_90) in samples:
 
             pil_img = Image.fromarray((img * 255).astype("uint8"))
             draw = ImageDraw.Draw(im=pil_img)
 
             # Draw the rectangles on the image.
-            for box in label:
-                draw.rectangle(xy=tuple(box), outline="green", width=2)
-            for box in prediction:
-                try:
-                    draw.rectangle(xy=tuple(box), outline="red", width=2)
-                except ValueError:
-                    # If the box is invalid, skip it.
-                    continue
+            for tag, prediction in zip(["@0.50", "@0.75", "@0.90"], [prediction_50, prediction_75, prediction_90]):
 
-            # Write the caption on the image.
-            font = ImageFont.load_default()
-            n_digits = len(caption)
-            draw.rectangle(xy=(0, 0, 10 + n_digits * 7, 20), fill="black")
-            draw.text((5, 2), caption, fill="white", font=font)
+                for box in label:
+                    draw.rectangle(xy=tuple(box), outline="green", width=2)
+                for box in prediction:
+                    try:
+                        draw.rectangle(xy=tuple(box), outline="red", width=2)
+                    except ValueError:
+                        # If the box is invalid, skip it.
+                        continue
 
-            # Append the image to the samples.
-            tb_samples.append(pil_img)
+                # Write the caption on the image.
+                font = ImageFont.load_default()
+                n_digits = len(caption)
+                draw.rectangle(xy=(0, 0, 10 + n_digits * 7, 20), fill="black")
+                draw.text((5, 2), caption, fill="white", font=font)
 
-        # Add the images to the Tensorboard writer.
-        for idx, sample in enumerate(iterable=tb_samples):
-            self.writer.add_image(tag=f"sample_{idx}", img_tensor=np.asarray(sample), global_step=step, dataformats="HWC")
+                # Append the image to the samples.
+                tb_samples.append(pil_img)
+
+            # Add the images to the Tensorboard writer.
+            for idx, sample in enumerate(iterable=tb_samples):
+                self.writer.add_image(tag=f"sample_{idx}{tag}", img_tensor=np.asarray(sample), global_step=step, dataformats="HWC")
 
     def close(self):
         """
