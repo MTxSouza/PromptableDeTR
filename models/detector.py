@@ -209,13 +209,13 @@ class PromptableDeTRTrainer(PromptableDeTR):
         ap = torch.tensor(ap)
         logger.debug(msg="- Average precision: %s." % (ap,))
 
-        # Define new scores labels and predicted labels.
-        new_scores = torch.full(size=(sorted_pred_presence.shape[0],), fill_value=0, device=sorted_pred_presence.device).long()
-        logger.debug(msg="- New scores shape: %s." % (new_scores.shape,))
-        new_scores[(batch_idx, tgt_idx)] = sorted_true_presence
+        # # Define new scores labels and predicted labels.
+        # new_scores = torch.full(size=(sorted_pred_presence.shape[0],), fill_value=0, device=sorted_pred_presence.device).long()
+        # logger.debug(msg="- New scores shape: %s." % (new_scores.shape,))
+        # new_scores[(batch_idx, tgt_idx)] = sorted_true_presence
 
         # Compute number of boxes.
-        obj_idx = new_scores == 1
+        obj_idx = sorted_true_presence == 1
         num_boxes = obj_idx.sum()
         logger.debug(msg="- Number of boxes: %s." % num_boxes)
 
@@ -224,7 +224,7 @@ class PromptableDeTRTrainer(PromptableDeTR):
         if self.__presence_weight != 1.0:
             presence_weight = torch.tensor([1.0, self.__presence_weight], device=pred_presence.device)
         predictions = sorted_pred_presence.view(-1, 2)
-        targets = new_scores.view(-1)
+        targets = sorted_true_presence.view(-1)
 
         alpha = torch.tensor(0.25).to(device=targets.device)
         gamma = torch.tensor(2.0).to(device=predictions.device)
