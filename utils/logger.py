@@ -202,7 +202,7 @@ class Tensorboard:
 
         # Add the images to the Tensorboard writer.
         for idx, sample in enumerate(iterable=tb_samples):
-            self.writer.add_image(tag=f"sample_{idx}{giou_th}", img_tensor=np.asarray(sample), global_step=step, dataformats="HWC")
+            self.writer.add_image(tag=f"[{idx} - GIoU@{giou_th}]", img_tensor=np.asarray(sample), global_step=step, dataformats="HWC")
 
     def close(self):
         """
