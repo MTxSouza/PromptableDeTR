@@ -321,7 +321,7 @@ class Trainer:
         new_logits = []
         for pred in logits:
             iou = iou_accuracy(labels=y, logits=pred[None, :], threshold=threshold)
-            if iou > threshold:
+            if iou >= threshold:
                 new_logits.append(pred)
         new_logits = np.asarray(new_logits)
         sample = (img, cap, y, new_logits)
