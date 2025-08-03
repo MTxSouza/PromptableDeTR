@@ -293,18 +293,16 @@ class Trainer:
         Returns:
             Tuple[np.ndarray, str, np.ndarray, np.ndarray]: The fixed sample.
         """
-        img, caption, y_objs, logits_obj_50, logits_obj_75, logits_obj_90 = sample
+        img, caption, y_objs, logits_obj = sample
 
         # Get the image dimensions.
         height, width = img.shape[:2]
 
         # Convert the bounding boxes from xywh to xyxy format.
         y_objs = xywh_to_xyxy(boxes=y_objs, height=height, width=width)
-        logits_obj_50 = xywh_to_xyxy(boxes=logits_obj_50, height=height, width=width)
-        logits_obj_75 = xywh_to_xyxy(boxes=logits_obj_75, height=height, width=width)
-        logits_obj_90 = xywh_to_xyxy(boxes=logits_obj_90, height=height, width=width)
+        logits_obj = xywh_to_xyxy(boxes=logits_obj, height=height, width=width)
 
-        return img, caption, y_objs, logits_obj_50, logits_obj_75, logits_obj_90
+        return img, caption, y_objs, logits_obj
 
 
     def __main_loop(self):
