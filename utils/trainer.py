@@ -226,15 +226,8 @@ class Trainer:
             conf_threshold (float): The confidence threshold to filter the objects. (Default: 0.5)
 
         Returns:
-            Tuple[np.ndarray, str, np.ndarray, np.ndarray, np.ndarray, np.ndarray]: The image, input caption, true objects, and predicted objects.
+            Tuple[np.ndarray, str, np.ndarray, np.ndarray]: The image, input caption, true objects, and predicted objects.
         """
-        def get_by_threshold(logits, threshold):
-            logits = logits[logits[:, 5] > threshold]
-            logits = logits[:, :4]
-
-            logits = logits.detach().cpu().numpy()
-            return logits
-
         # Retrieve samples.
         image = images.permute(1, 2, 0).detach().cpu().numpy()
         caption = captions.detach().cpu().numpy()
@@ -250,13 +243,15 @@ class Trainer:
         logits_objs = logits_objs[logits_max == 1]
         logits_objs[:, 4:] = logits_objs[:, 4:].softmax(dim=1)
 
-        logits_objs_50 = get_by_threshold(logits_objs, 0.5)
-        logits_objs_75 = get_by_threshold(logits_objs, 0.75)
-        logits_objs_90 = get_by_threshold(logits_objs, 0.9)
+        logits_objs = logits_objs[logits_objs[:, 5] > 0.5]
+        logits_objs = logits_objs[:, :4]
+
+        logits_objs = logits_objs.detach().cpu().numpy()
 
         y_objs = y_objs[y_objs[:, 4] == 1][:, :4]
 
-        return image, caption, y_objs, logits_objs_50, logits_objs_75, logits_objs_90
+        return image, caption, y_objs, logits_objs
+
 
     def __save_model(self, valid_loss):
         """
@@ -349,9 +344,9 @@ class Trainer:
                 samples = [self.__get_sample(images=images[idx_batch], captions=captions[idx_batch], y=y[idx_batch], logits=logits[idx_batch]) for idx_batch in range(images.size(0))]
                 samples = [self.__fix_bbox(sample=sample) for sample in samples]
 
-                total_50_acc = [iou_accuracy(labels=y_objs, logits=logits_obj_50) for (_, _, y_objs, logits_obj_50, _, _) in samples]
-                total_75_acc = [iou_accuracy(labels=y_objs, logits=logits_obj_75) for (_, _, y_objs, _, logits_obj_75, _) in samples]
-                total_90_acc = [iou_accuracy(labels=y_objs, logits=logits_obj_90) for (_, _, y_objs, _, _, logits_obj_90) in samples]
+                total_50_acc = [iou_accuracy(labels=y_objs, logits=logits_obj, threshold=0.5) for (_, _, y_objs, logits_obj) in samples]
+                total_75_acc = [iou_accuracy(labels=y_objs, logits=logits_obj, threshold=0.75) for (_, _, y_objs, logits_obj) in samples]
+                total_90_acc = [iou_accuracy(labels=y_objs, logits=logits_obj, threshold=0.9) for (_, _, y_objs, logits_obj) in samples]
 
                 total_50_acc = sum(total_50_acc) / len(total_50_acc) if total_50_acc else 0.0
                 total_75_acc = sum(total_75_acc) / len(total_75_acc) if total_75_acc else 0.0
@@ -452,14 +447,22 @@ class Trainer:
                     # Compute final accuracy.
                     samples = [self.__fix_bbox(sample=sample) for sample in samples]
 
-                    total_giou_50_acc = [iou_accuracy(labels=y_objs, logits=logits_obj_50) for (_, _, y_objs, logits_obj_50, _, _)  in samples]
+                    total_giou_50_acc = [iou_accuracy(labels=y_objs, logits=logits_obj, threshold=0.5) for (_, _, y_objs, logits_obj)  in samples]
+                    samples_giou_50_acc = list(filter(lambda data: data[1] >= 0.5, zip(samples, total_giou_50_acc)))
+                    samples_giou_50_acc = list(map(lambda data: data[0], samples_giou_50_acc))
                     total_giou_50_acc = sum(total_giou_50_acc) / len(total_giou_50_acc) if total_giou_50_acc else 0.0
 
-                    total_giou_75_acc = [iou_accuracy(labels=y_objs, logits=logits_obj_75) for (_, _, y_objs, _, logits_obj_75, _) in samples]
+                    total_giou_75_acc = [iou_accuracy(labels=y_objs, logits=logits_obj, threshold=0.75) for (_, _, y_objs, logits_obj) in samples]
+                    samples_giou_75_acc = list(filter(lambda data: data[1] >= 0.75, zip(samples, total_giou_75_acc)))
+                    samples_giou_75_acc = list(map(lambda data: data[0], samples_giou_75_acc))
                     total_giou_75_acc = sum(total_giou_75_acc) / len(total_giou_75_acc) if total_giou_75_acc else 0.0
 
-                    total_giou_90_acc = [iou_accuracy(labels=y_objs, logits=logits_obj_90) for (_, _, y_objs, _, _, logits_obj_90) in samples]
+                    total_giou_90_acc = [iou_accuracy(labels=y_objs, logits=logits_obj, threshold=0.9) for (_, _, y_objs, logits_obj) in samples]
+                    samples_giou_90_acc = list(filter(lambda data: data[1] >= 0.9, zip(samples, total_giou_90_acc)))
+                    samples_giou_90_acc = list(map(lambda data: data[0], samples_giou_90_acc))
                     total_giou_90_acc = sum(total_giou_90_acc) / len(total_giou_90_acc) if total_giou_90_acc else 0.0
+
+                    del samples
 
                     total_loss /= len(self.valid_dataset)
                     total_l1_loss /= len(self.valid_dataset)
@@ -491,8 +494,9 @@ class Trainer:
                     self.__tensorboard.add_valid_ap_accuracy(acc=total_ap_90_acc, step=self.__current_iter, th=0.90)
 
                     # Display the samples on Tensorboard.
-                    self.__tensorboard.add_image(samples=samples, step=self.__current_iter)
-                    del samples
+                    self.__tensorboard.add_image(samples=samples_giou_50_acc, step=self.__current_iter, giou_th=0.5)
+                    self.__tensorboard.add_image(samples=samples_giou_75_acc, step=self.__current_iter, giou_th=0.75)
+                    self.__tensorboard.add_image(samples=samples_giou_90_acc, step=self.__current_iter, giou_th=0.90)
 
                     print("Validation time: %.2f minutes" % end_time)
                     print("Overfit counter: %d" % self.__overfit_counter)

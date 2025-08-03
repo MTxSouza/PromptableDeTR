@@ -8,7 +8,7 @@ from utils.data import xywh_to_xyxy
 
 
 # Functions.
-def iou_accuracy(labels, logits):
+def iou_accuracy(labels, logits, threshold=0.5):
     """
     Computes the accuracy of the model based on the Intersection over Union (IoU) 
     between the ground truth and the predicted bounding boxes.
@@ -16,6 +16,7 @@ def iou_accuracy(labels, logits):
     Args:
         labels (numpy.ndarray): The true labels with shape (N, 4).
         logits (numpy.ndarray): The logits from the model with shape (N, 4).
+        threshold (float): The IoU threshold for positive samples. (Default: 0.5)
 
     Returns:
         float: The accuracy of the model.
@@ -33,7 +34,7 @@ def iou_accuracy(labels, logits):
         torch.from_numpy(labels),
         torch.from_numpy(logits)
     )
-    iou_score = iou_score[iou_score > 0.0]
+    iou_score = iou_score[iou_score > threshold]
     iou_score = iou_score.float().mean()
 
     # Check if the IoU score is NaN.

@@ -164,7 +164,7 @@ class Tensorboard:
         self.writer.add_scalar(tag=tag, scalar_value=acc, global_step=step)
 
 
-    def add_image(self, samples, step):
+    def add_image(self, samples, step, giou_th):
         """
         Displays the predictions of the model on the target
         image.
@@ -172,38 +172,37 @@ class Tensorboard:
         Args:
             samples (List[Tuple[numpy.ndarray, numpy.ndarray, numpy.ndarray]]): List of tuples containing the image, label, and prediction.
             step (int): Step number.
+            giou_th (float): GIoU threshold used for the predictions.
         """
+        tb_samples = []
         # Prepare the images for Tensorboard.
-        for (img, caption, label, prediction_50, prediction_75, prediction_90) in samples:
+        for (img, caption, label, prediction) in samples:
 
             # Draw the rectangles on the image.
-            tb_samples = []
-            for tag, prediction in zip(["@0.50", "@0.75", "@0.90"], [prediction_50, prediction_75, prediction_90]):
+            pil_img = Image.fromarray((img * 255).astype("uint8"))
+            draw = ImageDraw.Draw(im=pil_img)
 
-                pil_img = Image.fromarray((img * 255).astype("uint8"))
-                draw = ImageDraw.Draw(im=pil_img)
+            for box in label:
+                draw.rectangle(xy=tuple(box), outline="green", width=2)
+            for box in prediction:
+                try:
+                    draw.rectangle(xy=tuple(box), outline="red", width=2)
+                except ValueError:
+                    # If the box is invalid, skip it.
+                    continue
 
-                for box in label:
-                    draw.rectangle(xy=tuple(box), outline="green", width=2)
-                for box in prediction:
-                    try:
-                        draw.rectangle(xy=tuple(box), outline="red", width=2)
-                    except ValueError:
-                        # If the box is invalid, skip it.
-                        continue
+            # Write the caption on the image.
+            font = ImageFont.load_default()
+            n_digits = len(caption)
+            draw.rectangle(xy=(0, 0, 10 + n_digits * 7, 20), fill="black")
+            draw.text((5, 2), caption, fill="white", font=font)
 
-                # Write the caption on the image.
-                font = ImageFont.load_default()
-                n_digits = len(caption)
-                draw.rectangle(xy=(0, 0, 10 + n_digits * 7, 20), fill="black")
-                draw.text((5, 2), caption, fill="white", font=font)
+            # Append the image to the samples.
+            tb_samples.append(pil_img)
 
-                # Append the image to the samples.
-                tb_samples.append(pil_img)
-
-            # Add the images to the Tensorboard writer.
-            for idx, sample in enumerate(iterable=tb_samples):
-                self.writer.add_image(tag=f"sample_{idx}{tag}", img_tensor=np.asarray(sample), global_step=step, dataformats="HWC")
+        # Add the images to the Tensorboard writer.
+        for idx, sample in enumerate(iterable=tb_samples):
+            self.writer.add_image(tag=f"sample_{idx}{giou_th}", img_tensor=np.asarray(sample), global_step=step, dataformats="HWC")
 
     def close(self):
         """
