@@ -209,11 +209,6 @@ class PromptableDeTRTrainer(PromptableDeTR):
         ap = torch.tensor(ap)
         logger.debug(msg="- Average precision: %s." % (ap,))
 
-        # # Define new scores labels and predicted labels.
-        # new_scores = torch.full(size=(sorted_pred_presence.shape[0],), fill_value=0, device=sorted_pred_presence.device).long()
-        # logger.debug(msg="- New scores shape: %s." % (new_scores.shape,))
-        # new_scores[(batch_idx, tgt_idx)] = sorted_true_presence
-
         # Compute number of boxes.
         obj_idx = sorted_true_presence == 1
         num_boxes = obj_idx.sum()
@@ -229,19 +224,31 @@ class PromptableDeTRTrainer(PromptableDeTR):
         alpha = torch.tensor(0.25).to(device=targets.device)
         gamma = torch.tensor(2.0).to(device=predictions.device)
 
-        probs = torch.softmax(predictions, dim=1)
         targets_one_hot = F.one_hot(targets, num_classes=2).float()
-        ce_loss = F.cross_entropy(input=predictions, target=targets, weight=presence_weight, reduction="none")
+        log_pred_soft = predictions.log_softmax(dim=1)
 
-        p_t = torch.sum(probs * targets_one_hot, dim=1)
-        focal_weight = (1 - p_t) ** gamma
+        focal_loss = -torch.pow(1.0 - log_pred_soft.exp(), gamma) * log_pred_soft * targets_one_hot
 
-        alpha_t = alpha.gather(0, targets)
-        ce_loss = alpha_t.unsqueeze(1) * ce_loss
+        alpha_fac = torch.tensor([1 - alpha] + [alpha], device=targets.device).float()
+        alpha_fac = alpha_fac.view(-1, 1, 2)
+        focal_loss = focal_loss * alpha_fac
 
-        presence_loss = focal_weight.unsqueeze(1) * ce_loss
-        presence_loss = presence_loss.mean()
+        presence_loss = focal_loss.mean()
         logger.debug(msg="- Presence loss: %s." % presence_loss)
+
+        # probs = torch.softmax(predictions, dim=1)
+        # targets_one_hot = F.one_hot(targets, num_classes=2).float()
+        # ce_loss = F.cross_entropy(input=predictions, target=targets, weight=presence_weight, reduction="none")
+
+        # p_t = torch.sum(probs * targets_one_hot, dim=1)
+        # focal_weight = (1 - p_t) ** gamma
+
+        # alpha_t = alpha.gather(0, targets)
+        # ce_loss = alpha_t.unsqueeze(1) * ce_loss
+
+        # presence_loss = focal_weight.unsqueeze(1) * ce_loss
+        # presence_loss = presence_loss.mean()
+        # logger.debug(msg="- Presence loss: %s." % presence_loss)
 
         # Compute bounding box loss.
         bbox_loss = F.l1_loss(input=sorted_pred_boxes, target=sorted_true_boxes, reduction="none")
