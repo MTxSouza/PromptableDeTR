@@ -2,6 +2,8 @@
 This script trains the Detector model to optimize the entire model to localize and classify objects 
 in images based on the prompts.
 """
+import random
+
 import torch
 import torch.optim as optim
 
@@ -100,6 +102,14 @@ def main(device=None):
     args = get_args()
     for name, value in vars(args).items():
         print("[%s]: %s" % (name, value))
+
+    # Set the random seed for reproducibility.
+    if args.seed is not None:
+        print("Setting the random seed to %d" % args.seed)
+        random.seed(args.seed)
+        torch.manual_seed(args.seed)
+        if torch.cuda.is_available():
+            torch.cuda.manual_seed_all(args.seed)
 
     # Prepare the data loader.
     print("Preparing the data loader...")
