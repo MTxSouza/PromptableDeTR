@@ -465,15 +465,15 @@ class Trainer:
                     samples = [self.__fix_bbox(sample=sample) for sample in samples]
 
                     total_giou_50_acc = [iou_accuracy(labels=y_objs, logits=logits_obj, threshold=0.5) for (_, _, y_objs, logits_obj)  in samples]
-                    samples_giou_50_acc = [self.__filter_samples_by_giou(samples=sample, acc=acc, threshold=0.5) for sample, acc in zip(samples, total_giou_50_acc)]
+                    samples_giou_50_acc = [self.__filter_samples_by_giou(sample=sample, acc=acc, threshold=0.5) for sample, acc in zip(samples, total_giou_50_acc)]
                     total_giou_50_acc = sum(total_giou_50_acc) / len(total_giou_50_acc) if total_giou_50_acc else 0.0
 
                     total_giou_75_acc = [iou_accuracy(labels=y_objs, logits=logits_obj, threshold=0.75) for (_, _, y_objs, logits_obj) in samples]
-                    samples_giou_75_acc = [self.__filter_samples_by_giou(samples=sample, acc=acc, threshold=0.75) for sample, acc in zip(samples, total_giou_75_acc)]
+                    samples_giou_75_acc = [self.__filter_samples_by_giou(sample=sample, acc=acc, threshold=0.75) for sample, acc in zip(samples, total_giou_75_acc)]
                     total_giou_75_acc = sum(total_giou_75_acc) / len(total_giou_75_acc) if total_giou_75_acc else 0.0
 
                     total_giou_90_acc = [iou_accuracy(labels=y_objs, logits=logits_obj, threshold=0.9) for (_, _, y_objs, logits_obj) in samples]
-                    samples_giou_90_acc = [self.__filter_samples_by_giou(samples=sample, acc=acc, threshold=0.9) for sample, acc in zip(samples, total_giou_90_acc)]
+                    samples_giou_90_acc = [self.__filter_samples_by_giou(sample=sample, acc=acc, threshold=0.9) for sample, acc in zip(samples, total_giou_90_acc)]
                     total_giou_90_acc = sum(total_giou_90_acc) / len(total_giou_90_acc) if total_giou_90_acc else 0.0
 
                     del samples
