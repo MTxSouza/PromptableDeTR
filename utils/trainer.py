@@ -319,8 +319,10 @@ class Trainer:
         """
         new_samples = []
         for sample in samples:
+            sample = list(sample)
             if acc < threshold:
                 sample[3] = [] # Clear the predicted objects.
+            sample = tuple(sample)
             new_samples.append(sample)
         return new_samples
 
