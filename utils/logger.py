@@ -201,9 +201,9 @@ class Tensorboard:
                 # Append the image to the samples.
                 tb_samples.append(pil_img)
 
-            # Add the images to the Tensorboard writer.
-            for idx, sample in enumerate(iterable=tb_samples):
-                self.writer.add_image(tag=f"sample_{idx}{tag}", img_tensor=np.asarray(sample), global_step=step, dataformats="HWC")
+                # Add the images to the Tensorboard writer.
+                for idx, sample in enumerate(iterable=tb_samples):
+                    self.writer.add_image(tag=f"sample_{idx}{tag}", img_tensor=np.asarray(sample), global_step=step, dataformats="HWC")
 
     def close(self):
         """
