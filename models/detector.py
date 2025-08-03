@@ -175,7 +175,7 @@ class PromptableDeTRTrainer(PromptableDeTR):
             labels (torch.Tensor): The true tensor.
 
         Returns:
-            Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]: The losses of model and it AP.
+            dict: A dictionary containing the loss and accuracy values.
         """
         logger.info(msg="Computing the detector loss.")
 
@@ -205,9 +205,15 @@ class PromptableDeTRTrainer(PromptableDeTR):
         logger.debug(msg="- Sorted true boxes shape: %s." % (sorted_true_boxes.shape,))
 
         # Compute average precision.
-        ap = average_precision_open_vocab(labels=sorted_true_boxes, logits=sorted_pred_boxes, fix_boxes=True, height=640, width=640) # Hardcoded for now.
-        ap = torch.tensor(ap)
-        logger.debug(msg="- Average precision: %s." % (ap,))
+        ap_50 = average_precision_open_vocab(labels=sorted_true_boxes, logits=sorted_pred_boxes, fix_boxes=True, iou_threshold=0.5, height=640, width=640) # Hardcoded for now.
+        ap_75 = average_precision_open_vocab(labels=sorted_true_boxes, logits=sorted_pred_boxes, fix_boxes=True, iou_threshold=0.75, height=640, width=640)
+        ap_90 = average_precision_open_vocab(labels=sorted_true_boxes, logits=sorted_pred_boxes, fix_boxes=True, iou_threshold=0.90, height=640, width=640)
+        ap_50 = torch.tensor(ap_50)
+        ap_75 = torch.tensor(ap_75)
+        ap_90 = torch.tensor(ap_90)
+        logger.debug(msg="- Average precision @0.50: %s." % ap_50)
+        logger.debug(msg="- Average precision @0.75: %s." % ap_75)
+        logger.debug(msg="- Average precision @0.90: %s." % ap_90)
 
         # Compute number of boxes.
         obj_idx = sorted_true_presence == 1
@@ -268,7 +274,17 @@ class PromptableDeTRTrainer(PromptableDeTR):
         logger.debug(msg="- Total loss: %s." % loss)
         logger.info(msg="Returning the loss value.")
 
-        return loss, final_l1_loss, final_giou_loss, final_presence_loss, ap
+        metrics = {
+            "loss": loss,
+            "l1_loss": final_l1_loss,
+            "giou_loss": final_giou_loss,
+            "presence_loss": final_presence_loss,
+            "ap_50": ap_50,
+            "ap_75": ap_75,
+            "ap_90": ap_90
+        }
+
+        return metrics
 
 
     def save_checkpoint(self, model, optimizer, scheduler, dir_path, step):
