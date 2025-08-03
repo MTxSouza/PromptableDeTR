@@ -305,26 +305,23 @@ class Trainer:
         return img, caption, y_objs, logits_obj
 
 
-    def __filter_samples_by_giou(self, samples, acc, threshold):
+    def __filter_samples_by_giou(self, sample, acc, threshold):
         """
         It filters the samples by the GIoU threshold.
 
         Args:
-            samples (List[Tuple[np.ndarray, str, np.ndarray, np.ndarray]]): The list of samples.
+            sample (Tuple[np.ndarray, str, np.ndarray, np.ndarray]): The sample containing the image, caption, true objects, and predicted objects.
             acc (float): The GIoU accuracy.
             threshold (float): The GIoU threshold.
 
         Returns:
-            List[Tuple[np.ndarray, str, np.ndarray, np.ndarray]]: The filtered samples.
+            Tuple[np.ndarray, str, np.ndarray, np.ndarray]: The filtered samples.
         """
-        new_samples = []
-        for sample in samples:
-            sample = list(sample)
-            if acc < threshold:
-                sample[3] = [] # Clear the predicted objects.
-            sample = tuple(sample)
-            new_samples.append(sample)
-        return new_samples
+        sample = list(sample)
+        if acc < threshold:
+            sample[3] = [] # Clear the predicted objects.
+        sample = tuple(sample)
+        return sample
 
 
     def __main_loop(self):
@@ -468,15 +465,15 @@ class Trainer:
                     samples = [self.__fix_bbox(sample=sample) for sample in samples]
 
                     total_giou_50_acc = [iou_accuracy(labels=y_objs, logits=logits_obj, threshold=0.5) for (_, _, y_objs, logits_obj)  in samples]
-                    samples_giou_50_acc = [self.__filter_samples_by_giou(samples=samples, acc=acc, threshold=0.5) for acc in total_giou_50_acc]
+                    samples_giou_50_acc = [self.__filter_samples_by_giou(samples=sample, acc=acc, threshold=0.5) for sample, acc in zip(samples, total_giou_50_acc)]
                     total_giou_50_acc = sum(total_giou_50_acc) / len(total_giou_50_acc) if total_giou_50_acc else 0.0
 
                     total_giou_75_acc = [iou_accuracy(labels=y_objs, logits=logits_obj, threshold=0.75) for (_, _, y_objs, logits_obj) in samples]
-                    samples_giou_75_acc = [self.__filter_samples_by_giou(samples=samples, acc=acc, threshold=0.75) for acc in total_giou_75_acc]
+                    samples_giou_75_acc = [self.__filter_samples_by_giou(samples=sample, acc=acc, threshold=0.75) for sample, acc in zip(samples, total_giou_75_acc)]
                     total_giou_75_acc = sum(total_giou_75_acc) / len(total_giou_75_acc) if total_giou_75_acc else 0.0
 
                     total_giou_90_acc = [iou_accuracy(labels=y_objs, logits=logits_obj, threshold=0.9) for (_, _, y_objs, logits_obj) in samples]
-                    samples_giou_90_acc = [self.__filter_samples_by_giou(samples=samples, acc=acc, threshold=0.9) for acc in total_giou_90_acc]
+                    samples_giou_90_acc = [self.__filter_samples_by_giou(samples=sample, acc=acc, threshold=0.9) for sample, acc in zip(samples, total_giou_90_acc)]
                     total_giou_90_acc = sum(total_giou_90_acc) / len(total_giou_90_acc) if total_giou_90_acc else 0.0
 
                     del samples
