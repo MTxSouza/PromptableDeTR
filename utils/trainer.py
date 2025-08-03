@@ -433,6 +433,9 @@ class Trainer:
                     total_l1_loss = 0.0
                     total_giou_loss = 0.0
                     total_presence_loss = 0.0
+                    total_giou_50_acc = 0.0
+                    total_giou_75_acc = 0.0
+                    total_giou_90_acc = 0.0
                     total_ap_50_acc = 0.0
                     total_ap_75_acc = 0.0
                     total_ap_90_acc = 0.0
@@ -453,8 +456,15 @@ class Trainer:
                         total_ap_75_acc += metrics["ap_75"]
                         total_ap_90_acc += metrics["ap_90"]
 
-                        # Get a random sample.
                         small_samples = [self.__get_sample(images=images[idx_batch], captions=captions[idx_batch], y=y[idx_batch], logits=logits[idx_batch]) for idx_batch in range(images.size(0))]
+                        giou_50_acc = [iou_accuracy(labels=y_objs, logits=logits_obj, threshold=0.5) for (_, _, y_objs, logits_obj)  in samples]
+                        giou_75_acc = [iou_accuracy(labels=y_objs, logits=logits_obj, threshold=0.75) for (_, _, y_objs, logits_obj) in samples]
+                        giou_90_acc = [iou_accuracy(labels=y_objs, logits=logits_obj, threshold=0.9) for (_, _, y_objs, logits_obj) in samples]
+                        total_giou_50_acc += sum(giou_50_acc) / len(giou_50_acc) if giou_50_acc else 0.0
+                        total_giou_75_acc += sum(giou_75_acc) / len(giou_75_acc) if giou_75_acc else 0.0
+                        total_giou_90_acc += sum(giou_90_acc) / len(giou_90_acc) if giou_90_acc else 0.0
+
+                        # Get a random sample.
                         for sample in small_samples:
                             if self.__total_samples > len(samples):
                                 samples.append(sample)
@@ -468,16 +478,8 @@ class Trainer:
                     # Compute final accuracy.
                     samples = [self.__fix_bbox(sample=sample) for sample in samples]
 
-                    total_giou_50_acc = [iou_accuracy(labels=y_objs, logits=logits_obj, threshold=0.5) for (_, _, y_objs, logits_obj)  in samples]
-                    total_giou_50_acc = sum(total_giou_50_acc) / len(total_giou_50_acc) if total_giou_50_acc else 0.0
                     samples_giou_50_acc = [self.__filter_samples_by_giou(sample=sample, threshold=0.5) for sample in samples]
-
-                    total_giou_75_acc = [iou_accuracy(labels=y_objs, logits=logits_obj, threshold=0.75) for (_, _, y_objs, logits_obj) in samples]
-                    total_giou_75_acc = sum(total_giou_75_acc) / len(total_giou_75_acc) if total_giou_75_acc else 0.0
                     samples_giou_75_acc = [self.__filter_samples_by_giou(sample=sample, threshold=0.75) for sample in samples]
-
-                    total_giou_90_acc = [iou_accuracy(labels=y_objs, logits=logits_obj, threshold=0.9) for (_, _, y_objs, logits_obj) in samples]
-                    total_giou_90_acc = sum(total_giou_90_acc) / len(total_giou_90_acc) if total_giou_90_acc else 0.0
                     samples_giou_90_acc = [self.__filter_samples_by_giou(sample=sample, threshold=0.9) for sample in samples]
 
                     del samples
@@ -486,6 +488,9 @@ class Trainer:
                     total_l1_loss /= len(self.valid_dataset)
                     total_giou_loss /= len(self.valid_dataset)
                     total_presence_loss /= len(self.valid_dataset)
+                    total_giou_50_acc /= len(self.valid_dataset)
+                    total_giou_75_acc /= len(self.valid_dataset)
+                    total_giou_90_acc /= len(self.valid_dataset)
                     total_ap_50_acc /= len(self.valid_dataset)
                     total_ap_75_acc /= len(self.valid_dataset)
                     total_ap_90_acc /= len(self.valid_dataset)
