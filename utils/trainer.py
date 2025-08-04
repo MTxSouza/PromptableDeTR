@@ -460,9 +460,9 @@ class Trainer:
                         giou_50_acc = [iou_accuracy(labels=y_objs, logits=logits_obj, threshold=0.5) for (_, _, y_objs, logits_obj)  in samples]
                         giou_75_acc = [iou_accuracy(labels=y_objs, logits=logits_obj, threshold=0.75) for (_, _, y_objs, logits_obj) in samples]
                         giou_90_acc = [iou_accuracy(labels=y_objs, logits=logits_obj, threshold=0.9) for (_, _, y_objs, logits_obj) in samples]
-                        total_giou_50_acc += sum(giou_50_acc)
-                        total_giou_75_acc += sum(giou_75_acc)
-                        total_giou_90_acc += sum(giou_90_acc)
+                        total_giou_50_acc += sum(giou_50_acc) / len(giou_50_acc) if giou_50_acc else 0
+                        total_giou_75_acc += sum(giou_75_acc) / len(giou_75_acc) if giou_75_acc else 0
+                        total_giou_90_acc += sum(giou_90_acc) / len(giou_90_acc) if giou_90_acc else 0
 
                         # Get a random sample.
                         for sample in small_samples:
