@@ -46,3 +46,20 @@ class Logger(logging.Logger):
     
         # Set logger level.
         self.setLevel(level=logging.DEBUG)
+
+
+    # HOT FIX: Override logging methods to prevent errors when logging is not set up.
+    def debug(self, *args, **kargs):
+        pass
+
+    def info(self, *args, **kargs):
+        pass
+
+    def warning(self, *args, **kargs):
+        pass
+
+    def error(self, *args, **kargs):
+        pass
+
+    def critical(self, *args, **kargs):
+        pass
