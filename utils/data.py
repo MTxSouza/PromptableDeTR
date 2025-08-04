@@ -51,11 +51,9 @@ def xywh2xyxy(boxes):
     Returns:
         torch.Tensor: The converted boxes with shape (N, 4).
     """
-    cx, cy, w, h = boxes.unbind(dim=-1)
-    x1 = cx - w / 2
-    y1 = cy - h / 2
-    x2 = cx + w / 2
-    y2 = cy + h / 2
+    x1, y1, w, h = boxes.unbind(dim=-1)
+    x2 = x1 + w
+    y2 = y1 + h
     new_boxes = torch.stack([x1, y1, x2, y2], dim=-1)
     return new_boxes
 
@@ -72,8 +70,8 @@ def generalized_iou(boxes1, boxes2):
         torch.Tensor: The GIoU between the two sets of boxes.
     """
     # Convert coordinates to (x1, y1, x2, y2).
-    boxes1 = xywh_to_xyxy(boxes=boxes1)
-    boxes2 = xywh_to_xyxy(boxes=boxes2)
+    boxes1 = xywh2xyxy(boxes=boxes1)
+    boxes2 = xywh2xyxy(boxes=boxes2)
 
     assert (boxes1[:, 2:] >= boxes1[:, :2]).all()
     assert (boxes2[:, 2:] >= boxes2[:, :2]).all()
