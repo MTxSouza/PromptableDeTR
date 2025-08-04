@@ -230,17 +230,36 @@ class PromptableDeTRTrainer(PromptableDeTR):
         alpha = torch.tensor(0.25).to(device=targets.device)
         gamma = torch.tensor(2.0).to(device=predictions.device)
 
-        targets_one_hot = F.one_hot(targets, num_classes=2).float()
-        log_pred_soft = predictions.log_softmax(dim=1)
+        pred_pos = F.logsigmoid(predictions[:, 1])
+        pred_neg = F.logsigmoid(predictions[:, 0])
 
-        focal_loss = -torch.pow(1.0 - log_pred_soft.exp(), gamma) * log_pred_soft * targets_one_hot
+        pos_term = -pred_pos.exp().pow(gamma) * targets * pred_pos
+        neg_term = -pred_neg.exp().pow(gamma) * (1 - targets) * pred_neg
 
-        alpha_fac = torch.tensor([1 - alpha] + [alpha], device=targets.device).float()
-        alpha_fac = alpha_fac.view(-1, 1, 2)
-        focal_loss = focal_loss * alpha_fac
+        pos_term = alpha * pos_term
+        neg_term = (1 - alpha) * neg_term
 
+        if presence_weight is not None:
+            presence_weight = presence_weight.view(1, 1)
+            pos_term = pos_term * presence_weight
+
+        focal_loss = (pos_term + neg_term).view(-1)
         presence_loss = focal_loss.mean()
         logger.debug(msg="- Presence loss: %s." % presence_loss)
+
+
+        # targets_one_hot = F.one_hot(targets, num_classes=2).float()
+        # log_pred_soft = predictions.log_softmax(dim=1)
+
+        # focal_loss = -torch.pow(1.0 - log_pred_soft.exp(), gamma) * log_pred_soft * targets_one_hot
+
+        # alpha_fac = torch.tensor([1 - alpha] + [alpha], device=targets.device).float()
+        # alpha_fac = alpha_fac.view(-1, 1, 2)
+        # focal_loss = focal_loss * alpha_fac
+
+        # presence_loss = focal_loss.mean()
+        # logger.debug(msg="- Presence loss: %s." % presence_loss)
+
 
         # probs = torch.softmax(predictions, dim=1)
         # targets_one_hot = F.one_hot(targets, num_classes=2).float()
