@@ -32,7 +32,8 @@ class Logger(logging.Logger):
             filename=os.path.join(self.LOG_DIR, "%s.log" % name), 
             mode="w", 
             maxBytes=max_bytes, 
-            backupCount=5
+            backupCount=5,
+            delay=True
         )
         handler.setLevel(level=logging.DEBUG)
 
