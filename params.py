@@ -235,6 +235,11 @@ def get_args():
         default=1.0,
         help="The weight for the L1 loss."
     )
+    training_parser.add_argument(
+        "--save-logs",
+        action="store_true",
+        help="Whether to save the logs."
+    )
 
     # Parse the arguments.
     return parser.parse_args()

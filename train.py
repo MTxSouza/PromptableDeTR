@@ -2,6 +2,7 @@
 This script trains the Detector model to optimize the entire model to localize and classify objects 
 in images based on the prompts.
 """
+import logging
 import random
 
 import torch
@@ -110,6 +111,10 @@ def main(device=None):
         torch.manual_seed(args.seed)
         if torch.cuda.is_available():
             torch.cuda.manual_seed_all(args.seed)
+
+    # Set logging level.
+    if not args.save_logs:
+        logging.basicConfig(level=logging.CRITICAL, force=True)
 
     # Prepare the data loader.
     print("Preparing the data loader...")
