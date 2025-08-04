@@ -223,7 +223,7 @@ class PromptableDeTRTrainer(PromptableDeTR):
         # Compute presence loss with focal loss.
         presence_weight = None
         if self.__presence_weight != 1.0:
-            presence_weight = torch.tensor([1.0, self.__presence_weight], device=pred_presence.device)
+            presence_weight = torch.tensor([self.__presence_weight], device=pred_presence.device)
         predictions = sorted_pred_presence.view(-1, 2)
         targets = sorted_true_presence.view(-1)
 
@@ -240,7 +240,6 @@ class PromptableDeTRTrainer(PromptableDeTR):
         neg_term = (1 - alpha) * neg_term
 
         if presence_weight is not None:
-            presence_weight = presence_weight.view(1, 1)
             pos_term = pos_term * presence_weight
 
         focal_loss = (pos_term + neg_term).view(-1)
