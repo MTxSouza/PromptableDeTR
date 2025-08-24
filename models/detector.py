@@ -150,17 +150,15 @@ class PromptableDeTRTrainer(PromptableDeTR):
     """
 
     # Special methods.
-    def __init__(self, presence_loss_weight=1.0, l1_loss_weight=1.0, giou_loss_weight=1.0, *args, **kwargs):
+    def __init__(self, presence_loss_weight=1.0, l1_loss_weight=1.0, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
         # Matcher.
         self.__presence_weight = presence_loss_weight
         self.__l1_weight = l1_loss_weight
-        self.__giou_weight = giou_loss_weight
         self.matcher = HuggarianMatcher(
             presence_loss_weight=self.__presence_weight,
-            l1_loss_weight=self.__l1_weight,
-            giou_loss_weight=self.__giou_weight
+            l1_loss_weight=self.__l1_weight
         )
 
 
@@ -182,43 +180,43 @@ class PromptableDeTRTrainer(PromptableDeTR):
         assert self.matcher is not None, "Matcher is not defined."
 
         # Sort the logits and labels.
-        pred_presence = logits[:, :, 4:]
-        pred_boxes = logits[:, :, :4]
+        pred_presence = logits[:, :, 2:]
+        pred_points = logits[:, :, :2]
         true_presence = labels[:, :, 4].long()
-        true_boxes = labels[:, :, :4]
+        true_points = labels[:, :, :4]
         logger.debug(msg="- Predicted presence shape: %s." % (pred_presence.shape,))
-        logger.debug(msg="- Predicted boxes shape: %s." % (pred_boxes.shape,))
+        logger.debug(msg="- Predicted points shape: %s." % (pred_points.shape,))
         logger.debug(msg="- True presence shape: %s." % (true_presence.shape,))
-        logger.debug(msg="- True boxes shape: %s." % (true_boxes.shape,))
-        batch_idx, src_idx, tgt_idx = self.matcher(predict_scores=pred_presence, predict_boxes=pred_boxes, scores=true_presence, boxes=true_boxes)
+        logger.debug(msg="- True points shape: %s." % (true_points.shape,))
+        batch_idx, src_idx, tgt_idx = self.matcher(predict_scores=pred_presence, predict_points=pred_points, scores=true_presence, points=true_points)
         logger.debug(msg="- Batch index shape: %s." % (batch_idx.shape,))
         logger.debug(msg="- Source index shape: %s." % (src_idx.shape,))
         logger.debug(msg="- Target index shape: %s." % (tgt_idx.shape,))
 
         sorted_pred_presence = pred_presence[(batch_idx, src_idx)]
-        sorted_pred_boxes = pred_boxes[(batch_idx, src_idx)]
+        sorted_pred_points = pred_points[(batch_idx, src_idx)]
         sorted_true_presence = true_presence[(batch_idx, tgt_idx)]
-        sorted_true_boxes = true_boxes[(batch_idx, tgt_idx)]
+        sorted_true_points = true_points[(batch_idx, tgt_idx)]
         logger.debug(msg="- Sorted predicted presence shape: %s." % (sorted_pred_presence.shape,))
-        logger.debug(msg="- Sorted predicted boxes shape: %s." % (sorted_pred_boxes.shape,))
+        logger.debug(msg="- Sorted predicted points shape: %s." % (sorted_pred_points.shape,))
         logger.debug(msg="- Sorted true presence shape: %s." % (sorted_true_presence.shape,))
-        logger.debug(msg="- Sorted true boxes shape: %s." % (sorted_true_boxes.shape,))
+        logger.debug(msg="- Sorted true points shape: %s." % (sorted_true_points.shape,))
 
         # Compute average precision.
-        ap_50 = average_precision_open_vocab(labels=sorted_true_boxes, logits=sorted_pred_boxes, fix_boxes=True, iou_threshold=0.5, height=640, width=640) # Hardcoded for now.
-        ap_75 = average_precision_open_vocab(labels=sorted_true_boxes, logits=sorted_pred_boxes, fix_boxes=True, iou_threshold=0.75, height=640, width=640)
-        ap_90 = average_precision_open_vocab(labels=sorted_true_boxes, logits=sorted_pred_boxes, fix_boxes=True, iou_threshold=0.90, height=640, width=640)
-        ap_50 = torch.tensor(ap_50)
-        ap_75 = torch.tensor(ap_75)
-        ap_90 = torch.tensor(ap_90)
-        logger.debug(msg="- Average precision @0.50: %s." % ap_50)
-        logger.debug(msg="- Average precision @0.75: %s." % ap_75)
-        logger.debug(msg="- Average precision @0.90: %s." % ap_90)
+        ap_25 = average_precision_open_vocab(labels=sorted_true_points, logits=sorted_pred_points, dist_threshold=0.25) # Hardcoded for now.
+        ap_15 = average_precision_open_vocab(labels=sorted_true_points, logits=sorted_pred_points, dist_threshold=0.15)
+        ap_05 = average_precision_open_vocab(labels=sorted_true_points, logits=sorted_pred_points, dist_threshold=0.05)
+        ap_25 = torch.tensor(ap_25)
+        ap_15 = torch.tensor(ap_15)
+        ap_05 = torch.tensor(ap_05)
+        logger.debug(msg="- Average precision @0.25: %s." % ap_25)
+        logger.debug(msg="- Average precision @0.15: %s." % ap_15)
+        logger.debug(msg="- Average precision @0.05: %s." % ap_05)
 
-        # Compute number of boxes.
+        # Compute number of points.
         obj_idx = sorted_true_presence == 1
-        num_boxes = obj_idx.sum()
-        logger.debug(msg="- Number of boxes: %s." % num_boxes)
+        num_points = obj_idx.sum()
+        logger.debug(msg="- Number of points: %s." % num_points)
 
         # Compute presence loss with focal loss.
         presence_weight = None
@@ -246,32 +244,26 @@ class PromptableDeTRTrainer(PromptableDeTR):
         presence_loss = focal_loss.mean()
         logger.debug(msg="- Presence loss: %s." % presence_loss)
 
-        # Compute bounding box loss.
-        bbox_loss = F.l1_loss(input=sorted_pred_boxes, target=sorted_true_boxes, reduction="none")
-        bbox_loss = bbox_loss.sum() / num_boxes
-        logger.debug(msg="- Bounding box loss: %s." % bbox_loss)
-
-        diag_acc = torch.diag(input=generalized_iou(sorted_pred_boxes, sorted_true_boxes))
-        giou_loss = 1 - diag_acc
-        giou_loss = giou_loss.sum() / num_boxes
-        logger.debug(msg="- GIoU loss: %s." % giou_loss)
+        # Compute L1 loss.
+        l1_loss = F.l1_loss(input=sorted_pred_points, target=sorted_true_points, reduction="none")
+        l1_loss = l1_loss.sum(dim=-1)
+        l1_loss = l1_loss[obj_idx].sum() / num_points
+        logger.debug(msg="- L1 loss: %s." % l1_loss)
 
         # Compute the total loss.
-        final_l1_loss = self.__l1_weight * bbox_loss
-        final_giou_loss = self.__giou_weight * giou_loss
+        final_l1_loss = self.__l1_weight * l1_loss
         final_presence_loss = self.__presence_weight * presence_loss
-        loss = final_l1_loss + final_presence_loss + final_giou_loss
+        loss = final_l1_loss + final_presence_loss
         logger.debug(msg="- Total loss: %s." % loss)
         logger.info(msg="Returning the loss value.")
 
         metrics = {
             "loss": loss,
             "l1_loss": final_l1_loss,
-            "giou_loss": final_giou_loss,
             "presence_loss": final_presence_loss,
-            "ap_50": ap_50,
-            "ap_75": ap_75,
-            "ap_90": ap_90
+            "ap_25": ap_25,
+            "ap_15": ap_15,
+            "ap_05": ap_05
         }
 
         return metrics
