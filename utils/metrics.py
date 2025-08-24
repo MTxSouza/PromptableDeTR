@@ -2,21 +2,18 @@
 This module contains all evaluation metrics used to validate the PromptableDeTR model.
 """
 import torch
-from torchvision.ops.boxes import box_iou
-
-from utils.data import xywh_to_xyxy
 
 
 # Functions.
-def iou_accuracy(labels, logits, threshold=0.5):
+def dist_accuracy(labels, logits, threshold=0.25):
     """
-    Computes the accuracy of the model based on the Intersection over Union (IoU) 
-    between the ground truth and the predicted bounding boxes.
+    Computes the accuracy of the model based on the L1 distance
+    between the ground truth and the predicted bounding points.
 
     Args:
-        labels (numpy.ndarray): The true labels with shape (N, 4).
-        logits (numpy.ndarray): The logits from the model with shape (N, 4).
-        threshold (float): The IoU threshold for positive samples. (Default: 0.5)
+        labels (numpy.ndarray): The true labels with shape (N, 2).
+        logits (numpy.ndarray): The logits from the model with shape (N, 2).
+        threshold (float): The distance threshold for positive samples. (Default: 0.25)
 
     Returns:
         float: The accuracy of the model.
@@ -30,18 +27,19 @@ def iou_accuracy(labels, logits, threshold=0.5):
         return 0.0
 
     # Compute the accuracy.
-    iou_score = box_iou(
+    dist_score = torch.cdist(
+        torch.from_numpy(logits),
         torch.from_numpy(labels),
-        torch.from_numpy(logits)
+        p=2
     )
-    iou_score = iou_score[iou_score > threshold]
-    iou_score = iou_score.float().mean()
+    dist_score = dist_score[threshold >= dist_score]
+    dist_score = dist_score.float().mean()
 
-    # Check if the IoU score is NaN.
-    if torch.isnan(iou_score):
-        iou_score = torch.tensor(0.0)
+    # Check if the distance score is NaN.
+    if torch.isnan(dist_score):
+        dist_score = torch.tensor(0.0)
 
-    return iou_score.item()
+    return dist_score.item()
 
 
 def average_precision_open_vocab(labels, logits, dist_threshold=0.25):
