@@ -10,7 +10,7 @@ import torch.nn.functional as F
 
 from logger import Logger
 from models.base import BasePromptableDeTR
-from models.matcher import HuggarianMatcher, generalized_iou
+from models.matcher import HuggarianMatcher
 from utils.metrics import average_precision_open_vocab
 
 # Logger.
