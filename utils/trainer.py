@@ -13,7 +13,7 @@ from tqdm import tqdm
 from data.loader import PromptableDeTRDataLoader
 from utils.data import xywh_to_xyxy
 from utils.logger import Tensorboard
-from utils.metrics import iou_accuracy
+from utils.metrics import dist_accuracy
 
 
 # Classes.
@@ -90,11 +90,10 @@ class Trainer:
         self.__overfit_counter = 0
         self.__losses = []
         self.__l1_losses = []
-        self.__giou_losses = []
         self.__presence_losses = []
-        self.__giou_50_accuracies = []
-        self.__giou_75_accuracies = []
-        self.__giou_90_accuracies = []
+        self.__dist_25_accuracies = []
+        self.__dist_15_accuracies = []
+        self.__dist_05_accuracies = []
         self.__ap_50_accuracies = []
         self.__ap_75_accuracies = []
         self.__ap_90_accuracies = []
@@ -141,13 +140,12 @@ class Trainer:
         # Compute mean loss.
         mean_loss = sum(self.__losses) / len(self.__losses)
         mean_l1_loss = sum(self.__l1_losses) / len(self.__l1_losses)
-        mean_giou_loss = sum(self.__giou_losses) / len(self.__giou_losses)
         mean_presence_loss = sum(self.__presence_losses) / len(self.__presence_losses)
 
         # Compute mean accuracy.
-        mean_giou_50_acc = sum(self.__giou_50_accuracies) / len(self.__giou_50_accuracies)
-        mean_giou_75_acc = sum(self.__giou_75_accuracies) / len(self.__giou_75_accuracies)
-        mean_giou_90_acc = sum(self.__giou_90_accuracies) / len(self.__giou_90_accuracies)
+        mean_dist_25_acc = sum(self.__dist_25_accuracies) / len(self.__dist_25_accuracies)
+        mean_dist_15_acc = sum(self.__dist_15_accuracies) / len(self.__dist_15_accuracies)
+        mean_dist_05_acc = sum(self.__dist_05_accuracies) / len(self.__dist_05_accuracies)
         mean_ap_50_acc = sum(self.__ap_50_accuracies) / len(self.__ap_50_accuracies)
         mean_ap_75_acc = sum(self.__ap_75_accuracies) / len(self.__ap_75_accuracies)
         mean_ap_90_acc = sum(self.__ap_90_accuracies) / len(self.__ap_90_accuracies)
@@ -155,11 +153,10 @@ class Trainer:
         if reset:
             self.__losses.clear()
             self.__l1_losses.clear()
-            self.__giou_losses.clear()
             self.__presence_losses.clear()
-            self.__giou_50_accuracies.clear()
-            self.__giou_75_accuracies.clear()
-            self.__giou_90_accuracies.clear()
+            self.__dist_25_accuracies.clear()
+            self.__dist_15_accuracies.clear()
+            self.__dist_05_accuracies.clear()
             self.__ap_50_accuracies.clear()
             self.__ap_75_accuracies.clear()
             self.__ap_90_accuracies.clear()
@@ -167,11 +164,10 @@ class Trainer:
         metrics = {
             "mean_loss": mean_loss,
             "mean_l1_loss": mean_l1_loss,
-            "mean_giou_loss": mean_giou_loss,
             "mean_presence_loss": mean_presence_loss,
-            "mean_giou_50_acc": mean_giou_50_acc,
-            "mean_giou_75_acc": mean_giou_75_acc,
-            "mean_giou_90_acc": mean_giou_90_acc,
+            "mean_dist_25_acc": mean_dist_25_acc,
+            "mean_dist_15_acc": mean_dist_15_acc,
+            "mean_dist_05_acc": mean_dist_05_acc,
             "mean_ap_50_acc": mean_ap_50_acc,
             "mean_ap_75_acc": mean_ap_75_acc,
             "mean_ap_90_acc": mean_ap_90_acc
@@ -224,7 +220,6 @@ class Trainer:
             captions (torch.Tensor): The true captions.
             y (torch.Tensor): The true captions.
             logits (torch.Tensor): The logits from the model.
-            conf_threshold (float): The confidence threshold to filter the objects. (Default: 0.5)
 
         Returns:
             Tuple[np.ndarray, str, np.ndarray, np.ndarray]: The image, input caption, true objects, and predicted objects.
@@ -240,16 +235,12 @@ class Trainer:
         caption = caption[0]
 
         # Filter the objects.
-        logits_max = logits_objs[:, 4:].argmax(dim=1)
-        logits_objs = logits_objs[logits_max == 1]
-        logits_objs[:, 4:] = logits_objs[:, 4:].softmax(dim=1)
-
-        logits_objs = logits_objs[logits_objs[:, 5] >= 0.5]
-        logits_objs = logits_objs[:, :4]
-
+        logits_objs[:, 2:] = logits_objs[:, 2:].softmax(dim=1)
+        logits_objs = logits_objs[logits_objs[:, 3] >= 0.5]
+        logits_objs = logits_objs[:, :2]
         logits_objs = logits_objs.detach().cpu().numpy()
 
-        y_objs = y_objs[y_objs[:, 4] == 1][:, :4]
+        y_objs = y_objs[y_objs[:, 2] == 1][:, :2]
 
         return image, caption, y_objs, logits_objs
 
@@ -282,33 +273,11 @@ class Trainer:
             dir_path=self.exp_dir,
             step=self.__current_iter
         )
-    
 
-    def __fix_bbox(self, sample):
+
+    def __filter_samples_by_dist(self, sample, threshold):
         """
-        It fixes the bounding boxes in the sample.
-
-        Args:
-            sample (Tuple[np.ndarray, str, np.ndarray, np.ndarray]): The sample containing the image, caption, true objects, and predicted objects.
-
-        Returns:
-            Tuple[np.ndarray, str, np.ndarray, np.ndarray]: The fixed sample.
-        """
-        img, caption, y_objs, logits_obj = sample
-
-        # Get the image dimensions.
-        height, width = img.shape[:2]
-
-        # Convert the bounding boxes from xywh to xyxy format.
-        y_objs = xywh_to_xyxy(boxes=y_objs, height=height, width=width)
-        logits_obj = xywh_to_xyxy(boxes=logits_obj, height=height, width=width)
-
-        return img, caption, y_objs, logits_obj
-
-
-    def __filter_samples_by_giou(self, sample, threshold):
-        """
-        It filters the samples by the GIoU threshold.
+        It filters the samples by the L1 distance threshold.
 
         Args:
             sample (Tuple[np.ndarray, str, np.ndarray, np.ndarray]): The sample containing the image, caption, true objects, and predicted objects.
@@ -320,8 +289,8 @@ class Trainer:
         img, cap, y, logits = sample
         new_logits = []
         for pred in logits:
-            iou = iou_accuracy(labels=y, logits=pred[None, :], threshold=threshold)
-            if iou >= threshold:
+            dist = dist_accuracy(labels=y, logits=pred[None, :], threshold=threshold)
+            if threshold >= dist:
                 new_logits.append(pred)
         new_logits = np.asarray(new_logits)
         sample = (img, cap, y, new_logits)
@@ -346,7 +315,6 @@ class Trainer:
                 metrics = self.model.compute_loss_and_accuracy(logits=logits, labels=y)
                 loss = metrics["loss"]
                 final_l1_loss = metrics["l1_loss"]
-                final_giou_loss = metrics["giou_loss"]
                 final_presence_loss = metrics["presence_loss"]
                 ap_50 = metrics["ap_50"]
                 ap_75 = metrics["ap_75"]
@@ -363,19 +331,18 @@ class Trainer:
 
                 # Store accuracy.
                 samples = [self.__get_sample(images=images[idx_batch], captions=captions[idx_batch], y=y[idx_batch], logits=logits[idx_batch]) for idx_batch in range(images.size(0))]
-                samples = [self.__fix_bbox(sample=sample) for sample in samples]
 
-                total_50_acc = [iou_accuracy(labels=y_objs, logits=logits_obj, threshold=0.5) for (_, _, y_objs, logits_obj) in samples]
-                total_75_acc = [iou_accuracy(labels=y_objs, logits=logits_obj, threshold=0.75) for (_, _, y_objs, logits_obj) in samples]
-                total_90_acc = [iou_accuracy(labels=y_objs, logits=logits_obj, threshold=0.9) for (_, _, y_objs, logits_obj) in samples]
+                total_25_acc = [dist_accuracy(labels=y_objs, logits=logits_obj, threshold=0.25) for (_, _, y_objs, logits_obj) in samples]
+                total_15_acc = [dist_accuracy(labels=y_objs, logits=logits_obj, threshold=0.15) for (_, _, y_objs, logits_obj) in samples]
+                total_05_acc = [dist_accuracy(labels=y_objs, logits=logits_obj, threshold=0.05) for (_, _, y_objs, logits_obj) in samples]
 
-                total_50_acc = sum(total_50_acc) / len(total_50_acc) if total_50_acc else 0.0
-                total_75_acc = sum(total_75_acc) / len(total_75_acc) if total_75_acc else 0.0
-                total_90_acc = sum(total_90_acc) / len(total_90_acc) if total_90_acc else 0.0
+                total_25_acc = sum(total_25_acc) / len(total_25_acc) if total_25_acc else 0.0
+                total_15_acc = sum(total_15_acc) / len(total_15_acc) if total_15_acc else 0.0
+                total_05_acc = sum(total_05_acc) / len(total_05_acc) if total_05_acc else 0.0
 
-                self.__giou_50_accuracies.append(total_50_acc)
-                self.__giou_75_accuracies.append(total_75_acc)
-                self.__giou_90_accuracies.append(total_90_acc)
+                self.__dist_25_accuracies.append(total_25_acc)
+                self.__dist_15_accuracies.append(total_15_acc)
+                self.__dist_05_accuracies.append(total_05_acc)
                 self.__ap_50_accuracies.append(ap_50.cpu().detach().numpy().item())
                 self.__ap_75_accuracies.append(ap_75.cpu().detach().numpy().item())
                 self.__ap_90_accuracies.append(ap_90.cpu().detach().numpy().item())
@@ -384,7 +351,6 @@ class Trainer:
                 # Store the losses.
                 self.__losses.append(loss.cpu().detach().numpy().item())
                 self.__l1_losses.append(final_l1_loss.cpu().detach().numpy().item())
-                self.__giou_losses.append(final_giou_loss.cpu().detach().numpy().item())
                 self.__presence_losses.append(final_presence_loss.cpu().detach().numpy().item())
 
                 # Check if it is time to log the loss.
@@ -393,11 +359,10 @@ class Trainer:
                     metrics = self.__compute_current_training_metrics(reset=False)
                     current_loss = metrics["mean_loss"]
                     current_l1_loss = metrics["mean_l1_loss"]
-                    current_giou_loss = metrics["mean_giou_loss"]
                     current_presence_loss = metrics["mean_presence_loss"]
-                    current_giou_50_acc = metrics["mean_giou_50_acc"]
-                    current_giou_75_acc = metrics["mean_giou_75_acc"]
-                    current_giou_90_acc = metrics["mean_giou_90_acc"]
+                    current_dist_25_acc = metrics["mean_dist_25_acc"]
+                    current_dist_15_acc = metrics["mean_dist_15_acc"]
+                    current_dist_05_acc = metrics["mean_dist_05_acc"]
                     current_ap_50_acc = metrics["mean_ap_50_acc"]
                     current_ap_75_acc = metrics["mean_ap_75_acc"]
                     current_ap_90_acc = metrics["mean_ap_90_acc"]
@@ -406,21 +371,20 @@ class Trainer:
                     self.__tensorboard.add_train_losses(
                         loss=current_loss, 
                         l1_loss=current_l1_loss, 
-                        giou_loss=current_giou_loss, 
                         presence_loss=current_presence_loss, 
                         step=self.__current_iter
                     )
 
                     # Log the training accuracy.
-                    self.__tensorboard.add_train_giou_accuracy(acc=current_giou_50_acc, step=self.__current_iter, th=0.5)
-                    self.__tensorboard.add_train_giou_accuracy(acc=current_giou_75_acc, step=self.__current_iter, th=0.75)
-                    self.__tensorboard.add_train_giou_accuracy(acc=current_giou_90_acc, step=self.__current_iter, th=0.9)
-                    self.__tensorboard.add_train_ap_accuracy(acc=current_ap_50_acc, step=self.__current_iter, th=0.5)
+                    self.__tensorboard.add_train_l1_dist_accuracy(acc=current_dist_25_acc, step=self.__current_iter, th=0.25)
+                    self.__tensorboard.add_train_l1_dist_accuracy(acc=current_dist_15_acc, step=self.__current_iter, th=0.15)
+                    self.__tensorboard.add_train_l1_dist_accuracy(acc=current_dist_05_acc, step=self.__current_iter, th=0.05)
+                    self.__tensorboard.add_train_ap_accuracy(acc=current_ap_50_acc, step=self.__current_iter, th=0.50)
                     self.__tensorboard.add_train_ap_accuracy(acc=current_ap_75_acc, step=self.__current_iter, th=0.75)
-                    self.__tensorboard.add_train_ap_accuracy(acc=current_ap_90_acc, step=self.__current_iter, th=0.9)
+                    self.__tensorboard.add_train_ap_accuracy(acc=current_ap_90_acc, step=self.__current_iter, th=0.90)
 
-                    print("Loss: %.4f - L1 Loss: %.4f - GIoU Loss: %.4f - Presence Loss: %.4f" % (current_loss, current_l1_loss, current_giou_loss, current_presence_loss))
-                    print("GIoU@0.5: %.4f - GIoU@0.75: %.4f - GIoU@0.90: %.4f | AP@0.5: %.4f - AP@0.75: %.4f - AP@0.90: %.4f" % (current_giou_50_acc, current_giou_75_acc, current_giou_90_acc, current_ap_50_acc, current_ap_75_acc, current_ap_90_acc))
+                    print("Loss: %.4f - L1 Loss: %.4f - Presence Loss: %.4f" % (current_loss, current_l1_loss, current_presence_loss))
+                    print("L1@0.25: %.4f - L1@0.15: %.4f - L1@0.05: %.4f | AP@0.50: %.4f - AP@0.75: %.4f - AP@0.90: %.4f" % (current_dist_25_acc, current_dist_15_acc, current_dist_05_acc, current_ap_50_acc, current_ap_75_acc, current_ap_90_acc))
                     print("-" * 100)
 
                 # Check if it is time to validate the model.
@@ -431,11 +395,10 @@ class Trainer:
                     # Loop over the validation data loader.
                     total_loss = 0.0
                     total_l1_loss = 0.0
-                    total_giou_loss = 0.0
                     total_presence_loss = 0.0
-                    total_giou_50_acc = 0.0
-                    total_giou_75_acc = 0.0
-                    total_giou_90_acc = 0.0
+                    total_dist_25_acc = 0.0
+                    total_dist_15_acc = 0.0
+                    total_dist_05_acc = 0.0
                     total_ap_50_acc = 0.0
                     total_ap_75_acc = 0.0
                     total_ap_90_acc = 0.0
@@ -450,19 +413,18 @@ class Trainer:
                         metrics = self.model.compute_loss_and_accuracy(logits=logits, labels=y)
                         total_loss += metrics["loss"]
                         total_l1_loss += metrics["l1_loss"]
-                        total_giou_loss += metrics["giou_loss"]
                         total_presence_loss += metrics["presence_loss"]
                         total_ap_50_acc += metrics["ap_50"]
                         total_ap_75_acc += metrics["ap_75"]
                         total_ap_90_acc += metrics["ap_90"]
 
                         small_samples = [self.__get_sample(images=images[idx_batch], captions=captions[idx_batch], y=y[idx_batch], logits=logits[idx_batch]) for idx_batch in range(images.size(0))]
-                        giou_50_acc = [iou_accuracy(labels=y_objs, logits=logits_obj, threshold=0.5) for (_, _, y_objs, logits_obj)  in samples]
-                        giou_75_acc = [iou_accuracy(labels=y_objs, logits=logits_obj, threshold=0.75) for (_, _, y_objs, logits_obj) in samples]
-                        giou_90_acc = [iou_accuracy(labels=y_objs, logits=logits_obj, threshold=0.9) for (_, _, y_objs, logits_obj) in samples]
-                        total_giou_50_acc += sum(giou_50_acc) / len(giou_50_acc) if giou_50_acc else 0
-                        total_giou_75_acc += sum(giou_75_acc) / len(giou_75_acc) if giou_75_acc else 0
-                        total_giou_90_acc += sum(giou_90_acc) / len(giou_90_acc) if giou_90_acc else 0
+                        dist_25_acc = [dist_accuracy(labels=y_objs, logits=logits_obj, threshold=0.25) for (_, _, y_objs, logits_obj)  in samples]
+                        dist_15_acc = [dist_accuracy(labels=y_objs, logits=logits_obj, threshold=0.15) for (_, _, y_objs, logits_obj) in samples]
+                        dist_05_acc = [dist_accuracy(labels=y_objs, logits=logits_obj, threshold=0.05) for (_, _, y_objs, logits_obj) in samples]
+                        total_dist_25_acc += sum(dist_25_acc) / len(dist_25_acc) if dist_25_acc else 0
+                        total_dist_15_acc += sum(dist_15_acc) / len(dist_15_acc) if dist_15_acc else 0
+                        total_dist_05_acc += sum(dist_05_acc) / len(dist_05_acc) if dist_05_acc else 0
 
                         # Get a random sample.
                         for sample in small_samples:
@@ -476,21 +438,17 @@ class Trainer:
                         del small_samples
 
                     # Compute final accuracy.
-                    samples = [self.__fix_bbox(sample=sample) for sample in samples]
-
-                    samples_giou_50_acc = [self.__filter_samples_by_giou(sample=sample, threshold=0.5) for sample in samples]
-                    samples_giou_75_acc = [self.__filter_samples_by_giou(sample=sample, threshold=0.75) for sample in samples]
-                    samples_giou_90_acc = [self.__filter_samples_by_giou(sample=sample, threshold=0.9) for sample in samples]
-
+                    samples_dist_25_acc = [self.__filter_samples_by_dist(sample=sample, threshold=0.25) for sample in samples]
+                    samples_dist_15_acc = [self.__filter_samples_by_dist(sample=sample, threshold=0.15) for sample in samples]
+                    samples_dist_05_acc = [self.__filter_samples_by_dist(sample=sample, threshold=0.05) for sample in samples]
                     del samples
 
                     total_loss /= len(self.valid_dataset)
                     total_l1_loss /= len(self.valid_dataset)
-                    total_giou_loss /= len(self.valid_dataset)
                     total_presence_loss /= len(self.valid_dataset)
-                    total_giou_50_acc /= len(self.valid_dataset)
-                    total_giou_75_acc /= len(self.valid_dataset)
-                    total_giou_90_acc /= len(self.valid_dataset)
+                    total_dist_25_acc /= len(self.valid_dataset)
+                    total_dist_15_acc /= len(self.valid_dataset)
+                    total_dist_05_acc /= len(self.valid_dataset)
                     total_ap_50_acc /= len(self.valid_dataset)
                     total_ap_75_acc /= len(self.valid_dataset)
                     total_ap_90_acc /= len(self.valid_dataset)
@@ -503,28 +461,27 @@ class Trainer:
                     self.__tensorboard.add_valid_losses(
                         loss=total_loss, 
                         l1_loss=total_l1_loss, 
-                        giou_loss=total_giou_loss, 
                         presence_loss=total_presence_loss, 
                         step=self.__current_iter
                     )
 
                     # Log the valid accuracy.
-                    self.__tensorboard.add_valid_giou_accuracy(acc=total_giou_50_acc, step=self.__current_iter, th=0.5)
-                    self.__tensorboard.add_valid_giou_accuracy(acc=total_giou_75_acc, step=self.__current_iter, th=0.75)
-                    self.__tensorboard.add_valid_giou_accuracy(acc=total_giou_90_acc, step=self.__current_iter, th=0.90)
-                    self.__tensorboard.add_valid_ap_accuracy(acc=total_ap_50_acc, step=self.__current_iter, th=0.5)
+                    self.__tensorboard.add_valid_dist_accuracy(acc=total_dist_25_acc, step=self.__current_iter, th=0.25)
+                    self.__tensorboard.add_valid_dist_accuracy(acc=total_dist_15_acc, step=self.__current_iter, th=0.15)
+                    self.__tensorboard.add_valid_dist_accuracy(acc=total_dist_05_acc, step=self.__current_iter, th=0.05)
+                    self.__tensorboard.add_valid_ap_accuracy(acc=total_ap_50_acc, step=self.__current_iter, th=0.50)
                     self.__tensorboard.add_valid_ap_accuracy(acc=total_ap_75_acc, step=self.__current_iter, th=0.75)
                     self.__tensorboard.add_valid_ap_accuracy(acc=total_ap_90_acc, step=self.__current_iter, th=0.90)
 
                     # Display the samples on Tensorboard.
-                    self.__tensorboard.add_image(samples=samples_giou_50_acc, step=self.__current_iter, giou_th=0.5)
-                    self.__tensorboard.add_image(samples=samples_giou_75_acc, step=self.__current_iter, giou_th=0.75)
-                    self.__tensorboard.add_image(samples=samples_giou_90_acc, step=self.__current_iter, giou_th=0.90)
+                    self.__tensorboard.add_image(samples=samples_dist_25_acc, step=self.__current_iter, giou_th=0.25)
+                    self.__tensorboard.add_image(samples=samples_dist_15_acc, step=self.__current_iter, giou_th=0.15)
+                    self.__tensorboard.add_image(samples=samples_dist_05_acc, step=self.__current_iter, giou_th=0.05)
 
                     print("Validation time: %.2f minutes" % end_time)
                     print("Overfit counter: %d" % self.__overfit_counter)
-                    print("Validation loss: %.4f - L1 Loss: %.4f - GIoU Loss: %.4f - Presence Loss: %.4f" % (total_loss, total_l1_loss, total_giou_loss, total_presence_loss))
-                    print("GIoU@0.5: %.4f - GIoU@0.75: %.4f - GIoU@0.90: %.4f | AP@0.5: %.4f - AP@0.75: %.4f - AP@0.90: %.4f" % (total_giou_50_acc, total_giou_75_acc, total_giou_90_acc, total_ap_50_acc, total_ap_75_acc, total_ap_90_acc))
+                    print("Validation loss: %.4f - L1 Loss: %.4f - Presence Loss: %.4f" % (total_loss, total_l1_loss, total_presence_loss))
+                    print("L1@0.5: %.4f - L1@0.75: %.4f - L1@0.90: %.4f | AP@0.5: %.4f - AP@0.75: %.4f - AP@0.90: %.4f" % (total_dist_25_acc, total_dist_15_acc, total_dist_05_acc, total_ap_50_acc, total_ap_75_acc, total_ap_90_acc))
                     print("=" * 100)
 
                 # Update the iteration.
