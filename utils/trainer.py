@@ -11,7 +11,6 @@ import torch.optim as optim
 from tqdm import tqdm
 
 from data.loader import PromptableDeTRDataLoader
-from utils.data import xywh_to_xyxy
 from utils.logger import Tensorboard
 from utils.metrics import dist_accuracy
 
