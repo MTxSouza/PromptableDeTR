@@ -2,10 +2,8 @@
 This module contains all data transformations and augmentations to be used in 
 the training process.
 """
-import random
 from abc import ABC, abstractmethod
 
-import nltk
 import numpy as np
 import torch
 import torch.nn.functional as F
@@ -152,9 +150,9 @@ class PrepareCaption(BaseTransform):
         return sample
 
 
-class PrepareBBox(BaseTransform):
+class PreparePoints(BaseTransform):
     """
-    This class prepares the bounding box for training.
+    This class prepares the points for training.
     """
 
 
@@ -173,17 +171,15 @@ class PrepareBBox(BaseTransform):
     # Methods.
     def transform(self, sample):
 
-        # Transform the bounding box.
-        bbox = sample.bbox
-        bbox = torch.tensor(data=bbox, dtype=torch.float32)
+        # Transform the points.
+        points = sample.points
+        points = torch.tensor(data=points, dtype=torch.float32)
 
-        # Normalize the bounding box.
+        # Normalize the points.
         _, h, w = sample.image.shape
-        bbox[:, 0] /= w
-        bbox[:, 1] /= h
-        bbox[:, 2] /= w
-        bbox[:, 3] /= h
-        sample.bbox_tensor = bbox
+        points[:, 0] /= w
+        points[:, 1] /= h
+        sample.points_tensor = points
 
         return sample
 
@@ -204,7 +200,7 @@ class PrepareSample(BaseTransform):
         # Define the transformations.
         self.image_transform = PrepareImage()
         self.caption_transform = PrepareCaption(vocab_file=vocab_file)
-        self.bbox_transform = PrepareBBox()
+        self.points_transform = PreparePoints()
 
 
     def __call__(self, samples):
@@ -227,8 +223,8 @@ class PrepareSample(BaseTransform):
         # Prepare the caption.
         sample = self.caption_transform.transform(sample=sample)
 
-        # Prepare the bounding box.
-        sample = self.bbox_transform.transform(sample=sample)
+        # Prepare the points.
+        sample = self.points_transform.transform(sample=sample)
 
         return sample
 

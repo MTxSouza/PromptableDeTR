@@ -16,8 +16,8 @@ class Sample:
     """
     image_path: str
     caption: str
-    bbox: list
+    points: list
 
     image: Optional[torch.FloatTensor | np.ndarray] = None
     caption_tokens: Optional[torch.IntTensor | np.ndarray] = None
-    bbox_tensor: Optional[torch.FloatTensor | np.ndarray] = None
+    points_tensor: Optional[torch.FloatTensor | np.ndarray] = None
