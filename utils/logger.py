@@ -175,13 +175,16 @@ class Tensorboard:
         for (img, caption, label, prediction) in samples:
 
             # Draw the rectangles on the image.
+            height, width = img.shape[:2]
             pil_img = Image.fromarray((img * 255).astype("uint8"))
             draw = ImageDraw.Draw(im=pil_img)
 
             for point in label:
+                point = (point[0] * width, point[1] * height)
                 draw.point(xy=tuple(point), fill="lime")
             for point in prediction:
                 try:
+                    point = (point[0] * width, point[1] * height)
                     draw.point(xy=tuple(point), fill="red")
                 except ValueError:
                     # If the point is invalid, skip it.
