@@ -22,35 +22,33 @@ class HuggarianMatcher(nn.Module):
 
 
     # Special methods.
-    def __init__(self, presence_loss_weight = 1.0, l1_loss_weight = 1.0, giou_loss_weight = 1.0):
+    def __init__(self, presence_loss_weight = 1.0, l1_loss_weight = 1.0):
         """
         Class constructor for the HungarianMatcher class.
 
         Args:
             presence_loss_weight (float): The weight for the presence loss. (Default: 1.0)
             l1_loss_weight (float): The weight for the L1 loss. (Default: 1.0)
-            giou_loss_weight (float): The weight for the GIoU loss. (Default: 1.0)
         """
         super().__init__()
 
         # Attribute.
         self.presence_loss_weight = presence_loss_weight
         self.l1_loss_weight = l1_loss_weight
-        self.giou_loss_weight = giou_loss_weight
 
 
     # Methods.
     @torch.no_grad()
-    def forward(self, predict_scores, predict_boxes, scores, boxes):
+    def forward(self, predict_scores, predict_points, scores, points):
         """
-        Find the best matching between the predicted boxes and the ground truth 
-        boxes using the Hungarian algorithm.
+        Find the best matching between the predicted points and the ground truth 
+        points using the Hungarian algorithm.
 
         Args:
             predict_scores (torch.Tensor): The predicted scores from the model with shape (B, N, 2).
-            predict_boxes (torch.Tensor): The predicted boxes from the model with shape (B, N, 4).
+            predict_points (torch.Tensor): The predicted points from the model with shape (B, N, 2).
             scores (torch.Tensor): The ground truth scores with shape (B, M).
-            boxes (torch.Tensor): The ground truth boxes with shape (B, M, 4).
+            points (torch.Tensor): The ground truth points with shape (B, M, 2).
 
         Returns:
             Tuple[torch.Tensor, torch.Tensor, torch.Tensor]: The batch, source, and target indices.
@@ -61,27 +59,24 @@ class HuggarianMatcher(nn.Module):
 
         for batch in range(B):
 
-            # Get the predicted scores and boxes for the current batch.
+            # Get the predicted scores and points for the current batch.
             batch_predict_scores = predict_scores[batch].softmax(dim=1)
-            batch_predict_boxes = predict_boxes[batch]
+            batch_predict_points = predict_points[batch]
             batch_scores = scores[batch]
-            batch_boxes = boxes[batch]
+            batch_points = points[batch]
 
             obj_idx = batch_scores == 1
             batch_scores = batch_scores[obj_idx]
-            batch_boxes = batch_boxes[obj_idx]
+            batch_points = batch_points[obj_idx]
 
             # Compute presence loss.
             presence_loss = -batch_predict_scores[:, batch_scores]
 
             # Compute L1 loss.
-            l1_loss = torch.cdist(batch_predict_boxes, batch_boxes, p=1)
-
-            # Compute GIoU loss.
-            giou_loss = 1 - generalized_iou(batch_predict_boxes, batch_boxes)
+            l1_loss = torch.cdist(batch_predict_points, batch_points, p=1)
 
             # Compute matrix loss.
-            mtx_loss = self.presence_loss_weight * presence_loss + self.l1_loss_weight * l1_loss + self.giou_loss_weight * giou_loss
+            mtx_loss = self.presence_loss_weight * presence_loss + self.l1_loss_weight * l1_loss
             row_idx, col_idx = linear_sum_assignment(mtx_loss.cpu())
             indices.append((row_idx, col_idx))
 
