@@ -44,7 +44,7 @@ def iou_accuracy(labels, logits, threshold=0.5):
     return iou_score.item()
 
 
-def average_precision_open_vocab(labels, logits, iou_threshold=0.5, fix_boxes=False, height=None, width=None):
+def average_precision_open_vocab(labels, logits, dist_threshold=0.25):
     """
     Computes the average precision for open vocabulary object detection. The metric
     is based on the paper https://arxiv.org/pdf/2102.01066.
@@ -52,10 +52,7 @@ def average_precision_open_vocab(labels, logits, iou_threshold=0.5, fix_boxes=Fa
     Args:
         labels (numpy.ndarray): The true labels with shape (N, 4).
         logits (numpy.ndarray): The logits from the model with shape (N, 4).
-        iou_threshold (float): The IoU threshold for positive samples. (Default: 0.5)
-        fix_boxes (bool): Whether to fix the boxes before computing the average precision. (Default: False)
-        height (int): The height of the image. Used only if fix_boxes is True. (Default: None)
-        width (int): The width of the image. Used only if fix_boxes is True. (Default: None)
+        dist_threshold (float): Distance threshold for positive samples. (Default: 0.25)
 
     Returns:
         float: The average precision score.
@@ -72,35 +69,27 @@ def average_precision_open_vocab(labels, logits, iou_threshold=0.5, fix_boxes=Fa
     if logits.ndim == 2:
         logits = logits[None, :, :]
 
-    labels = labels.reshape((-1, 4))
-    logits = logits.reshape((-1, 4))
-
-    # Fix the boxes if needed.
-    if fix_boxes:
-
-        assert height is not None and width is not None, "Height and width must be provided if fix_boxes is True."
-
-        # Convert the bounding boxes from xywh to xyxy format.
-        labels = xywh_to_xyxy(boxes=labels, height=height, width=width)
-        logits = xywh_to_xyxy(boxes=logits, height=height, width=width)
+    labels = labels.reshape((-1, 2))
+    logits = logits.reshape((-1, 2))
 
     # Compute the IoU between the predicted and true boxes.
-    iou_matrix = box_iou(
+    dist_matrix = torch.cdist(
         torch.from_numpy(logits),
-        torch.from_numpy(labels)
+        torch.from_numpy(labels),
+        p=2
     )
 
     # Compute precision and recall based on the IoU threashold.
-    n_pred, n_true = iou_matrix.shape
+    n_pred, n_true = dist_matrix.shape
     matched = set()
     true_positive = torch.zeros(n_pred)
     false_positive = torch.zeros(n_pred)
 
     for idx_iou in range(n_pred):
-        iou_vec = iou_matrix[idx_iou]
-        max_iou, idx = iou_vec.max(0)
+        iou_vec = dist_matrix[idx_iou]
+        min_dist, idx = iou_vec.min(0)
         idx = idx.item()
-        if max_iou >= iou_threshold and idx not in matched:
+        if dist_threshold >= min_dist and idx not in matched:
             matched.add(idx)
             true_positive[idx_iou] = 1
         else:
