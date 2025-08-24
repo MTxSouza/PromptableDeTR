@@ -194,9 +194,9 @@ class Trainer:
         mask = mask.to(device=self.device)
 
         def run_forward(model, images, captions, extra_data):
-            bbox = extra_data["bbox"].to(device=self.device)
+            points = extra_data["points"].to(device=self.device)
             logits = model(images, captions, mask) # Input: Image, caption and the mask to occlude padded tokens.
-            return logits, bbox # Output: Pred boxes and presences and the true boxes and presences.
+            return logits, points # Output: Pred points and presences and the true points and presences.
 
         # Run the forward pass.
         if not is_training:
