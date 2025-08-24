@@ -203,15 +203,12 @@ class PromptableDeTRTrainer(PromptableDeTR):
         logger.debug(msg="- Sorted true points shape: %s." % (sorted_true_points.shape,))
 
         # Compute average precision.
-        ap_25 = average_precision_open_vocab(labels=sorted_true_points, logits=sorted_pred_points, dist_threshold=0.25) # Hardcoded for now.
-        ap_15 = average_precision_open_vocab(labels=sorted_true_points, logits=sorted_pred_points, dist_threshold=0.15)
-        ap_05 = average_precision_open_vocab(labels=sorted_true_points, logits=sorted_pred_points, dist_threshold=0.05)
-        ap_25 = torch.tensor(ap_25)
-        ap_15 = torch.tensor(ap_15)
-        ap_05 = torch.tensor(ap_05)
-        logger.debug(msg="- Average precision @0.25: %s." % ap_25)
-        logger.debug(msg="- Average precision @0.15: %s." % ap_15)
-        logger.debug(msg="- Average precision @0.05: %s." % ap_05)
+        ap_50 = torch.tensor(average_precision_open_vocab(labels=sorted_true_presence, logits=sorted_pred_presence, threshold=0.50))
+        ap_75 = torch.tensor(average_precision_open_vocab(labels=sorted_true_presence, logits=sorted_pred_presence, threshold=0.75))
+        ap_90 = torch.tensor(average_precision_open_vocab(labels=sorted_true_presence, logits=sorted_pred_presence, threshold=0.90))
+        logger.debug(msg="- Average precision @0.50: %s." % ap_50)
+        logger.debug(msg="- Average precision @0.75: %s." % ap_75)
+        logger.debug(msg="- Average precision @0.90: %s." % ap_90)
 
         # Compute number of points.
         obj_idx = sorted_true_presence == 1
@@ -261,9 +258,9 @@ class PromptableDeTRTrainer(PromptableDeTR):
             "loss": loss,
             "l1_loss": final_l1_loss,
             "presence_loss": final_presence_loss,
-            "ap_25": ap_25,
-            "ap_15": ap_15,
-            "ap_05": ap_05
+            "ap_50": ap_50,
+            "ap_75": ap_75,
+            "ap_90": ap_90
         }
 
         return metrics
