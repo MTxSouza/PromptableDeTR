@@ -30,7 +30,6 @@ OVERFIT_PATIENCE=${OVERFIT_PATIENCE:-"5"}
 
 EXP_DIR=${EXP_DIR:-"./promptable_detr_exp"}
 
-GIOU_WEIGHT=${GIOU_WEIGHT:-"1.0"}
 PRESENCE_WEIGHT=${PRESENCE_WEIGHT:-"1.0"}
 L1_WEIGHT=${L1_WEIGHT:-"1.0"}
 
@@ -57,7 +56,6 @@ python train.py \
         --overfit-threshold $OVERFIT_THRESHOLD \
         --overfit-patience $OVERFIT_PATIENCE \
         --exp-dir $EXP_DIR \
-        --giou-weight $GIOU_WEIGHT \
         --presence-weight $PRESENCE_WEIGHT \
         --l1-weight $L1_WEIGHT \
         --seed $SEED

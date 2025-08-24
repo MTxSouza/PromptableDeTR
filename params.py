@@ -218,12 +218,6 @@ def get_args():
         help="The path to the experiment directory."
     )
     training_parser.add_argument(
-        "--giou-weight",
-        type=float,
-        default=1.0,
-        help="The weight for the GIoU loss."
-    )
-    training_parser.add_argument(
         "--presence-weight",
         type=float,
         default=1.0,

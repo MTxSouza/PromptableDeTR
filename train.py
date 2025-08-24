@@ -90,8 +90,7 @@ def get_model(args, data_loader):
         emb_dropout_rate=args.emb_dropout_rate,
         num_joiner_layers=args.num_joiner_layers,
         presence_loss_weight=args.presence_weight,
-        l1_loss_weight=args.l1_weight,
-        giou_loss_weight=args.giou_weight
+        l1_loss_weight=args.l1_weight
     )
 
     return model
