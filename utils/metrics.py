@@ -42,15 +42,15 @@ def dist_accuracy(labels, logits, threshold=0.25):
     return dist_score.item()
 
 
-def average_precision_open_vocab(labels, logits, dist_threshold=0.25):
+def average_precision_open_vocab(labels, logits, threshold=0.5):
     """
     Computes the average precision for open vocabulary object detection. The metric
     is based on the paper https://arxiv.org/pdf/2102.01066.
 
     Args:
-        labels (numpy.ndarray): The true labels with shape (N, 4).
-        logits (numpy.ndarray): The logits from the model with shape (N, 4).
-        dist_threshold (float): Distance threshold for positive samples. (Default: 0.25)
+        labels (numpy.ndarray): The true labels with shape (N, 1).
+        logits (numpy.ndarray): The logits from the model with shape (N, 2).
+        threshold (float): Threshold for positive samples. (Default: 0.25)
 
     Returns:
         float: The average precision score.
@@ -67,34 +67,17 @@ def average_precision_open_vocab(labels, logits, dist_threshold=0.25):
     if logits.ndim == 2:
         logits = logits[None, :, :]
 
-    labels = labels.reshape((-1, 2))
+    labels = labels.reshape((-1, 1))
     logits = logits.reshape((-1, 2))
 
-    # Compute the IoU between the predicted and true boxes.
-    dist_matrix = torch.cdist(
-        torch.from_numpy(logits),
-        torch.from_numpy(labels),
-        p=2
-    )
+    # Filter out the invalid points.
+    logits = (logits[:, 1] >= threshold).astype(float)
 
-    # Compute precision and recall based on the IoU threashold.
-    n_pred, n_true = dist_matrix.shape
-    matched = set()
-    true_positive = torch.zeros(n_pred)
-    false_positive = torch.zeros(n_pred)
+    # Compute precision and recall.
+    n_true = (labels == 1).sum().item()
+    true_positive = torch.tensor((labels == 1) & (logits == 1), dtype=torch.float32).sum()
+    false_positive = torch.tensor((labels == 0) & (logits == 1), dtype=torch.float32).sum()
 
-    for idx_iou in range(n_pred):
-        iou_vec = dist_matrix[idx_iou]
-        min_dist, idx = iou_vec.min(0)
-        idx = idx.item()
-        if dist_threshold >= min_dist and idx not in matched:
-            matched.add(idx)
-            true_positive[idx_iou] = 1
-        else:
-            false_positive[idx_iou] = 1
-    
-    true_positive = torch.cumsum(true_positive, dim=0)
-    false_positive = torch.cumsum(false_positive, dim=0)
     recall = true_positive / n_true
     precision = true_positive / (true_positive + false_positive)
 
