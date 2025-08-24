@@ -65,7 +65,7 @@ class PromptableDeTR(BasePromptableDeTR):
             nn.Linear(in_features=proj_dim * 4, out_features=proj_dim * 2),
             nn.ReLU()
         )
-        self.bbox_predictor = nn.Linear(in_features=proj_dim * 2, out_features=4)
+        self.point_predictor = nn.Linear(in_features=proj_dim * 2, out_features=2)
         self.presence_predictor = nn.Linear(in_features=proj_dim * 2, out_features=2)
 
         # Initialize weights.
@@ -83,7 +83,7 @@ class PromptableDeTR(BasePromptableDeTR):
                 nn.init.zeros_(module.bias)
         
         self.detector.apply(init_weights)
-        self.bbox_predictor.apply(init_weights)
+        self.point_predictor.apply(init_weights)
         self.presence_predictor.apply(init_weights)
 
 
@@ -115,14 +115,14 @@ class PromptableDeTR(BasePromptableDeTR):
         logger.debug(msg="- Result of the `nn.Sequential` block: %s." % (out.shape,))
 
         logger.debug(msg="- Calling `nn.Linear` block to the tensor %s." % (out.shape,))
-        bbox = self.bbox_predictor(out)
-        bbox = F.sigmoid(input=bbox)
+        point = self.point_predictor(out)
+        point = F.sigmoid(input=point)
         presence = self.presence_predictor(out)
-        logger.debug(msg="- Result of the `nn.Linear` block: %s and %s." % (bbox.shape, presence.shape))
+        logger.debug(msg="- Result of the `nn.Linear` block: %s and %s." % (point.shape, presence.shape))
 
         # Concatenate the predictions.
         logger.debug(msg="- Concatenating the predictions.")
-        outputs = torch.cat(tensors=(bbox, presence), dim=-1)
+        outputs = torch.cat(tensors=(point, presence), dim=-1)
         logger.debug(msg="- Result of the concatenation: %s." % (outputs.shape,))
 
         return outputs
