@@ -93,7 +93,7 @@ class Tensorboard:
         self.writer.add_scalar(tag="train_presence_loss", scalar_value=presence_loss, global_step=step)
 
 
-    def add_train_giou_accuracy(self, acc, step, th):
+    def add_train_l1_dist_accuracy(self, acc, step, th):
         """
         Adds the training L1 distance accuracy to the Tensorboard writer.
 
@@ -134,7 +134,7 @@ class Tensorboard:
         self.writer.add_scalar(tag="valid_presence_loss", scalar_value=presence_loss, global_step=step)
 
 
-    def add_valid_giou_accuracy(self, acc, step, th):
+    def add_valid_l1_dist_accuracy(self, acc, step, th):
         """
         Adds the validation L1 distance accuracy to the Tensorboard writer.
 
