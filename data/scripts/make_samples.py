@@ -115,33 +115,26 @@ def make_sample(image_file, annot_file, captions):
 
     # Group boxes by class.
     mapper = {}
-    for cat_idx, cx, cy, width, height in tqdm.tqdm(iterable=annot, desc="Mapping captions..."):
+    for cat_idx, cx, cy, _, _ in tqdm.tqdm(iterable=annot, desc="Mapping captions..."):
         caption = captions[int(cat_idx)]
         mapper[caption] = mapper.get(caption, [])
 
-        # Convert to min and max.
-        cx = float(cx) * img_width
-        cy = float(cy) * img_height
-        width = float(width) * img_width
-        height = float(height) * img_height
-
-        xmin = int(cx - width / 2)
-        ymin = int(cy - height / 2)
-        xmax = int(cx + width / 2)
-        ymax = int(cy + height / 2)
+        # Get center coordinates.
+        cx = int(float(cx) * img_width)
+        cy = int(float(cy) * img_height)
 
         # Append to the list.
-        mapper[caption].append([xmin, ymin, xmax, ymax])
+        mapper[caption].append([cx, cy])
 
     # Create a samples object.
     samples = []
-    for caption, box_list in tqdm.tqdm(iterable=mapper.items(), desc="Creating samples..."):
+    for caption, point_list in tqdm.tqdm(iterable=mapper.items(), desc="Creating samples..."):
 
         # Create a sample object.
         sample = Sample(
             image_path=image_file,
             caption=caption,
-            bbox=box_list
+            points=point_list
         )
         samples.append(sample)
     
