@@ -78,8 +78,8 @@ def average_precision_open_vocab(labels, logits, threshold=0.5):
     true_positive = torch.tensor((labels == 1) & (logits == 1), dtype=torch.float32).sum()
     false_positive = torch.tensor((labels == 0) & (logits == 1), dtype=torch.float32).sum()
 
-    recall = true_positive / n_true
-    precision = true_positive / (true_positive + false_positive)
+    recall = (true_positive / n_true).unsqueeze(dim=0)
+    precision = (true_positive / (true_positive + false_positive)).unsqueeze(dim=0)
 
     recall = torch.cat(tensors=[torch.tensor([0.0]), recall, torch.tensor([1.0])])
     precision = torch.cat(tensors=[torch.tensor([1.0]), precision, torch.tensor([0.0])])
