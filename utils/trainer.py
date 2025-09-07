@@ -90,9 +90,9 @@ class Trainer:
         self.__losses = []
         self.__l1_losses = []
         self.__presence_losses = []
-        self.__dist_25_accuracies = []
-        self.__dist_15_accuracies = []
-        self.__dist_05_accuracies = []
+        self.__dist_50_accuracies = []
+        self.__dist_75_accuracies = []
+        self.__dist_90_accuracies = []
         self.__ap_50_accuracies = []
         self.__ap_75_accuracies = []
         self.__ap_90_accuracies = []
@@ -142,9 +142,9 @@ class Trainer:
         mean_presence_loss = sum(self.__presence_losses) / len(self.__presence_losses)
 
         # Compute mean accuracy.
-        mean_dist_25_acc = sum(self.__dist_25_accuracies) / len(self.__dist_25_accuracies)
-        mean_dist_15_acc = sum(self.__dist_15_accuracies) / len(self.__dist_15_accuracies)
-        mean_dist_05_acc = sum(self.__dist_05_accuracies) / len(self.__dist_05_accuracies)
+        mean_dist_50_acc = sum(self.__dist_50_accuracies) / len(self.__dist_50_accuracies)
+        mean_dist_75_acc = sum(self.__dist_75_accuracies) / len(self.__dist_75_accuracies)
+        mean_dist_90_acc = sum(self.__dist_90_accuracies) / len(self.__dist_90_accuracies)
         mean_ap_50_acc = sum(self.__ap_50_accuracies) / len(self.__ap_50_accuracies)
         mean_ap_75_acc = sum(self.__ap_75_accuracies) / len(self.__ap_75_accuracies)
         mean_ap_90_acc = sum(self.__ap_90_accuracies) / len(self.__ap_90_accuracies)
@@ -153,9 +153,9 @@ class Trainer:
             self.__losses.clear()
             self.__l1_losses.clear()
             self.__presence_losses.clear()
-            self.__dist_25_accuracies.clear()
-            self.__dist_15_accuracies.clear()
-            self.__dist_05_accuracies.clear()
+            self.__dist_50_accuracies.clear()
+            self.__dist_75_accuracies.clear()
+            self.__dist_90_accuracies.clear()
             self.__ap_50_accuracies.clear()
             self.__ap_75_accuracies.clear()
             self.__ap_90_accuracies.clear()
@@ -164,9 +164,9 @@ class Trainer:
             "mean_loss": mean_loss,
             "mean_l1_loss": mean_l1_loss,
             "mean_presence_loss": mean_presence_loss,
-            "mean_dist_25_acc": mean_dist_25_acc,
-            "mean_dist_15_acc": mean_dist_15_acc,
-            "mean_dist_05_acc": mean_dist_05_acc,
+            "mean_dist_50_acc": mean_dist_50_acc,
+            "mean_dist_75_acc": mean_dist_75_acc,
+            "mean_dist_90_acc": mean_dist_90_acc,
             "mean_ap_50_acc": mean_ap_50_acc,
             "mean_ap_75_acc": mean_ap_75_acc,
             "mean_ap_90_acc": mean_ap_90_acc
@@ -331,17 +331,17 @@ class Trainer:
                 # Store accuracy.
                 samples = [self.__get_sample(images=images[idx_batch], captions=captions[idx_batch], y=y[idx_batch], logits=logits[idx_batch]) for idx_batch in range(images.size(0))]
 
-                total_25_acc = [dist_accuracy(labels=y_objs, logits=logits_obj, threshold=0.25) for (_, _, y_objs, logits_obj) in samples]
-                total_15_acc = [dist_accuracy(labels=y_objs, logits=logits_obj, threshold=0.15) for (_, _, y_objs, logits_obj) in samples]
-                total_05_acc = [dist_accuracy(labels=y_objs, logits=logits_obj, threshold=0.05) for (_, _, y_objs, logits_obj) in samples]
+                total_25_acc = [dist_accuracy(labels=y_objs, logits=logits_obj, threshold=0.50) for (_, _, y_objs, logits_obj) in samples]
+                total_15_acc = [dist_accuracy(labels=y_objs, logits=logits_obj, threshold=0.75) for (_, _, y_objs, logits_obj) in samples]
+                total_05_acc = [dist_accuracy(labels=y_objs, logits=logits_obj, threshold=0.90) for (_, _, y_objs, logits_obj) in samples]
 
                 total_25_acc = sum(total_25_acc) / len(total_25_acc) if total_25_acc else 0.0
                 total_15_acc = sum(total_15_acc) / len(total_15_acc) if total_15_acc else 0.0
                 total_05_acc = sum(total_05_acc) / len(total_05_acc) if total_05_acc else 0.0
 
-                self.__dist_25_accuracies.append(total_25_acc)
-                self.__dist_15_accuracies.append(total_15_acc)
-                self.__dist_05_accuracies.append(total_05_acc)
+                self.__dist_50_accuracies.append(total_25_acc)
+                self.__dist_75_accuracies.append(total_15_acc)
+                self.__dist_90_accuracies.append(total_05_acc)
                 self.__ap_50_accuracies.append(ap_50.cpu().detach().numpy().item())
                 self.__ap_75_accuracies.append(ap_75.cpu().detach().numpy().item())
                 self.__ap_90_accuracies.append(ap_90.cpu().detach().numpy().item())
@@ -359,9 +359,9 @@ class Trainer:
                     current_loss = metrics["mean_loss"]
                     current_l1_loss = metrics["mean_l1_loss"]
                     current_presence_loss = metrics["mean_presence_loss"]
-                    current_dist_25_acc = metrics["mean_dist_25_acc"]
-                    current_dist_15_acc = metrics["mean_dist_15_acc"]
-                    current_dist_05_acc = metrics["mean_dist_05_acc"]
+                    current_dist_50_acc = metrics["mean_dist_50_acc"]
+                    current_dist_75_acc = metrics["mean_dist_75_acc"]
+                    current_dist_90_acc = metrics["mean_dist_90_acc"]
                     current_ap_50_acc = metrics["mean_ap_50_acc"]
                     current_ap_75_acc = metrics["mean_ap_75_acc"]
                     current_ap_90_acc = metrics["mean_ap_90_acc"]
@@ -375,15 +375,15 @@ class Trainer:
                     )
 
                     # Log the training accuracy.
-                    self.__tensorboard.add_train_l1_dist_accuracy(acc=current_dist_25_acc, step=self.__current_iter, th=0.25)
-                    self.__tensorboard.add_train_l1_dist_accuracy(acc=current_dist_15_acc, step=self.__current_iter, th=0.15)
-                    self.__tensorboard.add_train_l1_dist_accuracy(acc=current_dist_05_acc, step=self.__current_iter, th=0.05)
+                    self.__tensorboard.add_train_l1_dist_accuracy(acc=current_dist_50_acc, step=self.__current_iter, th=0.50)
+                    self.__tensorboard.add_train_l1_dist_accuracy(acc=current_dist_75_acc, step=self.__current_iter, th=0.75)
+                    self.__tensorboard.add_train_l1_dist_accuracy(acc=current_dist_90_acc, step=self.__current_iter, th=0.90)
                     self.__tensorboard.add_train_ap_accuracy(acc=current_ap_50_acc, step=self.__current_iter, th=0.50)
                     self.__tensorboard.add_train_ap_accuracy(acc=current_ap_75_acc, step=self.__current_iter, th=0.75)
                     self.__tensorboard.add_train_ap_accuracy(acc=current_ap_90_acc, step=self.__current_iter, th=0.90)
 
                     print("Loss: %.4f - L1 Loss: %.4f - Presence Loss: %.4f" % (current_loss, current_l1_loss, current_presence_loss))
-                    print("L1@0.25: %.4f - L1@0.15: %.4f - L1@0.05: %.4f | AP@0.50: %.4f - AP@0.75: %.4f - AP@0.90: %.4f" % (current_dist_25_acc, current_dist_15_acc, current_dist_05_acc, current_ap_50_acc, current_ap_75_acc, current_ap_90_acc))
+                    print("L1@0.50: %.4f - L1@0.75: %.4f - L1@0.90: %.4f | AP@0.50: %.4f - AP@0.75: %.4f - AP@0.90: %.4f" % (current_dist_50_acc, current_dist_75_acc, current_dist_90_acc, current_ap_50_acc, current_ap_75_acc, current_ap_90_acc))
                     print("-" * 100)
 
                 # Check if it is time to validate the model.
@@ -395,9 +395,9 @@ class Trainer:
                     total_loss = 0.0
                     total_l1_loss = 0.0
                     total_presence_loss = 0.0
-                    total_dist_25_acc = 0.0
-                    total_dist_15_acc = 0.0
-                    total_dist_05_acc = 0.0
+                    total_dist_50_acc = 0.0
+                    total_dist_75_acc = 0.0
+                    total_dist_90_acc = 0.0
                     total_ap_50_acc = 0.0
                     total_ap_75_acc = 0.0
                     total_ap_90_acc = 0.0
@@ -418,12 +418,12 @@ class Trainer:
                         total_ap_90_acc += metrics["ap_90"]
 
                         small_samples = [self.__get_sample(images=images[idx_batch], captions=captions[idx_batch], y=y[idx_batch], logits=logits[idx_batch]) for idx_batch in range(images.size(0))]
-                        dist_25_acc = [dist_accuracy(labels=y_objs, logits=logits_obj, threshold=0.25) for (_, _, y_objs, logits_obj)  in samples]
-                        dist_15_acc = [dist_accuracy(labels=y_objs, logits=logits_obj, threshold=0.15) for (_, _, y_objs, logits_obj) in samples]
-                        dist_05_acc = [dist_accuracy(labels=y_objs, logits=logits_obj, threshold=0.05) for (_, _, y_objs, logits_obj) in samples]
-                        total_dist_25_acc += sum(dist_25_acc) / len(dist_25_acc) if dist_25_acc else 0
-                        total_dist_15_acc += sum(dist_15_acc) / len(dist_15_acc) if dist_15_acc else 0
-                        total_dist_05_acc += sum(dist_05_acc) / len(dist_05_acc) if dist_05_acc else 0
+                        dist_50_acc = [dist_accuracy(labels=y_objs, logits=logits_obj, threshold=0.5) for (_, _, y_objs, logits_obj)  in samples]
+                        dist_75_acc = [dist_accuracy(labels=y_objs, logits=logits_obj, threshold=0.75) for (_, _, y_objs, logits_obj) in samples]
+                        dist_90_acc = [dist_accuracy(labels=y_objs, logits=logits_obj, threshold=0.90) for (_, _, y_objs, logits_obj) in samples]
+                        total_dist_50_acc += sum(dist_50_acc) / len(dist_50_acc) if dist_50_acc else 0
+                        total_dist_75_acc += sum(dist_75_acc) / len(dist_75_acc) if dist_75_acc else 0
+                        total_dist_90_acc += sum(dist_90_acc) / len(dist_90_acc) if dist_90_acc else 0
 
                         # Get a random sample.
                         for sample in small_samples:
@@ -437,17 +437,17 @@ class Trainer:
                         del small_samples
 
                     # Compute final accuracy.
-                    samples_dist_25_acc = [self.__filter_samples_by_dist(sample=sample, threshold=0.25) for sample in samples]
-                    samples_dist_15_acc = [self.__filter_samples_by_dist(sample=sample, threshold=0.15) for sample in samples]
-                    samples_dist_05_acc = [self.__filter_samples_by_dist(sample=sample, threshold=0.05) for sample in samples]
+                    samples_dist_50_acc = [self.__filter_samples_by_dist(sample=sample, threshold=0.50) for sample in samples]
+                    samples_dist_75_acc = [self.__filter_samples_by_dist(sample=sample, threshold=0.75) for sample in samples]
+                    samples_dist_90_acc = [self.__filter_samples_by_dist(sample=sample, threshold=0.90) for sample in samples]
                     del samples
 
                     total_loss /= len(self.valid_dataset)
                     total_l1_loss /= len(self.valid_dataset)
                     total_presence_loss /= len(self.valid_dataset)
-                    total_dist_25_acc /= len(self.valid_dataset)
-                    total_dist_15_acc /= len(self.valid_dataset)
-                    total_dist_05_acc /= len(self.valid_dataset)
+                    total_dist_50_acc /= len(self.valid_dataset)
+                    total_dist_75_acc /= len(self.valid_dataset)
+                    total_dist_90_acc /= len(self.valid_dataset)
                     total_ap_50_acc /= len(self.valid_dataset)
                     total_ap_75_acc /= len(self.valid_dataset)
                     total_ap_90_acc /= len(self.valid_dataset)
@@ -465,22 +465,22 @@ class Trainer:
                     )
 
                     # Log the valid accuracy.
-                    self.__tensorboard.add_valid_l1_dist_accuracy(acc=total_dist_25_acc, step=self.__current_iter, th=0.25)
-                    self.__tensorboard.add_valid_l1_dist_accuracy(acc=total_dist_15_acc, step=self.__current_iter, th=0.15)
-                    self.__tensorboard.add_valid_l1_dist_accuracy(acc=total_dist_05_acc, step=self.__current_iter, th=0.05)
+                    self.__tensorboard.add_valid_l1_dist_accuracy(acc=total_dist_50_acc, step=self.__current_iter, th=0.50)
+                    self.__tensorboard.add_valid_l1_dist_accuracy(acc=total_dist_75_acc, step=self.__current_iter, th=0.75)
+                    self.__tensorboard.add_valid_l1_dist_accuracy(acc=total_dist_90_acc, step=self.__current_iter, th=0.90)
                     self.__tensorboard.add_valid_ap_accuracy(acc=total_ap_50_acc, step=self.__current_iter, th=0.50)
                     self.__tensorboard.add_valid_ap_accuracy(acc=total_ap_75_acc, step=self.__current_iter, th=0.75)
                     self.__tensorboard.add_valid_ap_accuracy(acc=total_ap_90_acc, step=self.__current_iter, th=0.90)
 
                     # Display the samples on Tensorboard.
-                    self.__tensorboard.add_image(samples=samples_dist_25_acc, step=self.__current_iter, l1_dist_th=0.25)
-                    self.__tensorboard.add_image(samples=samples_dist_15_acc, step=self.__current_iter, l1_dist_th=0.15)
-                    self.__tensorboard.add_image(samples=samples_dist_05_acc, step=self.__current_iter, l1_dist_th=0.05)
+                    self.__tensorboard.add_image(samples=samples_dist_50_acc, step=self.__current_iter, l1_dist_th=0.50)
+                    self.__tensorboard.add_image(samples=samples_dist_75_acc, step=self.__current_iter, l1_dist_th=0.75)
+                    self.__tensorboard.add_image(samples=samples_dist_90_acc, step=self.__current_iter, l1_dist_th=0.90)
 
                     print("Validation time: %.2f minutes" % end_time)
                     print("Overfit counter: %d" % self.__overfit_counter)
                     print("Validation loss: %.4f - L1 Loss: %.4f - Presence Loss: %.4f" % (total_loss, total_l1_loss, total_presence_loss))
-                    print("L1@0.5: %.4f - L1@0.75: %.4f - L1@0.90: %.4f | AP@0.5: %.4f - AP@0.75: %.4f - AP@0.90: %.4f" % (total_dist_25_acc, total_dist_15_acc, total_dist_05_acc, total_ap_50_acc, total_ap_75_acc, total_ap_90_acc))
+                    print("L1@0.5: %.4f - L1@0.75: %.4f - L1@0.90: %.4f | AP@0.5: %.4f - AP@0.75: %.4f - AP@0.90: %.4f" % (total_dist_50_acc, total_dist_75_acc, total_dist_90_acc, total_ap_50_acc, total_ap_75_acc, total_ap_90_acc))
                     print("=" * 100)
 
                 # Update the iteration.
