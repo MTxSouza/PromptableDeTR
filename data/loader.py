@@ -156,7 +156,6 @@ class PromptableDeTRDataLoader:
     def __init__(
             self, 
             sample_file_paths, 
-            image_directory,
             batch_size, 
             transformations = None, 
             shuffle = True, 
@@ -167,7 +166,6 @@ class PromptableDeTRDataLoader:
 
         Args:
             sample_file_paths (list): The list of sample file paths.
-            image_directory (str): The path to the image directory where the images are stored.
             batch_size (int): The batch size.
             transformations (List[BaseTransform]): The transforms to apply to the data. (Default: None)
             shuffle (bool): Whether to shuffle the samples. (Default: True)
@@ -191,7 +189,6 @@ class PromptableDeTRDataLoader:
 
         # Attributes.
         self.sample_file_paths = sample_file_paths
-        self.image_directory = image_directory
         self.batch_size = batch_size
         self.shuffle = shuffle
         self.transformations = transformations
