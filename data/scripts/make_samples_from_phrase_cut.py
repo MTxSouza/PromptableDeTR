@@ -130,8 +130,11 @@ def main():
 
     # Save all samples to a JSON file.
     for sample in all_samples:
-        filename = str(uuid.uuid4()) + ".json"
-        output_path = os.path.join(args.output_dir, filename)
+        while True:
+            filename = str(uuid.uuid4()) + ".json"
+            output_path = os.path.join(args.output_dir, filename)
+            if not os.path.exists(output_path):
+                break
         with open(file=output_path, mode="w") as file_buffer:
             json.dump(sample, file_buffer, indent=4)
 
