@@ -48,9 +48,9 @@ def average_precision_open_vocab(labels, logits, threshold=0.5):
     is based on the paper https://arxiv.org/pdf/2102.01066.
 
     Args:
-        labels (numpy.ndarray): The true labels with shape (N, 2).
+        labels (numpy.ndarray): The true labels with shape (N, 1).
         logits (numpy.ndarray): The logits from the model with shape (N, 2).
-        threshold (float): Threshold for positive samples. (Default: 0.25)
+        threshold (float): Threshold for positive samples. (Default: 0.5)
 
     Returns:
         float: The average precision score.
@@ -67,31 +67,19 @@ def average_precision_open_vocab(labels, logits, threshold=0.5):
     if logits.ndim == 2:
         logits = logits[None, :, :]
 
-    labels = labels.reshape((-1, 2))
+    labels = labels.reshape((-1, 1))
     logits = logits.reshape((-1, 2))
 
-    # Compute distance matrix.
-    dist = torch.cdist(torch.tensor(labels), torch.tensor(logits))
-    n_pred, n_true = dist.shape
-    matched = set()
-    true_positive = torch.zeros(n_pred)
-    false_positive = torch.zeros(n_pred)
-    for idx_dist in range(n_pred):
-        dist_vec = dist[idx_dist]
-        min_dist, idx = dist_vec.min(0)
-        idx = idx.item()
-        if threshold >= min_dist and idx not in matched:
-            matched.add(idx)
-            true_positive[idx_dist] = 1
-        else:
-            false_positive[idx_dist] = 1
+    # Filter out the invalid points.
+    logits = (logits[:, 1] >= threshold).astype(float)
 
     # Compute precision and recall.
-    true_positive = torch.cumsum(true_positive, dim=0)
-    false_positive = torch.cumsum(false_positive, dim=0)
+    n_true = (labels == 1).sum().item()
+    true_positive = torch.tensor((labels == 1) & (logits == 1), dtype=torch.float32).sum()
+    false_positive = torch.tensor((labels == 0) & (logits == 1), dtype=torch.float32).sum()
 
-    recall = (true_positive / n_true)
-    precision = (true_positive / (true_positive + false_positive))
+    recall = (true_positive / n_true).unsqueeze(dim=0)
+    precision = (true_positive / (true_positive + false_positive)).unsqueeze(dim=0)
 
     recall = torch.cat(tensors=[torch.tensor([0.0]), recall, torch.tensor([1.0])])
     precision = torch.cat(tensors=[torch.tensor([1.0]), precision, torch.tensor([0.0])])
