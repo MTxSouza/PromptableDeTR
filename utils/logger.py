@@ -172,6 +172,7 @@ class Tensorboard:
         """
         tb_samples = []
         # Prepare the images for Tensorboard.
+        size = 5
         for (img, caption, label, prediction) in samples:
 
             # Draw the rectangles on the image.
@@ -181,11 +182,11 @@ class Tensorboard:
 
             for point in label:
                 point = (point[0] * width, point[1] * height)
-                draw.point(xy=tuple(point), fill="lime")
+                draw.ellipse(xy=[point[0] - size, point[1] - size, point[0] + size, point[1] + size], fill="lime")
             for point in prediction:
                 try:
                     point = (point[0] * width, point[1] * height)
-                    draw.point(xy=tuple(point), fill="red")
+                    draw.ellipse(xy=[point[0] - size, point[1] - size, point[0] + size, point[1] + size], fill="red")
                 except ValueError:
                     # If the point is invalid, skip it.
                     continue
