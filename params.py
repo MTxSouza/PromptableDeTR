@@ -145,14 +145,14 @@ def get_args():
     training_parser.add_argument(
         "--max-iter",
         type=int,
-        default=10000,
+        default=50000,
         help="The maximum number of iterations."
     )
     training_parser.add_argument(
         "--batch-size",
         "-b",
         type=int,
-        default=32,
+        default=16,
         help="The batch size for the training process."
     )
     training_parser.add_argument(
@@ -170,13 +170,13 @@ def get_args():
     training_parser.add_argument(
         "--warmup-steps",
         type=int,
-        default=1000,
+        default=250,
         help="The number of warmup steps for the learning rate scheduler."
     )
     training_parser.add_argument(
         "--frozen-steps",
         type=int,
-        default=2000,
+        default=1000,
         help="The number of frozen steps that the lr will not change."
     )
     training_parser.add_argument(
@@ -200,7 +200,7 @@ def get_args():
     training_parser.add_argument(
         "--overfit-patience",
         type=int,
-        default=5,
+        default=10,
         help="The patience for over fitting."
     )
     training_parser.add_argument(
@@ -220,7 +220,7 @@ def get_args():
     training_parser.add_argument(
         "--l1-weight",
         type=float,
-        default=1.0,
+        default=3.0,
         help="The weight for the L1 loss."
     )
     training_parser.add_argument(
