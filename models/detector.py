@@ -182,8 +182,8 @@ class PromptableDeTRTrainer(PromptableDeTR):
         # Sort the logits and labels.
         pred_presence = logits[:, :, 2:]
         pred_points = logits[:, :, :2]
-        true_presence = labels[:, :, 4].long()
-        true_points = labels[:, :, :4]
+        true_presence = labels[:, :, 2].long()
+        true_points = labels[:, :, :2]
         logger.debug(msg="- Predicted presence shape: %s." % (pred_presence.shape,))
         logger.debug(msg="- Predicted points shape: %s." % (pred_points.shape,))
         logger.debug(msg="- True presence shape: %s." % (true_presence.shape,))
