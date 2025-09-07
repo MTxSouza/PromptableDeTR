@@ -29,11 +29,9 @@ def dist_accuracy(labels, logits, threshold=0.25):
     # Compute the accuracy.
     dist_score = torch.cdist(
         torch.from_numpy(logits),
-        torch.from_numpy(labels),
-        p=2
+        torch.from_numpy(labels)
     )
-    dist_score = dist_score[threshold >= dist_score]
-    dist_score = dist_score.float().mean()
+    dist_score = (threshold >= dist_score).float().mean()
 
     # Check if the distance score is NaN.
     if torch.isnan(dist_score):
