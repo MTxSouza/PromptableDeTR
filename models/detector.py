@@ -216,29 +216,28 @@ class PromptableDeTRTrainer(PromptableDeTR):
         logger.debug(msg="- Number of points: %s." % num_points)
 
         # Compute presence loss with focal loss.
-        presence_weight = None
-        if self.__presence_weight != 1.0:
-            presence_weight = torch.tensor([self.__presence_weight], device=pred_presence.device)
+        presence_weight = torch.tensor([1.0, self.__presence_weight], device=pred_presence.device)
         predictions = sorted_pred_presence.view(-1, 2)
         targets = sorted_true_presence.view(-1)
+        presence_loss = F.cross_entropy(input=predictions, target=targets, weight=presence_weight, reduction="mean")
 
-        alpha = torch.tensor(0.25).to(device=targets.device)
-        gamma = torch.tensor(2.0).to(device=predictions.device)
+        # alpha = torch.tensor(0.25).to(device=targets.device)
+        # gamma = torch.tensor(2.0).to(device=predictions.device)
 
-        pred_pos = F.logsigmoid(predictions[:, 1])
-        pred_neg = F.logsigmoid(predictions[:, 0])
+        # pred_pos = F.logsigmoid(predictions[:, 1])
+        # pred_neg = F.logsigmoid(predictions[:, 0])
 
-        pos_term = -pred_pos.exp().pow(gamma) * targets * pred_pos
-        neg_term = -pred_neg.exp().pow(gamma) * (1 - targets) * pred_neg
+        # pos_term = -pred_pos.exp().pow(gamma) * targets * pred_pos
+        # neg_term = -pred_neg.exp().pow(gamma) * (1 - targets) * pred_neg
 
-        pos_term = alpha * pos_term
-        neg_term = (1 - alpha) * neg_term
+        # pos_term = alpha * pos_term
+        # neg_term = (1 - alpha) * neg_term
 
-        if presence_weight is not None:
-            pos_term = pos_term * presence_weight
+        # if presence_weight is not None:
+        #     pos_term = pos_term * presence_weight
 
-        focal_loss = (pos_term + neg_term).view(-1)
-        presence_loss = focal_loss.mean()
+        # focal_loss = (pos_term + neg_term).view(-1)
+        # presence_loss = focal_loss.mean()
         logger.debug(msg="- Presence loss: %s." % presence_loss)
 
         # Compute L1 loss.
