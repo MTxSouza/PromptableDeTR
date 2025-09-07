@@ -465,17 +465,17 @@ class Trainer:
                     )
 
                     # Log the valid accuracy.
-                    self.__tensorboard.add_valid_dist_accuracy(acc=total_dist_25_acc, step=self.__current_iter, th=0.25)
-                    self.__tensorboard.add_valid_dist_accuracy(acc=total_dist_15_acc, step=self.__current_iter, th=0.15)
-                    self.__tensorboard.add_valid_dist_accuracy(acc=total_dist_05_acc, step=self.__current_iter, th=0.05)
+                    self.__tensorboard.add_valid_l1_dist_accuracy(acc=total_dist_25_acc, step=self.__current_iter, th=0.25)
+                    self.__tensorboard.add_valid_l1_dist_accuracy(acc=total_dist_15_acc, step=self.__current_iter, th=0.15)
+                    self.__tensorboard.add_valid_l1_dist_accuracy(acc=total_dist_05_acc, step=self.__current_iter, th=0.05)
                     self.__tensorboard.add_valid_ap_accuracy(acc=total_ap_50_acc, step=self.__current_iter, th=0.50)
                     self.__tensorboard.add_valid_ap_accuracy(acc=total_ap_75_acc, step=self.__current_iter, th=0.75)
                     self.__tensorboard.add_valid_ap_accuracy(acc=total_ap_90_acc, step=self.__current_iter, th=0.90)
 
                     # Display the samples on Tensorboard.
-                    self.__tensorboard.add_image(samples=samples_dist_25_acc, step=self.__current_iter, giou_th=0.25)
-                    self.__tensorboard.add_image(samples=samples_dist_15_acc, step=self.__current_iter, giou_th=0.15)
-                    self.__tensorboard.add_image(samples=samples_dist_05_acc, step=self.__current_iter, giou_th=0.05)
+                    self.__tensorboard.add_image(samples=samples_dist_25_acc, step=self.__current_iter, l1_dist_th=0.25)
+                    self.__tensorboard.add_image(samples=samples_dist_15_acc, step=self.__current_iter, l1_dist_th=0.15)
+                    self.__tensorboard.add_image(samples=samples_dist_05_acc, step=self.__current_iter, l1_dist_th=0.05)
 
                     print("Validation time: %.2f minutes" % end_time)
                     print("Overfit counter: %d" % self.__overfit_counter)
