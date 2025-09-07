@@ -104,8 +104,8 @@ def get_basic_annot(annot, image_dir):
         x1, y1, w, h = box
         cx = x1 + w / 2
         cy = y1 + h / 2
-        cx = max(0.0, cx)
-        cy = max(0.0, cy)
+        cx = min(max(0.0, cx), width)
+        cy = min(max(0.0, cy), height)
         cx /= width
         cy /= height
         assert cx <= 1.0, "Center x-coordinate must be <= 1.0"
