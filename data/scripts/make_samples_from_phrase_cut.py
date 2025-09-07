@@ -9,6 +9,7 @@ import uuid
 from dataclasses import asdict
 
 import tqdm
+from PIL import Image
 
 from data.schemas import Sample
 
@@ -81,6 +82,12 @@ def get_basic_annot(annot, image_dir):
     image_path = os.path.join(image_dir, image_name)
     assert os.path.exists(image_path), "Image path does not exist: %s" % image_path
 
+    # Get image size.
+    with Image.open(fp=image_path, mode="r") as pil_img:
+        width, height = pil_img.width, pil_img.height
+    assert width > 0 and height > 0, "Image width and height must be positive"
+    del pil_img
+
     # Get caption and bounding box.
     white_space_pattern = re.compile(r"\s+")
     caption = annot["phrase"].strip().lower()
@@ -94,10 +101,15 @@ def get_basic_annot(annot, image_dir):
     points = []
     for box in bbox:
         assert len(box) == 4, "Bounding box must have 4 elements"
-        cx, cy, w, h = box
-        if all([value > 1 for value in box]):
-            cx /= w
-            cy /= h
+        x1, y1, w, h = box
+        cx = x1 + w / 2
+        cy = y1 + h / 2
+        cx = max(0.0, cx)
+        cy = max(0.0, cy)
+        cx /= width
+        cy /= height
+        assert cx <= 1.0, "Center x-coordinate must be <= 1.0"
+        assert cy <= 1.0, "Center y-coordinate must be <= 1.0"
         points.append([cx, cy])
 
     return {

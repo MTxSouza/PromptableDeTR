@@ -174,11 +174,6 @@ class PreparePoints(BaseTransform):
         # Transform the points.
         points = sample.points
         points = torch.tensor(data=points, dtype=torch.float32)
-
-        # Normalize the points.
-        _, h, w = sample.image.shape
-        points[:, 0] /= w
-        points[:, 1] /= h
         sample.points_tensor = points
 
         return sample
