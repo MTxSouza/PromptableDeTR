@@ -27,17 +27,20 @@ def get_data_loader(args):
         Tuple[PromptableDeTRDataLoader, PromptableDeTRDataLoader]: The training and validation data loaders.
     """
     # Get train and valid samples.
-    train_files = PromptableDeTRDataLoader.get_samples_from_dir(dirpath=args.train_dataset_dir)
-    valid_files = PromptableDeTRDataLoader.get_samples_from_dir(dirpath=args.valid_dataset_dir)
+    train_files = []
+    for dirpath in args.train_dataset_dir:
+        train_files += PromptableDeTRDataLoader.get_samples_from_dir(dirpath=dirpath)
+    valid_files = []
+    for dirpath in args.valid_dataset_dir:
+        valid_files += PromptableDeTRDataLoader.get_samples_from_dir(dirpath=dirpath)
     if len(train_files) == 0:
-        raise ValueError("No training samples found in the directory: %s" % args.train_dataset_dir)
+        raise ValueError("No training samples found in the directory: %s" % str(args.train_dataset_dir))
     if len(valid_files) == 0:
-        raise ValueError("No validation samples found in the directory: %s" % args.valid_dataset_dir)
+        raise ValueError("No validation samples found in the directory: %s" % str(args.valid_dataset_dir))
 
     # Get the data loader.
     train_data_loader = PromptableDeTRDataLoader(
         sample_file_paths=train_files,
-        image_directory=args.image_dir,
         batch_size=args.batch_size,
         transformations=[
             PrepareSample(vocab_file=args.vocab_file),
@@ -49,7 +52,6 @@ def get_data_loader(args):
 
     valid_data_loader = PromptableDeTRDataLoader(
         sample_file_paths=valid_files,
-        image_directory=args.image_dir,
         batch_size=args.batch_size,
         transformations=[
             PrepareSample(vocab_file=args.vocab_file),
