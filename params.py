@@ -30,24 +30,18 @@ def get_args():
         "--train-dataset",
         "-td",
         type=str,
+        nargs="+",
         required=True,
-        help="The path to the train dataset directory."
+        help="List of paths to the train dataset directory."
     )
     dataset_parser.add_argument(
         "--valid-dataset-dir",
         "--valid-dataset",
         "-vd",
         type=str,
+        nargs="+",
         required=True,
-        help="The path to the valid dataset directory."
-    )
-    dataset_parser.add_argument(
-        "--image-dir",
-        "--image",
-        "-i",
-        type=str,
-        required=True,
-        help="The path to the image directory."
+        help="List of paths to the valid dataset directory."
     )
     dataset_parser.add_argument(
         "--shuffle",
