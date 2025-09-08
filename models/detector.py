@@ -219,7 +219,8 @@ class PromptableDeTRTrainer(PromptableDeTR):
         presence_weight = torch.tensor([1.0, self.__presence_weight], device=pred_presence.device)
         predictions = sorted_pred_presence.view(-1, 2)
         targets = sorted_true_presence.view(-1)
-        presence_loss = F.cross_entropy(input=predictions, target=targets, weight=presence_weight, reduction="mean")
+        presence_loss = F.cross_entropy(input=predictions, target=targets, weight=presence_weight, reduction="none")
+        presence_loss = presence_loss[obj_idx].sum() / num_points
 
         # alpha = torch.tensor(0.25).to(device=targets.device)
         # gamma = torch.tensor(2.0).to(device=predictions.device)
