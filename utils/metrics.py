@@ -42,8 +42,7 @@ def dist_accuracy(labels, logits, threshold=0.25):
 
 def average_precision_open_vocab(labels, logits, threshold=0.5):
     """
-    Computes the average precision for open vocabulary object detection. The metric
-    is based on the paper https://arxiv.org/pdf/2102.01066.
+    Computes the average precision for open vocabulary object detection.
 
     Args:
         labels (numpy.ndarray): The true labels with shape (N, 1).
@@ -69,22 +68,22 @@ def average_precision_open_vocab(labels, logits, threshold=0.5):
     logits = logits.reshape((-1, 2))
 
     # Filter out the invalid points.
-    logits = (logits[:, 1] >= threshold).astype(float)
+    logits = (logits[:, 1] >= threshold).astype(int)
 
     # Compute precision and recall.
-    n_true = (labels == 1).sum().item()
     true_positive = torch.tensor((labels == 1) & (logits == 1), dtype=torch.float32).sum()
     false_positive = torch.tensor((labels == 0) & (logits == 1), dtype=torch.float32).sum()
+    false_negative = torch.tensor((labels == 1) & (logits == 0), dtype=torch.float32).sum()
 
-    recall = (true_positive / n_true).unsqueeze(dim=0)
-    precision = (true_positive / (true_positive + false_positive)).unsqueeze(dim=0)
+    if true_positive + false_positive == 0:
+        precision = 0.0
+    else:
+        precision = true_positive / (true_positive + false_positive)
+    
+    if true_positive + false_negative == 0:
+        recall = 0.0
+    else:
+        recall = true_positive / (true_positive + false_negative)
 
-    recall = torch.cat(tensors=[torch.tensor([0.0]), recall, torch.tensor([1.0])])
-    precision = torch.cat(tensors=[torch.tensor([1.0]), precision, torch.tensor([0.0])])
-
-    for i in range(precision.size(0) - 2, -1, -1):
-        precision[i] = max(precision[i], precision[i+1])
-
-    ap = torch.sum((recall[1:] - recall[:-1]) * precision[1:]).item()
-
-    return ap
+    ap = precision * recall  # Simplified for binary classification.
+    return ap.item()
