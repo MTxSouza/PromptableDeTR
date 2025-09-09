@@ -96,16 +96,10 @@ def get_args():
         help="The image tokens."
     )
     model_parser.add_argument(
-        "--emb-dim",
-        type=int,
-        default=128,
-        help="The embedding dimension for MobileBERT."
-    )
-    model_parser.add_argument(
         "--proj-dim",
         type=int,
         default=512,
-        help="The projection dimension for MobileBERT."
+        help="The projection dimension."
     )
     model_parser.add_argument(
         "--emb-dropout-rate",
@@ -122,14 +116,14 @@ def get_args():
     model_parser.add_argument(
         "--ff-dim",
         type=int,
-        default=2048,
+        default=1024,
         help="The feedforward dimension."
     )
     model_parser.add_argument(
         "--num-joiner-layers",
         "-jl",
         type=int,
-        default=4,
+        default=3,
         help="The number of joiner layers."
     )
 

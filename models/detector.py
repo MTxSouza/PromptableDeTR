@@ -26,10 +26,9 @@ class PromptableDeTR(BasePromptableDeTR):
             self, 
             image_tokens = [400, 100], 
             vocab_size = 30522, 
-            emb_dim = 128, 
-            proj_dim = 512, 
+            emb_dim = 512, 
             num_heads = 8, 
-            ff_dim = 2048, 
+            ff_dim = 1024, 
             emb_dropout_rate = 0.1, 
             num_joiner_layers = 3
         ):
@@ -40,10 +39,9 @@ class PromptableDeTR(BasePromptableDeTR):
         Args:
             image_tokens (List[int]): The number of tokens in the image. (Default: [400, 100])
             vocab_size (int): The size of the vocabulary. (Default: 30522)
-            emb_dim (int): The embedding dimension of the image and text embeddings. (Default: 128)
-            proj_dim (int): The projection dimension of the image and text embeddings. (Default: 512)
+            emb_dim (int): The projection dimension of the image and text embeddings. (Default: 512)
             num_heads (int): The number of attention heads. (Default: 8)
-            ff_dim (int): The dimension of the feed-forward network. (Default: 2048)
+            ff_dim (int): The dimension of the feed-forward network. (Default: 1024)
             emb_dropout_rate (float): The dropout rate for the embeddings. (Default: 0.1)
             num_joiner_layers (int): The number of joiner layers in the model. (Default: 3)
         """
@@ -51,7 +49,6 @@ class PromptableDeTR(BasePromptableDeTR):
             image_tokens=image_tokens, 
             vocab_size=vocab_size, 
             emb_dim=emb_dim, 
-            proj_dim=proj_dim, 
             num_heads=num_heads, 
             ff_dim=ff_dim, 
             emb_dropout_rate=emb_dropout_rate, 
@@ -60,13 +57,13 @@ class PromptableDeTR(BasePromptableDeTR):
 
         # Layers.
         self.detector = nn.Sequential(
-            nn.Linear(in_features=proj_dim, out_features=proj_dim * 4),
+            nn.Linear(in_features=emb_dim, out_features=emb_dim * 4),
             nn.ReLU(),
-            nn.Linear(in_features=proj_dim * 4, out_features=proj_dim * 2),
+            nn.Linear(in_features=emb_dim * 4, out_features=emb_dim * 2),
             nn.ReLU()
         )
-        self.point_predictor = nn.Linear(in_features=proj_dim * 2, out_features=2)
-        self.presence_predictor = nn.Linear(in_features=proj_dim * 2, out_features=2)
+        self.point_predictor = nn.Linear(in_features=emb_dim * 2, out_features=2)
+        self.presence_predictor = nn.Linear(in_features=emb_dim * 2, out_features=2)
 
         # Initialize weights.
         self.__initialize_weights()

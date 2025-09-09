@@ -316,7 +316,7 @@ class Joiner(nn.Module):
 
 
     # Special methods.
-    def __init__(self, image_tokens, emb_dim = 512, num_heads = 8, ff_dim = 2048, num_joins = 3):
+    def __init__(self, image_tokens, emb_dim = 512, num_heads = 8, ff_dim = 1024, num_joins = 3):
         super().__init__()
 
         # Prepare query vector.

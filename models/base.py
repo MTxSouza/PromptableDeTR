@@ -91,19 +91,18 @@ class BasePromptableDeTR(Encoder):
             self, 
             image_tokens, 
             vocab_size = 30522, 
-            emb_dim = 128, 
-            proj_dim = 512, 
+            emb_dim = 512, 
             num_heads = 8, 
-            ff_dim = 2048, 
+            ff_dim = 1024, 
             emb_dropout_rate = 0.1, 
             num_joiner_layers = 3
         ):
-        super().__init__(vocab_size=vocab_size, emb_dim=emb_dim, proj_dim=proj_dim, emb_dropout_rate=emb_dropout_rate)
+        super().__init__(vocab_size=vocab_size, emb_dropout_rate=emb_dropout_rate)
 
         # Joiner.
         self.joiner = Joiner(
             image_tokens=image_tokens, 
-            emb_dim=proj_dim, 
+            emb_dim=emb_dim, 
             num_heads=num_heads, 
             ff_dim=ff_dim, 
             num_joins=num_joiner_layers
