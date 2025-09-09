@@ -11,7 +11,7 @@ import torch.nn.functional as F
 from logger import Logger
 from models.base import BasePromptableDeTR
 from models.matcher import HuggarianMatcher
-from utils.metrics import average_precision_open_vocab
+from utils.metrics import average_precision_open_vocab, dist_accuracy
 
 # Logger.
 logger = Logger(name="model")
@@ -254,13 +254,23 @@ class PromptableDeTRTrainer(PromptableDeTR):
         logger.debug(msg="- Total loss: %s." % loss)
         logger.info(msg="Returning the loss value.")
 
+        # Compute distance accuracy.
+        filt_true = sorted_true_points[obj_idx]
+        filt_pred = sorted_pred_points[obj_idx]
+        dist_50 = dist_accuracy(labels=filt_true, logits=filt_pred, threshold=0.50)
+        dist_75 = dist_accuracy(labels=filt_true, logits=filt_pred, threshold=0.75)
+        dist_90 = dist_accuracy(labels=filt_true, logits=filt_pred, threshold=0.90)
+
         metrics = {
             "loss": loss,
             "l1_loss": final_l1_loss,
             "presence_loss": final_presence_loss,
             "ap_50": ap_50,
             "ap_75": ap_75,
-            "ap_90": ap_90
+            "ap_90": ap_90,
+            "dist_50": dist_50,
+            "dist_75": dist_75,
+            "dist_90": dist_90
         }
 
         return metrics

@@ -289,7 +289,7 @@ class Trainer:
         new_logits = []
         for pred in logits:
             dist = dist_accuracy(labels=y, logits=pred[None, :], threshold=threshold)
-            if threshold >= dist:
+            if dist >= threshold:
                 new_logits.append(pred)
         new_logits = np.asarray(new_logits)
         sample = (img, cap, y, new_logits)
@@ -312,12 +312,15 @@ class Trainer:
 
                 # Compute the loss.
                 metrics = self.model.compute_loss_and_accuracy(logits=logits, labels=y)
-                loss = metrics["loss"]
-                final_l1_loss = metrics["l1_loss"]
-                final_presence_loss = metrics["presence_loss"]
-                ap_50 = metrics["ap_50"]
-                ap_75 = metrics["ap_75"]
-                ap_90 = metrics["ap_90"]
+                loss = metrics["loss"].cpu().detach().numpy().item()
+                final_l1_loss = metrics["l1_loss"].cpu().detach().numpy().item()
+                final_presence_loss = metrics["presence_loss"].cpu().detach().numpy().item()
+                ap_50 = metrics["ap_50"].cpu().detach().numpy().item()
+                ap_75 = metrics["ap_75"].cpu().detach().numpy().item()
+                ap_90 = metrics["ap_90"].cpu().detach().numpy().item()
+                dist_50 = metrics["dist_50"].cpu().detach().numpy().item()
+                dist_75 = metrics["dist_75"].cpu().detach().numpy().item()
+                dist_90 = metrics["dist_90"].cpu().detach().numpy().item()
 
                 # Backward pass.
                 self.optimizer.zero_grad()
@@ -329,28 +332,18 @@ class Trainer:
                 self.__tensorboard.add_current_lr(lr=self.scheduler.get_last_lr()[0], step=self.__current_iter)
 
                 # Store accuracy.
-                samples = [self.__get_sample(images=images[idx_batch], captions=captions[idx_batch], y=y[idx_batch], logits=logits[idx_batch]) for idx_batch in range(images.size(0))]
-
-                total_25_acc = [dist_accuracy(labels=y_objs, logits=logits_obj, threshold=0.50) for (_, _, y_objs, logits_obj) in samples]
-                total_15_acc = [dist_accuracy(labels=y_objs, logits=logits_obj, threshold=0.75) for (_, _, y_objs, logits_obj) in samples]
-                total_05_acc = [dist_accuracy(labels=y_objs, logits=logits_obj, threshold=0.90) for (_, _, y_objs, logits_obj) in samples]
-
-                total_25_acc = sum(total_25_acc) / len(total_25_acc) if total_25_acc else 0.0
-                total_15_acc = sum(total_15_acc) / len(total_15_acc) if total_15_acc else 0.0
-                total_05_acc = sum(total_05_acc) / len(total_05_acc) if total_05_acc else 0.0
-
-                self.__dist_50_accuracies.append(total_25_acc)
-                self.__dist_75_accuracies.append(total_15_acc)
-                self.__dist_90_accuracies.append(total_05_acc)
-                self.__ap_50_accuracies.append(ap_50.cpu().detach().numpy().item())
-                self.__ap_75_accuracies.append(ap_75.cpu().detach().numpy().item())
-                self.__ap_90_accuracies.append(ap_90.cpu().detach().numpy().item())
+                self.__dist_50_accuracies.append(dist_50)
+                self.__dist_75_accuracies.append(dist_75)
+                self.__dist_90_accuracies.append(dist_90)
+                self.__ap_50_accuracies.append(ap_50)
+                self.__ap_75_accuracies.append(ap_75)
+                self.__ap_90_accuracies.append(ap_90)
                 del samples
 
                 # Store the losses.
-                self.__losses.append(loss.cpu().detach().numpy().item())
-                self.__l1_losses.append(final_l1_loss.cpu().detach().numpy().item())
-                self.__presence_losses.append(final_presence_loss.cpu().detach().numpy().item())
+                self.__losses.append(loss)
+                self.__l1_losses.append(final_l1_loss)
+                self.__presence_losses.append(final_presence_loss)
 
                 # Check if it is time to log the loss.
                 print("Iteration [%d/%d]" % (self.__current_iter, self.max_iter))
@@ -416,16 +409,12 @@ class Trainer:
                         total_ap_50_acc += metrics["ap_50"]
                         total_ap_75_acc += metrics["ap_75"]
                         total_ap_90_acc += metrics["ap_90"]
-
-                        small_samples = [self.__get_sample(images=images[idx_batch], captions=captions[idx_batch], y=y[idx_batch], logits=logits[idx_batch]) for idx_batch in range(images.size(0))]
-                        dist_50_acc = [dist_accuracy(labels=y_objs, logits=logits_obj, threshold=0.5) for (_, _, y_objs, logits_obj)  in samples]
-                        dist_75_acc = [dist_accuracy(labels=y_objs, logits=logits_obj, threshold=0.75) for (_, _, y_objs, logits_obj) in samples]
-                        dist_90_acc = [dist_accuracy(labels=y_objs, logits=logits_obj, threshold=0.90) for (_, _, y_objs, logits_obj) in samples]
-                        total_dist_50_acc += sum(dist_50_acc) / len(dist_50_acc) if dist_50_acc else 0
-                        total_dist_75_acc += sum(dist_75_acc) / len(dist_75_acc) if dist_75_acc else 0
-                        total_dist_90_acc += sum(dist_90_acc) / len(dist_90_acc) if dist_90_acc else 0
+                        total_dist_50_acc += metrics["dist_50"]
+                        total_dist_75_acc += metrics["dist_75"]
+                        total_dist_90_acc += metrics["dist_90"]
 
                         # Get a random sample.
+                        small_samples = [self.__get_sample(images=images[idx_batch], captions=captions[idx_batch], y=y[idx_batch], logits=logits[idx_batch]) for idx_batch in range(images.size(0))]
                         for sample in small_samples:
                             if self.__total_samples > len(samples):
                                 samples.append(sample)
