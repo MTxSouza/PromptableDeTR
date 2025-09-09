@@ -214,13 +214,13 @@ def get_args():
     training_parser.add_argument(
         "--presence-weight",
         type=float,
-        default=1.0,
+        default=3.0,
         help="The weight for the presence loss."
     )
     training_parser.add_argument(
         "--l1-weight",
         type=float,
-        default=3.0,
+        default=5.0,
         help="The weight for the L1 loss."
     )
     training_parser.add_argument(
