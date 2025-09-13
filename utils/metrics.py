@@ -1,6 +1,7 @@
 """
 This module contains all evaluation metrics used to validate the PromptableDeTR model.
 """
+import numpy as np
 import torch
 
 
@@ -18,18 +19,24 @@ def dist_accuracy(labels, logits, threshold=0.25):
     Returns:
         float: The accuracy of the model.
     """
+    # Check types.
+    if isinstance(labels, np.ndarray):
+        labels = torch.from_numpy(labels)
+    if isinstance(logits, np.ndarray):
+        logits = torch.from_numpy(logits)
+
     # Check if the labels and logits are empty.
-    if not labels.shape[0] and not logits.shape[0]:
+    if not labels.size(0) and not logits.size(0):
         return 1.0
-    elif labels.shape[0] and not logits.shape[0]:
+    elif labels.size(0) and not logits.size(0):
         return 0.0
-    elif not labels.shape[0] and logits.shape[0]:
+    elif not labels.size(0) and logits.size(0):
         return 0.0
 
     # Compute the accuracy.
     dist_score = 1 - torch.cdist(
-        torch.from_numpy(logits),
-        torch.from_numpy(labels)
+        logits,
+        labels
     )
     dist_score = (dist_score >= threshold).float().mean()
 
