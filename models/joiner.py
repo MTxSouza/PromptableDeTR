@@ -320,7 +320,7 @@ class Joiner(nn.Module):
         super().__init__()
 
         # Prepare query vector.
-        num_queries = sum(image_tokens)
+        num_queries = 50 # HARDCODED.
         self.query_vector = nn.Parameter(data=torch.Tensor(num_queries, emb_dim))
         self.query_layer = nn.Linear(in_features=emb_dim, out_features=emb_dim)
 
