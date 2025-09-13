@@ -288,7 +288,7 @@ class Trainer:
         img, cap, y, logits = sample
         new_logits = []
         for pred in logits:
-            dist = dist_accuracy(labels=y, logits=pred[None, :], threshold=threshold)
+            dist = dist_accuracy(labels=y, logits=pred[None, :], threshold=threshold).item()
             if dist >= threshold:
                 new_logits.append(pred)
         new_logits = np.asarray(new_logits)

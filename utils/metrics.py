@@ -17,7 +17,7 @@ def dist_accuracy(labels, logits, threshold=0.25):
         threshold (float): The distance threshold for positive samples. (Default: 0.25)
 
     Returns:
-        float: The accuracy of the model.
+        tensor: The distance accuracy score.
     """
     # Check types.
     if isinstance(labels, np.ndarray):
@@ -44,7 +44,7 @@ def dist_accuracy(labels, logits, threshold=0.25):
     if torch.isnan(dist_score):
         dist_score = torch.tensor(0.0)
 
-    return dist_score.item()
+    return dist_score
 
 
 def average_precision_open_vocab(labels, logits, threshold=0.5):
