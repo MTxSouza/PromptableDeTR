@@ -225,10 +225,10 @@ class PromptableDeTRTrainer(PromptableDeTR):
         logger.debug(msg="- Number of points: %s." % num_points)
 
         # Compute presence loss with focal loss.
+        predictions = sorted_pred_presence.view(-1, 2)
+        targets = sorted_true_presence.view(-1)
         if not self.__use_focal_loss:
             presence_weight = torch.tensor([1.0, self.__presence_weight], device=pred_presence.device)
-            predictions = sorted_pred_presence.view(-1, 2)
-            targets = sorted_true_presence.view(-1)
             presence_loss = F.cross_entropy(input=predictions, target=targets, weight=presence_weight, reduction="mean")
         else:
             alpha = torch.tensor(self.__alpha).to(device=targets.device)
@@ -242,9 +242,6 @@ class PromptableDeTRTrainer(PromptableDeTR):
 
             pos_term = alpha * pos_term
             neg_term = (1 - alpha) * neg_term
-
-            if presence_weight is not None:
-                pos_term = pos_term * presence_weight
 
             focal_loss = (pos_term + neg_term).view(-1)
             presence_loss = focal_loss.mean()
