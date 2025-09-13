@@ -89,7 +89,7 @@ class BasePromptableDeTR(Encoder):
     # Special methods.
     def __init__(
             self, 
-            image_tokens, 
+            image_size, 
             vocab_size = 30522, 
             emb_dim = 512, 
             num_heads = 8, 
@@ -101,7 +101,7 @@ class BasePromptableDeTR(Encoder):
 
         # Joiner.
         self.joiner = Joiner(
-            image_tokens=image_tokens, 
+            image_size=image_size, 
             emb_dim=emb_dim, 
             num_heads=num_heads, 
             ff_dim=ff_dim, 

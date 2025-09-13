@@ -1108,7 +1108,7 @@ if __name__ == "__main__":
         return path
 
     parser = argparse.ArgumentParser(prog="MobileBERT model", description=__doc__)
-    parser.add_argument("--weight-path", "-w", type=check_weight_file, required=True, help="The path to the pre-trained weights.")
+    parser.add_argument("--weight-path", "-w", type=check_weight_file, required=False, help="The path to the pre-trained weights.")
 
     args = parser.parse_args()
 
@@ -1116,5 +1116,6 @@ if __name__ == "__main__":
     encoder = MobileBert()
 
     # Load the pre-trained weights.
-    encoder.load_state_dict(state_dict=torch.load(f=args.weight_path, weights_only=True))
-    summary(model=encoder, input_data=torch.randint(low=0, high=30522, size=(1, 490)))
+    if args.weight_path is not None:
+        encoder.load_state_dict(state_dict=torch.load(f=args.weight_path, weights_only=True))
+    summary(model=encoder, input_data=torch.randint(low=0, high=30522, size=(1, 125)))

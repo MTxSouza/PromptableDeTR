@@ -24,7 +24,7 @@ class PromptableDeTR(BasePromptableDeTR):
     # Special methods.
     def __init__(
             self, 
-            image_tokens = [400, 100], 
+            image_size = 320, 
             vocab_size = 30522, 
             emb_dim = 512, 
             num_heads = 8, 
@@ -37,7 +37,7 @@ class PromptableDeTR(BasePromptableDeTR):
         of objects in the image.
 
         Args:
-            image_tokens (List[int]): The number of tokens in the image. (Default: [400, 100])
+            image_size (int): The size of the input image. (Default: 320)
             vocab_size (int): The size of the vocabulary. (Default: 30522)
             emb_dim (int): The projection dimension of the image and text embeddings. (Default: 512)
             num_heads (int): The number of attention heads. (Default: 8)
@@ -46,7 +46,7 @@ class PromptableDeTR(BasePromptableDeTR):
             num_joiner_layers (int): The number of joiner layers in the model. (Default: 3)
         """
         super().__init__(
-            image_tokens=image_tokens, 
+            image_size=image_size, 
             vocab_size=vocab_size, 
             emb_dim=emb_dim, 
             num_heads=num_heads, 

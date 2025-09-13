@@ -83,7 +83,7 @@ def get_model(args, data_loader):
 
     # Get the model.
     model = PromptableDeTRTrainer(
-        image_tokens=args.image_tokens,
+        image_size=args.image_size,
         vocab_size=vocab_size,
         emb_dim=args.proj_dim,
         num_heads=args.heads,

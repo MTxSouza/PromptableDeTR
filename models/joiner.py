@@ -316,8 +316,19 @@ class Joiner(nn.Module):
 
 
     # Special methods.
-    def __init__(self, image_tokens, emb_dim = 512, num_heads = 8, ff_dim = 1024, num_joins = 3):
+    def __init__(self, image_size, emb_dim = 512, num_heads = 8, ff_dim = 1024, num_joins = 3):
         super().__init__()
+
+        # Define number of image tokens based on the image size.
+        image_tokens = {
+            640: [400, 100],
+            480: [225, 64],
+            320: [100, 25],
+            224: [49, 16]
+        }
+        image_tokens = image_tokens.get(image_size, None)
+        if image_tokens is None:
+            raise ValueError("Unsupported image size. Supported sizes are: 640, 480, 320, 224.")
 
         # Prepare query vector.
         num_queries = 50 # HARDCODED.

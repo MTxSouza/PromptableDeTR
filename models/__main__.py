@@ -59,7 +59,8 @@ if __name__=="__main__":
         warn("The model is being run on the CPU. This will be slow.")
 
     # Create the model object.
-    model = PromptableDeTR(image_tokens=[400, 100])
+    image_size = 320
+    model = PromptableDeTR(image_size=image_size)
     model.load_base_weights(
         image_encoder_weights=args.image_encoder_weights, 
         text_encoder_weights=args.text_encoder_weights
@@ -67,11 +68,11 @@ if __name__=="__main__":
     model.to(device=device)
 
     # Display the model architecture.
-    image_size = (1, 3, 640, 640)
-    text_size = (1, 400 + 100)
+    image_shape = (1, 3, image_size, image_size)
+    text_size = (1, 125)
     summary(
         model=model, 
-        input_size=(image_size, text_size), 
+        input_size=(image_shape, text_size), 
         device=device, 
         verbose=args.verbose
     )
@@ -102,21 +103,21 @@ if __name__=="__main__":
         return inference_time
 
     print("Warm-up the model...")
-    compute_inference_time(image_size=image_size, text_size=text_size)
+    compute_inference_time(image_size=image_shape, text_size=text_size)
     time.sleep(1)
     print("Warm-up completed.\n")
 
     print("Computing single inference time...")
-    infer_time = compute_inference_time(image_size=image_size, text_size=text_size)
+    infer_time = compute_inference_time(image_size=image_shape, text_size=text_size)
     print(f"Single inference time: {infer_time:.4f} seconds.\n")
 
     print("Compute batch inference time...")
     for batch_size in [1, 2, 4, 8, 16, 32, 64]:
-        image_size = (batch_size, 3, 640, 640)
-        text_size = (batch_size, 500)
+        image_shape = (batch_size, 3, image_size, image_size)
+        text_size = (batch_size, 125)
         print(f"Batch size: {batch_size}")
         try:
-            infer_time = compute_inference_time(image_size=image_size, text_size=text_size)
+            infer_time = compute_inference_time(image_size=image_shape, text_size=text_size)
         except torch.OutOfMemoryError:
             print("Could not compute the inference time due to memory error.\n")
             break

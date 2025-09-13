@@ -84,16 +84,9 @@ def get_args():
         "--image-size",
         "--img-size",
         type=int,
-        default=640,
+        default=320,
+        choices=[640, 480, 320, 224],
         help="The image size."
-    )
-    model_parser.add_argument(
-        "--image-tokens",
-        "--img-tk",
-        type=int,
-        nargs="+",
-        default=[400, 100],
-        help="The image tokens."
     )
     model_parser.add_argument(
         "--proj-dim",
