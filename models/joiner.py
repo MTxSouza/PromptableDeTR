@@ -399,8 +399,9 @@ class Joiner(nn.Module):
         query_vector = self.query_layer(query_vector)
 
         # Join text and image embeddings.
+        memory = torch.cat(tensors=[text_embedding, processed_image_features], dim=1)
         for joiner_block in self.joiner_blocks:
-            query_vector = joiner_block(query_vector, text_embedding, processed_image_features)
+            query_vector = joiner_block(query_vector, memory, memory)
             logger.debug(msg="Text embedding shape: %s" % (query_vector.shape,))
 
         return query_vector
