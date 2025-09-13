@@ -399,10 +399,8 @@ class Joiner(nn.Module):
         query_vector = self.query_layer(query_vector)
 
         # Join text and image embeddings.
-        embeddings = (query_vector, text_embedding, processed_image_features)
         for joiner_block in self.joiner_blocks:
-            embeddings = joiner_block(*embeddings)
-            logger.debug(msg="Text embedding shape: %s" % (embeddings.shape,))
-            embeddings = (embeddings, embeddings, embeddings)
+            query_vector = joiner_block(query_vector, text_embedding, processed_image_features)
+            logger.debug(msg="Text embedding shape: %s" % (query_vector.shape,))
 
-        return embeddings[0]
+        return query_vector
