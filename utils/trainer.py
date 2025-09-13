@@ -312,7 +312,7 @@ class Trainer:
 
                 # Compute the loss.
                 metrics = self.model.compute_loss_and_accuracy(logits=logits, labels=y)
-                loss = metrics["loss"].cpu().detach().numpy().item()
+                loss = metrics["loss"]
                 final_l1_loss = metrics["l1_loss"].cpu().detach().numpy().item()
                 final_presence_loss = metrics["presence_loss"].cpu().detach().numpy().item()
                 ap_50 = metrics["ap_50"].cpu().detach().numpy().item()
@@ -341,7 +341,7 @@ class Trainer:
                 del samples
 
                 # Store the losses.
-                self.__losses.append(loss)
+                self.__losses.append(loss.cpu().detach().numpy().item())
                 self.__l1_losses.append(final_l1_loss)
                 self.__presence_losses.append(final_presence_loss)
 
