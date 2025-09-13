@@ -221,7 +221,7 @@ class Trainer:
             logits (torch.Tensor): The logits from the model.
 
         Returns:
-            Tuple[np.ndarray, str, np.ndarray, np.ndarray]: The image, input caption, true objects, and predicted objects.
+            Tuple[np.ndarray, str, np.ndarray, np.ndarray, np.ndarray]: The image, input caption, true objects, and predicted objects.
         """
         # Retrieve samples.
         image = images.permute(1, 2, 0).detach().cpu().numpy()
@@ -234,14 +234,12 @@ class Trainer:
         caption = caption[0]
 
         # Filter the objects.
-        logits_objs[:, 2:] = logits_objs[:, 2:].softmax(dim=1)
-        logits_objs = logits_objs[logits_objs[:, 3] >= 0.5]
-        logits_objs = logits_objs[:, :2]
-        logits_objs = logits_objs.detach().cpu().numpy()
+        logits_presence = logits_objs[:, 2:].softmax(dim=1).detach().cpu().numpy()
+        logits_points = logits_objs[:, :2].detach().cpu().numpy()
 
         y_objs = y_objs[y_objs[:, 2] == 1][:, :2]
 
-        return image, caption, y_objs, logits_objs
+        return image, caption, y_objs, logits_presence, logits_points
 
 
     def __save_model(self, valid_loss):
@@ -274,24 +272,22 @@ class Trainer:
         )
 
 
-    def __filter_samples_by_dist(self, sample, threshold):
+    def __filter_samples_by_conf(self, sample, threshold):
         """
-        It filters the samples by the L1 distance threshold.
+        It filters the samples by the confidence threshold.
 
         Args:
             sample (Tuple[np.ndarray, str, np.ndarray, np.ndarray]): The sample containing the image, caption, true objects, and predicted objects.
-            threshold (float): The GIoU threshold.
+            threshold (float): Presence threshold to filter the predicted objects.
 
         Returns:
-            Tuple[np.ndarray, str, np.ndarray, np.ndarray]: The filtered samples.
+            Tuple[np.ndarray, str, np.ndarray, list[np.ndarray]]: The filtered samples.
         """
-        img, cap, y, logits = sample
+        img, cap, y, confs, points = sample
         new_logits = []
-        for pred in logits:
-            dist = dist_accuracy(labels=y, logits=pred[None, :], threshold=threshold).item()
-            if dist >= threshold:
-                new_logits.append(pred)
-        new_logits = np.asarray(new_logits)
+        for conf, point in zip(confs, points):
+            filt_points = point[conf[:, 1] >= threshold]
+            new_logits.append(filt_points)
         sample = (img, cap, y, new_logits)
         return sample
 
@@ -425,9 +421,9 @@ class Trainer:
                         del small_samples
 
                     # Compute final accuracy.
-                    samples_dist_50_acc = [self.__filter_samples_by_dist(sample=sample, threshold=0.50) for sample in samples]
-                    samples_dist_75_acc = [self.__filter_samples_by_dist(sample=sample, threshold=0.75) for sample in samples]
-                    samples_dist_90_acc = [self.__filter_samples_by_dist(sample=sample, threshold=0.90) for sample in samples]
+                    samples_dist_50_acc = [self.__filter_samples_by_conf(sample=sample, threshold=0.50) for sample in samples]
+                    samples_dist_75_acc = [self.__filter_samples_by_conf(sample=sample, threshold=0.75) for sample in samples]
+                    samples_dist_90_acc = [self.__filter_samples_by_conf(sample=sample, threshold=0.90) for sample in samples]
                     del samples
 
                     total_loss /= len(self.valid_dataset)

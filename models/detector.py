@@ -259,9 +259,10 @@ class PromptableDeTRTrainer(PromptableDeTR):
         # Compute distance accuracy.
         filt_true = sorted_true_points[obj_idx]
         filt_pred = sorted_pred_points[obj_idx]
-        dist_50 = dist_accuracy(labels=filt_true, logits=filt_pred, threshold=0.50)
-        dist_75 = dist_accuracy(labels=filt_true, logits=filt_pred, threshold=0.75)
-        dist_90 = dist_accuracy(labels=filt_true, logits=filt_pred, threshold=0.90)
+        filt_pred_presence = sorted_pred_presence[obj_idx]
+        dist_50 = dist_accuracy(labels=filt_true, logits=filt_pred, conf=filt_pred_presence, threshold=0.50)
+        dist_75 = dist_accuracy(labels=filt_true, logits=filt_pred, conf=filt_pred_presence, threshold=0.75)
+        dist_90 = dist_accuracy(labels=filt_true, logits=filt_pred, conf=filt_pred_presence, threshold=0.90)
 
         metrics = {
             "loss": loss,

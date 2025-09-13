@@ -6,7 +6,7 @@ import torch
 
 
 # Functions.
-def dist_accuracy(labels, logits, threshold=0.25):
+def dist_accuracy(labels, logits, conf, threshold=0.5, return_logits=False):
     """
     Computes the accuracy of the model based on the L1 distance
     between the ground truth and the predicted bounding points.
@@ -14,7 +14,9 @@ def dist_accuracy(labels, logits, threshold=0.25):
     Args:
         labels (numpy.ndarray): The true labels with shape (N, 2).
         logits (numpy.ndarray): The logits from the model with shape (N, 2).
-        threshold (float): The distance threshold for positive samples. (Default: 0.25)
+        conf (numpy.ndarray): The confidence scores with shape (N, 2).
+        threshold (float): The presence threshold for positive samples. (Default: 0.5)
+        return_logits (bool): Whether to return the filtered logits. (Default: False)
 
     Returns:
         tensor: The distance accuracy score.
@@ -25,25 +27,31 @@ def dist_accuracy(labels, logits, threshold=0.25):
     if isinstance(logits, np.ndarray):
         logits = torch.from_numpy(logits)
 
+    # Filter out the points based on confidence.
+    logits = logits[conf[:, 1] >= threshold]
+
     # Check if the labels and logits are empty.
     if not labels.size(0) and not logits.size(0):
+        if return_logits:
+            return 1.0, logits
         return 1.0
-    elif labels.size(0) and not logits.size(0):
-        return 0.0
-    elif not labels.size(0) and logits.size(0):
+    elif (labels.size(0) and not logits.size(0)) or (not labels.size(0) and logits.size(0)):
+        if return_logits:
+            return 0.0, logits
         return 0.0
 
     # Compute the accuracy.
     dist_score = 1 - torch.cdist(
         logits,
         labels
-    )
-    dist_score = (dist_score >= threshold).float().mean()
+    ).mean()
 
     # Check if the distance score is NaN.
     if torch.isnan(dist_score):
         dist_score = torch.tensor(0.0)
 
+    if return_logits:
+        return dist_score, logits
     return dist_score
 
 
