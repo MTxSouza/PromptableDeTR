@@ -147,12 +147,24 @@ class PromptableDeTRTrainer(PromptableDeTR):
     """
 
     # Special methods.
-    def __init__(self, presence_loss_weight=1.0, l1_loss_weight=1.0, *args, **kwargs):
+    def __init__(
+            self,
+            use_focal_loss=False,
+            presence_loss_weight=1.0,
+            l1_loss_weight=1.0,
+            alpha=0.25,
+            *args,
+            **kwargs
+        ):
         super().__init__(*args, **kwargs)
 
-        # Matcher.
+        # Loss weights.
+        self.__use_focal_loss = use_focal_loss
         self.__presence_weight = presence_loss_weight
         self.__l1_weight = l1_loss_weight
+        self.__alpha = alpha
+
+        # Matcher.
         self.matcher = HuggarianMatcher(
             presence_loss_weight=self.__presence_weight,
             l1_loss_weight=self.__l1_weight
@@ -213,41 +225,40 @@ class PromptableDeTRTrainer(PromptableDeTR):
         logger.debug(msg="- Number of points: %s." % num_points)
 
         # Compute presence loss with focal loss.
-        presence_weight = torch.tensor([1.0, self.__presence_weight], device=pred_presence.device)
-        predictions = sorted_pred_presence.view(-1, 2)
-        targets = sorted_true_presence.view(-1)
-        presence_loss = F.cross_entropy(input=predictions, target=targets, weight=presence_weight, reduction="none")
-        presence_loss = presence_loss[obj_idx].sum() / num_points
+        if not self.__use_focal_loss:
+            presence_weight = torch.tensor([1.0, self.__presence_weight], device=pred_presence.device)
+            predictions = sorted_pred_presence.view(-1, 2)
+            targets = sorted_true_presence.view(-1)
+            presence_loss = F.cross_entropy(input=predictions, target=targets, weight=presence_weight, reduction="mean")
+        else:
+            alpha = torch.tensor(self.__alpha).to(device=targets.device)
+            gamma = torch.tensor(self.__presence_weight).to(device=predictions.device)
 
-        # alpha = torch.tensor(0.25).to(device=targets.device)
-        # gamma = torch.tensor(2.0).to(device=predictions.device)
+            pred_pos = F.logsigmoid(predictions[:, 1])
+            pred_neg = F.logsigmoid(predictions[:, 0])
 
-        # pred_pos = F.logsigmoid(predictions[:, 1])
-        # pred_neg = F.logsigmoid(predictions[:, 0])
+            pos_term = -pred_pos.exp().pow(gamma) * targets * pred_pos
+            neg_term = -pred_neg.exp().pow(gamma) * (1 - targets) * pred_neg
 
-        # pos_term = -pred_pos.exp().pow(gamma) * targets * pred_pos
-        # neg_term = -pred_neg.exp().pow(gamma) * (1 - targets) * pred_neg
+            pos_term = alpha * pos_term
+            neg_term = (1 - alpha) * neg_term
 
-        # pos_term = alpha * pos_term
-        # neg_term = (1 - alpha) * neg_term
+            if presence_weight is not None:
+                pos_term = pos_term * presence_weight
 
-        # if presence_weight is not None:
-        #     pos_term = pos_term * presence_weight
-
-        # focal_loss = (pos_term + neg_term).view(-1)
-        # presence_loss = focal_loss.mean()
+            focal_loss = (pos_term + neg_term).view(-1)
+            presence_loss = focal_loss.mean()
         logger.debug(msg="- Presence loss: %s." % presence_loss)
 
         # Compute L1 loss.
         l1_loss = F.l1_loss(input=sorted_pred_points, target=sorted_true_points, reduction="none")
         l1_loss = l1_loss.sum(dim=-1)
         l1_loss = l1_loss[obj_idx].sum() / num_points
+        l1_loss = self.__l1_weight * l1_loss
         logger.debug(msg="- L1 loss: %s." % l1_loss)
 
         # Compute the total loss.
-        final_l1_loss = self.__l1_weight * l1_loss
-        final_presence_loss = self.__presence_weight * presence_loss
-        loss = final_l1_loss + final_presence_loss
+        loss = l1_loss + presence_loss
         logger.debug(msg="- Total loss: %s." % loss)
         logger.info(msg="Returning the loss value.")
 
@@ -260,8 +271,8 @@ class PromptableDeTRTrainer(PromptableDeTR):
 
         metrics = {
             "loss": loss,
-            "l1_loss": final_l1_loss,
-            "presence_loss": final_presence_loss,
+            "l1_loss": l1_loss,
+            "presence_loss": presence_loss,
             "ap_50": ap_50,
             "ap_75": ap_75,
             "ap_90": ap_90,

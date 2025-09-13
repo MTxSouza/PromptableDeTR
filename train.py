@@ -90,8 +90,10 @@ def get_model(args, data_loader):
         ff_dim=args.ff_dim,
         emb_dropout_rate=args.emb_dropout_rate,
         num_joiner_layers=args.num_joiner_layers,
+        use_focal_loss=args.use_focal_loss,
         presence_loss_weight=args.presence_weight,
-        l1_loss_weight=args.l1_weight
+        l1_loss_weight=args.l1_weight,
+        alpha=args.alpha
     )
 
     return model

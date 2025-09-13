@@ -206,16 +206,27 @@ def get_args():
         help="The path to the experiment directory."
     )
     training_parser.add_argument(
+        "--use-focal-loss",
+        action="store_true",
+        help="Whether to use focal loss to compute the presence loss."
+    )
+    training_parser.add_argument(
         "--presence-weight",
         type=float,
         default=3.0,
-        help="The weight for the presence loss."
+        help="The weight for the presence loss. If using focal loss, this is the gamma parameter."
     )
     training_parser.add_argument(
         "--l1-weight",
         type=float,
         default=5.0,
         help="The weight for the L1 loss."
+    )
+    training_parser.add_argument(
+        "--alpha",
+        type=float,
+        default=0.25,
+        help="The alpha parameter for the focal loss."
     )
     training_parser.add_argument(
         "--save-logs",
