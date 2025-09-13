@@ -231,19 +231,16 @@ class PromptableDeTRTrainer(PromptableDeTR):
             presence_weight = torch.tensor([1.0, self.__presence_weight], device=pred_presence.device)
             presence_loss = F.cross_entropy(input=predictions, target=targets, weight=presence_weight, reduction="mean")
         else:
-            alpha = torch.tensor(self.__alpha).to(device=targets.device)
-            gamma = torch.tensor(self.__presence_weight).to(device=predictions.device)
 
-            pred_pos = F.logsigmoid(predictions[:, 1])
-            pred_neg = F.logsigmoid(predictions[:, 0])
+            log_probs = F.log_softmax(predictions, dim=-1)
+            probs = log_probs.exp()
 
-            pos_term = -pred_pos.exp().pow(gamma) * targets * pred_pos
-            neg_term = -pred_neg.exp().pow(gamma) * (1 - targets) * pred_neg
+            # Targets ∈ {0,1}
+            pt = probs[torch.arange(targets.size(0)), targets]
+            log_pt = log_probs[torch.arange(targets.size(0)), targets]
 
-            pos_term = alpha * pos_term
-            neg_term = (1 - alpha) * neg_term
-
-            focal_loss = (pos_term + neg_term).view(-1)
+            alpha_t = self.__alpha * targets + (1 - self.__alpha) * (1 - targets)
+            focal_loss = -alpha_t * (1 - pt).pow(self.__presence_weight) * log_pt
             presence_loss = focal_loss.mean()
         logger.debug(msg="- Presence loss: %s." % presence_loss)
 
