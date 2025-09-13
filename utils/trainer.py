@@ -338,7 +338,6 @@ class Trainer:
                 self.__ap_50_accuracies.append(ap_50)
                 self.__ap_75_accuracies.append(ap_75)
                 self.__ap_90_accuracies.append(ap_90)
-                del samples
 
                 # Store the losses.
                 self.__losses.append(loss.cpu().detach().numpy().item())
