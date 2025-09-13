@@ -320,14 +320,14 @@ class Joiner(nn.Module):
         super().__init__()
 
         # Define number of image tokens based on the image size.
-        image_tokens = {
+        IMAGE_TOKENS = {
             640: [400, 100],
             480: [225, 64],
             320: [100, 25],
             224: [49, 16]
         }
-        image_tokens = image_tokens.get(image_size, None)
-        if image_tokens is None:
+        self.__image_tokens = IMAGE_TOKENS.get(image_size, None)
+        if self.__image_tokens is None:
             raise ValueError("Unsupported image size. Supported sizes are: 640, 480, 320, 224.")
 
         # Prepare query vector.
@@ -337,13 +337,13 @@ class Joiner(nn.Module):
 
         # Layers.
         self.img_pe = nn.ModuleList(modules=[
-            PositionalEncoding(n_positions=image_token, emb_dim=emb_dim) for image_token in image_tokens
+            PositionalEncoding(n_positions=image_token, emb_dim=emb_dim) for image_token in self.__image_tokens
         ])
         self.joiner_blocks = nn.ModuleList(modules=[
             JoinerBlock(emb_dim=emb_dim, num_heads=num_heads, ff_dim=ff_dim) for _ in range(num_joins)
         ])
 
-        num_image_feature_levels = len(image_tokens)
+        num_image_feature_levels = len(self.__image_tokens)
         self.level_emb = nn.Parameter(data=torch.Tensor(num_image_feature_levels, emb_dim))
 
 
@@ -357,6 +357,17 @@ class Joiner(nn.Module):
             List[torch.Tensor]: List containing attention weights tensors.
         """
         return [joiner_block.multi_head_attention.attentions for joiner_block in self.joiner_blocks]
+
+
+    @property
+    def image_context_length(self):
+        """
+        Get the image context length.
+
+        Returns:
+            int: Image context length.
+        """
+        return sum(self.__image_tokens)
 
 
     # Methods.

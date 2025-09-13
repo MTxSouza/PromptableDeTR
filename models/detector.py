@@ -69,6 +69,22 @@ class PromptableDeTR(BasePromptableDeTR):
         self.__initialize_weights()
 
 
+    # Properties.
+    def image_context_length(self):
+        """
+        Returns the image context length based on the image size.
+
+        Returns:
+            int: Image context length.
+        """
+        logger.info(msg="Getting the image context length.")
+        logger.debug(msg="- Image size: %d." % self.image_size)
+        logger.debug(msg="- Calling `BasePromptableDeTR` image_context_length property.")
+        context_length = self.joiner.image_context_length
+        logger.debug(msg="- Image context length: %d." % context_length)
+        return context_length
+
+
     # Private methods.
     def __initialize_weights(self):
         """

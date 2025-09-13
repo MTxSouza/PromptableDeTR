@@ -188,7 +188,7 @@ class Trainer:
             Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]: The images, labels and logits.
         """
         # Convert the batch into tensors.
-        images, captions, mask, extra_data = PromptableDeTRDataLoader.convert_batch_into_tensor(batch=batch)
+        images, captions, mask, extra_data = PromptableDeTRDataLoader.convert_batch_into_tensor(batch=batch, max_len=model.image_context_length)
         images = images.to(device=self.device)
         captions = captions.to(device=self.device)
         mask = mask.to(device=self.device)
