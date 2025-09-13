@@ -33,12 +33,12 @@ def dist_accuracy(labels, logits, conf, threshold=0.5, return_logits=False):
     # Check if the labels and logits are empty.
     if not labels.size(0) and not logits.size(0):
         if return_logits:
-            return 1.0, logits
-        return 1.0
+            return torch.tensor(1.0), logits
+        return torch.tensor(1.0)
     elif (labels.size(0) and not logits.size(0)) or (not labels.size(0) and logits.size(0)):
         if return_logits:
-            return 0.0, logits
-        return 0.0
+            return torch.tensor(0.0), logits
+        return torch.tensor(0.0)
 
     # Compute the accuracy.
     dist_score = 1 - torch.cdist(
