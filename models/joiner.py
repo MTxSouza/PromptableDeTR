@@ -299,8 +299,8 @@ class JoinerBlock(nn.Module):
         logger.debug(msg="Image embedding shape: %s" % (image_embedding.shape,))
 
         # Compute multi-head attention.
-        attention_output = self.multi_head_attention(query_embedding, text_embedding, image_embedding)
-        attention_output = self.norm1(text_embedding + attention_output)
+        mha_out = self.multi_head_attention(query_embedding, text_embedding, image_embedding)
+        attention_output = self.norm1(query_embedding + mha_out)
         logger.debug(msg="Attention output shape: %s" % (attention_output.shape,))
 
         # Compute feed-forward layer.
