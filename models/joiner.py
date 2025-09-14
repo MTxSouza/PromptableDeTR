@@ -359,17 +359,6 @@ class Joiner(nn.Module):
         return [joiner_block.multi_head_attention.attentions for joiner_block in self.joiner_blocks]
 
 
-    @property
-    def image_context_length(self):
-        """
-        Get the image context length.
-
-        Returns:
-            int: Image context length.
-        """
-        return sum(self.__image_tokens)
-
-
     # Methods.
     def forward(self, image_features, text_embedding):
         """

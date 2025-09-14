@@ -12,7 +12,6 @@ from tqdm import tqdm
 
 from data.loader import PromptableDeTRDataLoader
 from utils.logger import Tensorboard
-from utils.metrics import dist_accuracy
 
 
 # Classes.
@@ -27,6 +26,7 @@ class Trainer:
             optimizer, 
             train_dataset, 
             valid_dataset, 
+            max_caption_length, 
             lr,
             lr_factor,
             warmup_steps,
@@ -48,6 +48,7 @@ class Trainer:
             optimizer (torch.optim.Optimizer): The optimizer to use.
             train_dataset (PromptableDeTRDataLoader): The training dataset.
             valid_dataset (PromptableDeTRDataLoader): The validation dataset.
+            max_caption_length (int): The maximum caption length.
             lr (float): The learning rate.
             lr_factor (float): The factor to reduce the learning rate.
             warmup_steps (int): The number of warmup steps for the learning rate scheduler.
@@ -67,6 +68,7 @@ class Trainer:
         self.scheduler = None
         self.train_dataset = train_dataset
         self.valid_dataset = valid_dataset
+        self.max_caption_length = max_caption_length
         self.lr = lr
         self.lr_factor = lr_factor
         self.warmup_steps = warmup_steps
@@ -188,7 +190,7 @@ class Trainer:
             Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]: The images, labels and logits.
         """
         # Convert the batch into tensors.
-        images, captions, mask, extra_data = PromptableDeTRDataLoader.convert_batch_into_tensor(batch=batch, max_len=model.image_context_length)
+        images, captions, mask, extra_data = PromptableDeTRDataLoader.convert_batch_into_tensor(batch=batch, max_len=self.max_caption_length)
         images = images.to(device=self.device)
         captions = captions.to(device=self.device)
         mask = mask.to(device=self.device)

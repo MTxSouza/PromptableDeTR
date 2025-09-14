@@ -137,6 +137,7 @@ def main(device=None):
         optimizer=optim.Adam,
         train_dataset=train_data_loader,
         valid_dataset=valid_data_loader,
+        max_caption_length=args.caption_length,
         lr=args.lr,
         lr_factor=args.lr_factor,
         warmup_steps=args.warmup_steps,

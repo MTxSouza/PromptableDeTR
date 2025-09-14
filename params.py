@@ -89,6 +89,14 @@ def get_args():
         help="The image size."
     )
     model_parser.add_argument(
+        "--caption-length",
+        "--cap-len",
+        type=int,
+        default=50,
+        choices=list(range(50, 101, 5)),
+        help="The caption length."
+    )
+    model_parser.add_argument(
         "--proj-dim",
         type=int,
         default=512,

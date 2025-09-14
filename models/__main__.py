@@ -60,6 +60,7 @@ if __name__=="__main__":
 
     # Create the model object.
     image_size = 320
+    text_size = 50
     model = PromptableDeTR(image_size=image_size)
     model.load_base_weights(
         image_encoder_weights=args.image_encoder_weights, 
@@ -69,10 +70,10 @@ if __name__=="__main__":
 
     # Display the model architecture.
     image_shape = (1, 3, image_size, image_size)
-    text_size = (1, 125)
+    text_shape = (1, text_size)
     summary(
         model=model, 
-        input_size=(image_shape, text_size), 
+        input_size=(image_shape, text_shape), 
         device=device, 
         verbose=args.verbose
     )
@@ -103,21 +104,21 @@ if __name__=="__main__":
         return inference_time
 
     print("Warm-up the model...")
-    compute_inference_time(image_size=image_shape, text_size=text_size)
+    compute_inference_time(image_size=image_shape, text_size=text_shape)
     time.sleep(1)
     print("Warm-up completed.\n")
 
     print("Computing single inference time...")
-    infer_time = compute_inference_time(image_size=image_shape, text_size=text_size)
+    infer_time = compute_inference_time(image_size=image_shape, text_size=text_shape)
     print(f"Single inference time: {infer_time:.4f} seconds.\n")
 
     print("Compute batch inference time...")
     for batch_size in [1, 2, 4, 8, 16, 32, 64]:
         image_shape = (batch_size, 3, image_size, image_size)
-        text_size = (batch_size, 125)
+        text_shape = (batch_size, text_size)
         print(f"Batch size: {batch_size}")
         try:
-            infer_time = compute_inference_time(image_size=image_shape, text_size=text_size)
+            infer_time = compute_inference_time(image_size=image_shape, text_size=text_shape)
         except torch.OutOfMemoryError:
             print("Could not compute the inference time due to memory error.\n")
             break
