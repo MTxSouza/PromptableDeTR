@@ -7,6 +7,7 @@ from abc import ABC, abstractmethod
 import numpy as np
 import torch
 import torch.nn.functional as F
+import torchvision.transforms as ptch_transforms
 from PIL import Image
 
 from data.schemas import Sample
@@ -74,6 +75,8 @@ class PrepareImage(BaseTransform):
     This class prepares the image for training.
     """
 
+    mean = torch.tensor([0.485, 0.456, 0.406]).view(1, 3, 1, 1)
+    std = torch.tensor([0.229, 0.224, 0.225]).view(1, 3, 1, 1)
 
     # Special methods.
     def __call__(self, samples):
@@ -86,6 +89,19 @@ class PrepareImage(BaseTransform):
 
         return samples
 
+    # Class methods.
+    @classmethod
+    def de_normalize(cls, normalized_image):
+        """
+        De-normalizes the image.
+
+        Args:
+            normalized_image (torch.Tensor): The normalized image.
+
+        Returns:
+            torch.Tensor: The de-normalized image.
+        """
+        return (normalized_image.cpu() * cls.std) + cls.mean
 
     # Methods.
     def transform(self, sample):
@@ -103,8 +119,7 @@ class PrepareImage(BaseTransform):
         sample.image = torch.from_numpy(np_img).permute(2, 0, 1)
 
         # Normalize the image.
-        if sample.image.max() > 1:
-            sample.image /= 255
+        sample.image = (sample.image - self.mean) / self.std
 
         return sample
 

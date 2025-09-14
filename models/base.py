@@ -107,6 +107,8 @@ class BasePromptableDeTR(Encoder):
             ff_dim=ff_dim, 
             num_joins=num_joiner_layers
         )
+        self.image_size = image_size
+        self.image_context_length = self.joiner.image_context_length
 
 
     # Methods.

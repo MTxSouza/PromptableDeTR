@@ -9,6 +9,8 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 from torch.utils.tensorboard import SummaryWriter
 
+from data.daug import PrepareImage
+
 
 # Enums.
 class LevelName(Enum):
@@ -177,7 +179,8 @@ class Tensorboard:
 
             # Draw the rectangles on the image.
             height, width = img.shape[:2]
-            pil_img = Image.fromarray((img * 255).astype("uint8"))
+            img = PrepareImage.de_normalize(normalized_image=img)
+            pil_img = Image.fromarray(img.astype("uint8"))
             draw = ImageDraw.Draw(im=pil_img)
 
             for point in label:
