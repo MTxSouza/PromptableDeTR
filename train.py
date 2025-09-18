@@ -92,9 +92,11 @@ def get_model(args, data_loader):
         num_joiner_layers=args.num_joiner_layers,
         use_focal_loss=args.use_focal_loss,
         presence_loss_weight=args.presence_weight,
+        giou_loss_weight=args.giou_weight,
         l1_loss_weight=args.l1_weight,
         alpha=args.alpha,
         hm_presence_weight=args.hm_presence_weight,
+        hm_giou_weight=args.hm_giou_weight,
         hm_l1_weight=args.hm_l1_weight
     )
 
