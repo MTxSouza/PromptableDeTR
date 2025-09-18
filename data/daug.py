@@ -7,7 +7,6 @@ from abc import ABC, abstractmethod
 import numpy as np
 import torch
 import torch.nn.functional as F
-import torchvision.transforms as ptch_transforms
 from PIL import Image
 
 from data.schemas import Sample
@@ -96,17 +95,22 @@ class PrepareImage(BaseTransform):
         De-normalizes the image.
 
         Args:
-            normalized_image (torch.Tensor): The normalized image.
+            normalized_image (numpy.ndarray): The normalized image.
 
         Returns:
-            torch.Tensor: The de-normalized image.
+            numpy.ndarray: The de-normalized image.
         """
-        return (normalized_image.cpu() * cls.std) + cls.mean
+        if isinstance(normalized_image, np.ndarray):
+            normalized_image = torch.from_numpy(normalized_image).permute(2, 0, 1).unsqueeze(0)
+        de_normalized_image = (normalized_image * cls.std) + cls.mean
+        de_normalized_image = de_normalized_image.squeeze(0).permute(1, 2, 0).clamp(0, 255)
+        return de_normalized_image.numpy()
 
     # Methods.
     def transform(self, sample):
 
         # Load the image.
+        sample.image_path = str(sample.image_path).replace("/home/msouza011201/bucket/images/phrase_cut_dataset", "/home/mtxsouza/workspace/PhraseCutDataset/data/VGPhraseCut_v0/images")
         with Image.open(fp=sample.image_path, mode="r") as pil_img:
             # Convert the image to RGB.
             if pil_img.mode != "RGB":

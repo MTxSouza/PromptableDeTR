@@ -331,7 +331,7 @@ class Joiner(nn.Module):
             raise ValueError("Unsupported image size. Supported sizes are: 640, 480, 320, 224.")
 
         # Prepare query vector.
-        num_queries = 50 # HARDCODED.
+        num_queries = 10 # HARDCODED.
         self.query_vector = nn.Parameter(data=torch.Tensor(num_queries, emb_dim))
         self.query_layer = nn.Linear(in_features=emb_dim, out_features=emb_dim)
 

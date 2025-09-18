@@ -93,7 +93,9 @@ def get_model(args, data_loader):
         use_focal_loss=args.use_focal_loss,
         presence_loss_weight=args.presence_weight,
         l1_loss_weight=args.l1_weight,
-        alpha=args.alpha
+        alpha=args.alpha,
+        hm_presence_weight=args.hm_presence_weight,
+        hm_l1_weight=args.hm_l1_weight
     )
 
     return model
@@ -152,9 +154,7 @@ def main(device=None):
     )
 
     # Resume training if a checkpoint is provided.
-    if args.resume_checkpoint:
-        trainer.resume_training(checkpoint_path=args.resume_checkpoint)
-    trainer.train()
+    trainer.train(checkpoint_path=args.resume_checkpoint)
 
 
 if __name__ == "__main__":

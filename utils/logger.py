@@ -108,16 +108,16 @@ class Tensorboard:
         self.writer.add_scalar(tag=tag, scalar_value=acc, global_step=step)
 
 
-    def add_train_ap_accuracy(self, acc, step, th):
+    def add_train_f1_accuracy(self, acc, step, th):
         """
-        Adds the training AP accuracy to the Tensorboard writer.
+        Adds the training F1 accuracy to the Tensorboard writer.
 
         Args:
             acc (float): Total training accuracy value.
             step (int): Step number.
-            th (float): Threshold used for the AP accuracy.
+            th (float): Threshold used for the F1 accuracy.
         """
-        tag = "train_AP@%f" % th
+        tag = "train_F1@%f" % th
         self.writer.add_scalar(tag=tag, scalar_value=acc, global_step=step)
 
 
@@ -149,16 +149,16 @@ class Tensorboard:
         self.writer.add_scalar(tag=tag, scalar_value=acc, global_step=step)
 
 
-    def add_valid_ap_accuracy(self, acc, step, th):
+    def add_valid_f1_accuracy(self, acc, step, th):
         """
-        Adds the validation AP accuracy to the Tensorboard writer.
+        Adds the validation F1 accuracy to the Tensorboard writer.
 
         Args:
             acc (float): Total validation accuracy value.
             step (int): Step number.
-            th (float): Threshold used for the AP accuracy.
+            th (float): Threshold used for the F1 accuracy.
         """
-        tag = "valid_AP@%f" % th
+        tag = "valid_F1@%f" % th
         self.writer.add_scalar(tag=tag, scalar_value=acc, global_step=step)
 
 
@@ -186,13 +186,14 @@ class Tensorboard:
             for point in label:
                 point = (point[0] * width, point[1] * height)
                 draw.ellipse(xy=[point[0] - size, point[1] - size, point[0] + size, point[1] + size], fill="lime")
-            for point in prediction:
-                try:
-                    point = (point[0] * width, point[1] * height)
-                    draw.ellipse(xy=[point[0] - size, point[1] - size, point[0] + size, point[1] + size], fill="red")
-                except ValueError:
-                    # If the point is invalid, skip it.
-                    continue
+            for point_array in prediction:
+                for point in point_array:
+                    try:
+                        point = (point[0] * width, point[1] * height)
+                        draw.ellipse(xy=[point[0] - size, point[1] - size, point[0] + size, point[1] + size], fill="red")
+                    except ValueError:
+                        # If the point is invalid, skip it.
+                        continue
 
             # Write the caption on the image.
             font = ImageFont.load_default()

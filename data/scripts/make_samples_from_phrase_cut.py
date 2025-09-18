@@ -12,6 +12,7 @@ import tqdm
 from PIL import Image
 
 from data.schemas import Sample
+from models.tokenizer import Tokenizer
 
 
 def parse_args():
@@ -43,6 +44,35 @@ def parse_args():
         type=str,
         required=True,
         help="Directory to save the generated samples.",
+    )
+
+    # Filters.
+    parser.add_argument(
+        "--vocab-path",
+        "--vocab",
+        type=str,
+        required=True,
+        help="Path to the vocabulary file.",
+    )
+    parser.add_argument(
+        "--max-detections",
+        "--max-det",
+        type=int,
+        default=5,
+        help="Maximum number of detections per image."
+    )
+    parser.add_argument(
+        "--max-tokens-per-caption",
+        "--max-tokens",
+        type=int,
+        default=10,
+        help="Maximum number of tokens per caption."
+    )
+    parser.add_argument(
+        "--target-words",
+        type=str,
+        default=None,
+        help="Path to a TXT file with all target words to keep, the script will ignore any sample with words outside this list."
     )
 
     return parser.parse_args()
@@ -125,11 +155,23 @@ def main():
     # Parse command line arguments.
     args = parse_args()
 
+    # Load word filter if provided.
+    if args.target_words is not None:
+        assert os.path.exists(args.target_words), "Target words file does not exist: %s" % args.target_words
+        with open(file=args.target_words, mode="r") as file_buffer:
+            target_words = set([line.strip().lower() for line in file_buffer.readlines()])
+        print("Loaded %d target words from %s" % (len(target_words), args.target_words))
+    else:
+        target_words = None
+
     # Load annotation information.
     annot_info = load_annot_info(annot_json_path=args.annot_json_path)
 
     # Create output directory if it doesn't exist.
     os.makedirs(name=args.output_dir, exist_ok=True)
+
+    # Instantiate tokenizer.
+    tokenizer = Tokenizer(vocab_filepath=args.vocab_path)
 
     # Iterate through all images and labels.
     all_samples = []
@@ -142,6 +184,16 @@ def main():
 
     # Save all samples to a JSON file.
     for sample in all_samples:
+        
+        # Filter sample.
+        n_det = len(sample["points"])
+        words = sample["caption"].split(" ")
+        n_tokens = len(tokenizer.encode_str(sample["caption"]).pop(0))
+        if n_det > args.max_detections or n_tokens > args.max_tokens_per_caption:
+            continue
+        if target_words is not None and any([w not in target_words for w in words]):
+            continue
+
         while True:
             filename = str(uuid.uuid4()) + ".json"
             output_path = os.path.join(args.output_dir, filename)

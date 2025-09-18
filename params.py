@@ -92,8 +92,8 @@ def get_args():
         "--caption-length",
         "--cap-len",
         type=int,
-        default=50,
-        choices=list(range(50, 101, 5)),
+        default=10,
+        choices=list(range(10, 51, 5)),
         help="The caption length."
     )
     model_parser.add_argument(
@@ -214,7 +214,7 @@ def get_args():
     training_parser.add_argument(
         "--presence-weight",
         type=float,
-        default=3.0,
+        default=2.0,
         help="The weight for the presence loss. If using focal loss, this is the gamma parameter."
     )
     training_parser.add_argument(
@@ -228,6 +228,18 @@ def get_args():
         type=float,
         default=0.25,
         help="The alpha parameter for the focal loss."
+    )
+    training_parser.add_argument(
+        "--hm-presence-weight",
+        type=float,
+        default=5.0,
+        help="The presence loss weight for the Hungarian matcher."
+    )
+    training_parser.add_argument(
+        "--hm-l1-weight",
+        type=float,
+        default=3.0,
+        help="The L1 loss weight for the Hungarian matcher."
     )
     training_parser.add_argument(
         "--save-logs",

@@ -26,8 +26,11 @@ def dist_accuracy(labels, logits, conf, threshold=0.5, return_logits=False):
         labels = torch.from_numpy(labels)
     if isinstance(logits, np.ndarray):
         logits = torch.from_numpy(logits)
+    if isinstance(conf, np.ndarray):
+        conf = torch.from_numpy(conf)
 
     # Filter out the points based on confidence.
+    conf = torch.softmax(conf, dim=1)
     logits = logits[conf[:, 1] >= threshold]
 
     # Check if the labels and logits are empty.
@@ -44,7 +47,7 @@ def dist_accuracy(labels, logits, conf, threshold=0.5, return_logits=False):
     dist_score = 1 - torch.cdist(
         logits,
         labels
-    ).mean()
+    ).mean().cpu()
 
     # Check if the distance score is NaN.
     if torch.isnan(dist_score):
@@ -55,9 +58,9 @@ def dist_accuracy(labels, logits, conf, threshold=0.5, return_logits=False):
     return dist_score
 
 
-def average_precision_open_vocab(labels, logits, threshold=0.5):
+def f1_accuracy_open_vocab(labels, logits, threshold=0.5):
     """
-    Computes the average precision for open vocabulary object detection.
+    Computes the F1 accuracy for open vocabulary object detection.
 
     Args:
         labels (numpy.ndarray): The true labels with shape (N, 1).
@@ -65,7 +68,7 @@ def average_precision_open_vocab(labels, logits, threshold=0.5):
         threshold (float): Threshold for positive samples. (Default: 0.5)
 
     Returns:
-        float: The average precision score.
+        float: The F1 accuracy score.
     """
     # Check types.
     if isinstance(labels, torch.Tensor):
@@ -79,10 +82,11 @@ def average_precision_open_vocab(labels, logits, threshold=0.5):
     if logits.ndim == 2:
         logits = logits[None, :, :]
 
-    labels = labels.reshape((-1, 1))
+    labels = labels.reshape((-1,))
     logits = logits.reshape((-1, 2))
 
     # Filter out the invalid points.
+    logits = torch.softmax(torch.from_numpy(logits), dim=1).numpy()
     logits = (logits[:, 1] >= threshold).astype(int)
 
     # Compute precision and recall.
@@ -100,5 +104,5 @@ def average_precision_open_vocab(labels, logits, threshold=0.5):
     else:
         recall = true_positive / (true_positive + false_negative)
 
-    ap = precision * recall  # Simplified for binary classification.
-    return ap.item()
+    f1 = 2 * (precision * recall) / (precision + recall) if precision + recall > 0 else torch.tensor(data=0.0)
+    return f1.item()

@@ -5,7 +5,6 @@ evaluation loop.
 import random
 import time
 
-import numpy as np
 import torch
 import torch.optim as optim
 from tqdm import tqdm
@@ -85,6 +84,7 @@ class Trainer:
 
         # Training attributes.
         self.__total_samples = 8
+        self.__metric_window = 100
         self.__current_iter = 1
         self.__best_loss = float("inf")
         self.__is_overfitting = False
@@ -95,9 +95,9 @@ class Trainer:
         self.__dist_50_accuracies = []
         self.__dist_75_accuracies = []
         self.__dist_90_accuracies = []
-        self.__ap_50_accuracies = []
-        self.__ap_75_accuracies = []
-        self.__ap_90_accuracies = []
+        self.__f1_50_accuracies = []
+        self.__f1_75_accuracies = []
+        self.__f1_90_accuracies = []
 
         self.__tensorboard = Tensorboard(log_dir=exp_dir)
 
@@ -113,14 +113,13 @@ class Trainer:
 
         # Define the optimizer.
         def lr_curve(step):
-            min_lr_factor = self.lr_factor
             if step < self.warmup_steps:
-                return min_lr_factor + (1.0 - min_lr_factor) * step / self.warmup_steps
+                return self.lr_factor + (1.0 - self.lr_factor) * step / self.warmup_steps
             elif step <= self.frozen_steps:
                 return 1.0
             decay_progress = (step - self.frozen_steps) / (self.max_iter - self.frozen_steps)
             decay_factor = (1 - decay_progress) ** 2
-            return min_lr_factor + (1.0 - min_lr_factor) * decay_factor
+            return self.lr_factor + (1.0 - self.lr_factor) * decay_factor
         self.optimizer = self.optimizer(params=self.model.parameters(), lr=self.lr)
         self.scheduler = optim.lr_scheduler.LambdaLR(optimizer=self.optimizer, lr_lambda=lr_curve)
 
@@ -128,16 +127,25 @@ class Trainer:
         self.model.to(device=self.device)
 
 
-    def __compute_current_training_metrics(self, reset = True):
+    def __compute_current_training_metrics(self):
         """
         It computes the current training metrics.
-
-        Args:
-            reset (bool): Whether to reset the metrics or not. (Default: True)
 
         Returns:
             dict: A dictionary containing the current training metrics.
         """
+        # Check the length of the metrics.
+        if len(self.__losses) > self.__metric_window:
+            self.__losses = self.__losses[-self.__metric_window:]
+            self.__l1_losses = self.__l1_losses[-self.__metric_window:]
+            self.__presence_losses = self.__presence_losses[-self.__metric_window:]
+            self.__dist_50_accuracies = self.__dist_50_accuracies[-self.__metric_window:]
+            self.__dist_75_accuracies = self.__dist_75_accuracies[-self.__metric_window:]
+            self.__dist_90_accuracies = self.__dist_90_accuracies[-self.__metric_window:]
+            self.__f1_50_accuracies = self.__f1_50_accuracies[-self.__metric_window:]
+            self.__f1_75_accuracies = self.__f1_75_accuracies[-self.__metric_window:]
+            self.__f1_90_accuracies = self.__f1_90_accuracies[-self.__metric_window:]
+
         # Compute mean loss.
         mean_loss = sum(self.__losses) / len(self.__losses)
         mean_l1_loss = sum(self.__l1_losses) / len(self.__l1_losses)
@@ -147,20 +155,9 @@ class Trainer:
         mean_dist_50_acc = sum(self.__dist_50_accuracies) / len(self.__dist_50_accuracies)
         mean_dist_75_acc = sum(self.__dist_75_accuracies) / len(self.__dist_75_accuracies)
         mean_dist_90_acc = sum(self.__dist_90_accuracies) / len(self.__dist_90_accuracies)
-        mean_ap_50_acc = sum(self.__ap_50_accuracies) / len(self.__ap_50_accuracies)
-        mean_ap_75_acc = sum(self.__ap_75_accuracies) / len(self.__ap_75_accuracies)
-        mean_ap_90_acc = sum(self.__ap_90_accuracies) / len(self.__ap_90_accuracies)
-
-        if reset:
-            self.__losses.clear()
-            self.__l1_losses.clear()
-            self.__presence_losses.clear()
-            self.__dist_50_accuracies.clear()
-            self.__dist_75_accuracies.clear()
-            self.__dist_90_accuracies.clear()
-            self.__ap_50_accuracies.clear()
-            self.__ap_75_accuracies.clear()
-            self.__ap_90_accuracies.clear()
+        mean_f1_50_acc = sum(self.__f1_50_accuracies) / len(self.__f1_50_accuracies)
+        mean_f1_75_acc = sum(self.__f1_75_accuracies) / len(self.__f1_75_accuracies)
+        mean_f1_90_acc = sum(self.__f1_90_accuracies) / len(self.__f1_90_accuracies)
 
         metrics = {
             "mean_loss": mean_loss,
@@ -169,9 +166,9 @@ class Trainer:
             "mean_dist_50_acc": mean_dist_50_acc,
             "mean_dist_75_acc": mean_dist_75_acc,
             "mean_dist_90_acc": mean_dist_90_acc,
-            "mean_ap_50_acc": mean_ap_50_acc,
-            "mean_ap_75_acc": mean_ap_75_acc,
-            "mean_ap_90_acc": mean_ap_90_acc
+            "mean_f1_50_acc": mean_f1_50_acc,
+            "mean_f1_75_acc": mean_f1_75_acc,
+            "mean_f1_90_acc": mean_f1_90_acc
         }
 
         return metrics
@@ -279,7 +276,7 @@ class Trainer:
         It filters the samples by the confidence threshold.
 
         Args:
-            sample (Tuple[np.ndarray, str, np.ndarray, np.ndarray]): The sample containing the image, caption, true objects, and predicted objects.
+            sample (Tuple[np.ndarray, str, np.ndarray, np.ndarray, np.ndarray]): The sample containing the image, caption, true objects, and predicted objects.
             threshold (float): Presence threshold to filter the predicted objects.
 
         Returns:
@@ -288,6 +285,9 @@ class Trainer:
         img, cap, y, confs, points = sample
         new_logits = []
         for conf, point in zip(confs, points):
+            if len(conf.shape) == 1:
+                conf = conf[None, :]
+                point = point[None, :]
             filt_points = point[conf[:, 1] >= threshold]
             new_logits.append(filt_points)
         sample = (img, cap, y, new_logits)
@@ -313,14 +313,15 @@ class Trainer:
                 loss = metrics["loss"]
                 final_l1_loss = metrics["l1_loss"].cpu().detach().numpy().item()
                 final_presence_loss = metrics["presence_loss"].cpu().detach().numpy().item()
-                ap_50 = metrics["ap_50"].cpu().detach().numpy().item()
-                ap_75 = metrics["ap_75"].cpu().detach().numpy().item()
-                ap_90 = metrics["ap_90"].cpu().detach().numpy().item()
+                f1_50 = metrics["f1_50"].cpu().detach().numpy().item()
+                f1_75 = metrics["f1_75"].cpu().detach().numpy().item()
+                f1_90 = metrics["f1_90"].cpu().detach().numpy().item()
                 dist_50 = metrics["dist_50"].cpu().detach().numpy().item()
                 dist_75 = metrics["dist_75"].cpu().detach().numpy().item()
                 dist_90 = metrics["dist_90"].cpu().detach().numpy().item()
 
                 # Backward pass.
+                torch.nn.utils.clip_grad_norm_(parameters=self.model.parameters(), max_norm=0.5)
                 self.optimizer.zero_grad()
                 loss.backward()
                 self.optimizer.step()
@@ -333,9 +334,9 @@ class Trainer:
                 self.__dist_50_accuracies.append(dist_50)
                 self.__dist_75_accuracies.append(dist_75)
                 self.__dist_90_accuracies.append(dist_90)
-                self.__ap_50_accuracies.append(ap_50)
-                self.__ap_75_accuracies.append(ap_75)
-                self.__ap_90_accuracies.append(ap_90)
+                self.__f1_50_accuracies.append(f1_50)
+                self.__f1_75_accuracies.append(f1_75)
+                self.__f1_90_accuracies.append(f1_90)
 
                 # Store the losses.
                 self.__losses.append(loss.cpu().detach().numpy().item())
@@ -345,16 +346,16 @@ class Trainer:
                 # Check if it is time to log the loss.
                 print("Iteration [%d/%d]" % (self.__current_iter, self.max_iter))
                 if self.__current_iter % self.log_interval == 0:
-                    metrics = self.__compute_current_training_metrics(reset=False)
+                    metrics = self.__compute_current_training_metrics()
                     current_loss = metrics["mean_loss"]
                     current_l1_loss = metrics["mean_l1_loss"]
                     current_presence_loss = metrics["mean_presence_loss"]
                     current_dist_50_acc = metrics["mean_dist_50_acc"]
                     current_dist_75_acc = metrics["mean_dist_75_acc"]
                     current_dist_90_acc = metrics["mean_dist_90_acc"]
-                    current_ap_50_acc = metrics["mean_ap_50_acc"]
-                    current_ap_75_acc = metrics["mean_ap_75_acc"]
-                    current_ap_90_acc = metrics["mean_ap_90_acc"]
+                    current_f1_50_acc = metrics["mean_f1_50_acc"]
+                    current_f1_75_acc = metrics["mean_f1_75_acc"]
+                    current_f1_90_acc = metrics["mean_f1_90_acc"]
 
                     # Log the training loss.
                     self.__tensorboard.add_train_losses(
@@ -368,12 +369,12 @@ class Trainer:
                     self.__tensorboard.add_train_l1_dist_accuracy(acc=current_dist_50_acc, step=self.__current_iter, th=0.50)
                     self.__tensorboard.add_train_l1_dist_accuracy(acc=current_dist_75_acc, step=self.__current_iter, th=0.75)
                     self.__tensorboard.add_train_l1_dist_accuracy(acc=current_dist_90_acc, step=self.__current_iter, th=0.90)
-                    self.__tensorboard.add_train_ap_accuracy(acc=current_ap_50_acc, step=self.__current_iter, th=0.50)
-                    self.__tensorboard.add_train_ap_accuracy(acc=current_ap_75_acc, step=self.__current_iter, th=0.75)
-                    self.__tensorboard.add_train_ap_accuracy(acc=current_ap_90_acc, step=self.__current_iter, th=0.90)
+                    self.__tensorboard.add_train_f1_accuracy(acc=current_f1_50_acc, step=self.__current_iter, th=0.50)
+                    self.__tensorboard.add_train_f1_accuracy(acc=current_f1_75_acc, step=self.__current_iter, th=0.75)
+                    self.__tensorboard.add_train_f1_accuracy(acc=current_f1_90_acc, step=self.__current_iter, th=0.90)
 
                     print("Loss: %.4f - L1 Loss: %.4f - Presence Loss: %.4f" % (current_loss, current_l1_loss, current_presence_loss))
-                    print("L1@0.50: %.4f - L1@0.75: %.4f - L1@0.90: %.4f | AP@0.50: %.4f - AP@0.75: %.4f - AP@0.90: %.4f" % (current_dist_50_acc, current_dist_75_acc, current_dist_90_acc, current_ap_50_acc, current_ap_75_acc, current_ap_90_acc))
+                    print("L1@0.50: %.4f - L1@0.75: %.4f - L1@0.90: %.4f | F1@0.50: %.4f - F1@0.75: %.4f - F1@0.90: %.4f" % (current_dist_50_acc, current_dist_75_acc, current_dist_90_acc, current_f1_50_acc, current_f1_75_acc, current_f1_90_acc))
                     print("-" * 100)
 
                 # Check if it is time to validate the model.
@@ -388,9 +389,9 @@ class Trainer:
                     total_dist_50_acc = 0.0
                     total_dist_75_acc = 0.0
                     total_dist_90_acc = 0.0
-                    total_ap_50_acc = 0.0
-                    total_ap_75_acc = 0.0
-                    total_ap_90_acc = 0.0
+                    total_f1_50_acc = 0.0
+                    total_f1_75_acc = 0.0
+                    total_f1_90_acc = 0.0
                     samples = []
                     init_time = time.time()
                     for validation_batch in tqdm(iterable=self.valid_dataset, desc="Validating", unit="batch"):
@@ -403,9 +404,9 @@ class Trainer:
                         total_loss += metrics["loss"]
                         total_l1_loss += metrics["l1_loss"]
                         total_presence_loss += metrics["presence_loss"]
-                        total_ap_50_acc += metrics["ap_50"]
-                        total_ap_75_acc += metrics["ap_75"]
-                        total_ap_90_acc += metrics["ap_90"]
+                        total_f1_50_acc += metrics["f1_50"]
+                        total_f1_75_acc += metrics["f1_75"]
+                        total_f1_90_acc += metrics["f1_90"]
                         total_dist_50_acc += metrics["dist_50"]
                         total_dist_75_acc += metrics["dist_75"]
                         total_dist_90_acc += metrics["dist_90"]
@@ -434,9 +435,9 @@ class Trainer:
                     total_dist_50_acc /= len(self.valid_dataset)
                     total_dist_75_acc /= len(self.valid_dataset)
                     total_dist_90_acc /= len(self.valid_dataset)
-                    total_ap_50_acc /= len(self.valid_dataset)
-                    total_ap_75_acc /= len(self.valid_dataset)
-                    total_ap_90_acc /= len(self.valid_dataset)
+                    total_f1_50_acc /= len(self.valid_dataset)
+                    total_f1_75_acc /= len(self.valid_dataset)
+                    total_f1_90_acc /= len(self.valid_dataset)
                     end_time = (time.time() - init_time) / 60.0
 
                     # Save the model weights.
@@ -454,9 +455,9 @@ class Trainer:
                     self.__tensorboard.add_valid_l1_dist_accuracy(acc=total_dist_50_acc, step=self.__current_iter, th=0.50)
                     self.__tensorboard.add_valid_l1_dist_accuracy(acc=total_dist_75_acc, step=self.__current_iter, th=0.75)
                     self.__tensorboard.add_valid_l1_dist_accuracy(acc=total_dist_90_acc, step=self.__current_iter, th=0.90)
-                    self.__tensorboard.add_valid_ap_accuracy(acc=total_ap_50_acc, step=self.__current_iter, th=0.50)
-                    self.__tensorboard.add_valid_ap_accuracy(acc=total_ap_75_acc, step=self.__current_iter, th=0.75)
-                    self.__tensorboard.add_valid_ap_accuracy(acc=total_ap_90_acc, step=self.__current_iter, th=0.90)
+                    self.__tensorboard.add_valid_f1_accuracy(acc=total_f1_50_acc, step=self.__current_iter, th=0.50)
+                    self.__tensorboard.add_valid_f1_accuracy(acc=total_f1_75_acc, step=self.__current_iter, th=0.75)
+                    self.__tensorboard.add_valid_f1_accuracy(acc=total_f1_90_acc, step=self.__current_iter, th=0.90)
 
                     # Display the samples on Tensorboard.
                     self.__tensorboard.add_image(samples=samples_dist_50_acc, step=self.__current_iter, l1_dist_th=0.50)
@@ -466,7 +467,7 @@ class Trainer:
                     print("Validation time: %.2f minutes" % end_time)
                     print("Overfit counter: %d" % self.__overfit_counter)
                     print("Validation loss: %.4f - L1 Loss: %.4f - Presence Loss: %.4f" % (total_loss, total_l1_loss, total_presence_loss))
-                    print("L1@0.5: %.4f - L1@0.75: %.4f - L1@0.90: %.4f | AP@0.5: %.4f - AP@0.75: %.4f - AP@0.90: %.4f" % (total_dist_50_acc, total_dist_75_acc, total_dist_90_acc, total_ap_50_acc, total_ap_75_acc, total_ap_90_acc))
+                    print("L1@0.5: %.4f - L1@0.75: %.4f - L1@0.90: %.4f | F1@0.5: %.4f - F1@0.75: %.4f - F1@0.90: %.4f" % (total_dist_50_acc, total_dist_75_acc, total_dist_90_acc, total_f1_50_acc, total_f1_75_acc, total_f1_90_acc))
                     print("=" * 100)
 
                 # Update the iteration.
@@ -476,9 +477,12 @@ class Trainer:
 
 
     # Methods.
-    def train(self):
+    def train(self, checkpoint_path=None):
         """
         It trains the model using the training and validation datasets.
+
+        Args:
+            checkpoint_path (str): The path to the checkpoint file to resume training. (Default: None)
         """
         print("=" * 100)
         print("🚀 Starting PromptableDeTR - %s training" % self.trainer_name)
@@ -487,6 +491,8 @@ class Trainer:
         try:
             # Compile the model.
             self.__compile_model()
+            if checkpoint_path is not None:
+                self.resume_training(checkpoint_path=checkpoint_path)
             # Run the main loop.
             self.__main_loop()
         except KeyboardInterrupt:

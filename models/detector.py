@@ -7,11 +7,12 @@ import os
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torchvision.ops import sigmoid_focal_loss
 
 from logger import Logger
 from models.base import BasePromptableDeTR
-from models.matcher import HuggarianMatcher
-from utils.metrics import average_precision_open_vocab, dist_accuracy
+from models.matcher import HungarianMatcher
+from utils.metrics import dist_accuracy, f1_accuracy_open_vocab
 
 # Logger.
 logger = Logger(name="model")
@@ -138,7 +139,6 @@ class PromptableDeTR(BasePromptableDeTR):
         # Load weights.
         super().load_full_weights(base_model_weights=base_model_weights)
 
-
 class PromptableDeTRTrainer(PromptableDeTR):
     """
     A subclass of PromptableDeTR that is used for training the model.
@@ -153,6 +153,8 @@ class PromptableDeTRTrainer(PromptableDeTR):
             presence_loss_weight=1.0,
             l1_loss_weight=1.0,
             alpha=0.25,
+            hm_presence_weight=5.0,
+            hm_l1_weight=3.0,
             *args,
             **kwargs
         ):
@@ -165,11 +167,10 @@ class PromptableDeTRTrainer(PromptableDeTR):
         self.__alpha = alpha
 
         # Matcher.
-        self.matcher = HuggarianMatcher(
-            presence_loss_weight=self.__presence_weight,
-            l1_loss_weight=self.__l1_weight
+        self.matcher = HungarianMatcher(
+            presence_loss_weight=hm_presence_weight,
+            l1_loss_weight=hm_l1_weight
         )
-
 
     # Methods.
     def compute_loss_and_accuracy(self, logits, labels):
@@ -202,50 +203,43 @@ class PromptableDeTRTrainer(PromptableDeTR):
         logger.debug(msg="- Source index shape: %s." % (src_idx.shape,))
         logger.debug(msg="- Target index shape: %s." % (tgt_idx.shape,))
 
-        sorted_pred_presence = pred_presence[(batch_idx, src_idx)]
-        sorted_pred_points = pred_points[(batch_idx, src_idx)]
-        sorted_true_presence = true_presence[(batch_idx, tgt_idx)]
-        sorted_true_points = true_points[(batch_idx, tgt_idx)]
-        logger.debug(msg="- Sorted predicted presence shape: %s." % (sorted_pred_presence.shape,))
-        logger.debug(msg="- Sorted predicted points shape: %s." % (sorted_pred_points.shape,))
-        logger.debug(msg="- Sorted true presence shape: %s." % (sorted_true_presence.shape,))
-        logger.debug(msg="- Sorted true points shape: %s." % (sorted_true_points.shape,))
+        # Prepare new targets.
+        new_true_presence = torch.zeros_like(true_presence).long().to(true_presence.device)
+        new_true_presence[batch_idx, src_idx] = 1
+        new_true_points = torch.zeros_like(pred_points).to(true_points.device)
+        new_true_points[batch_idx, src_idx] = true_points[batch_idx, tgt_idx]
 
-        # Compute average precision.
-        ap_50 = torch.tensor(average_precision_open_vocab(labels=true_presence.view(-1, 1), logits=pred_presence.view(-1, 2), threshold=0.50))
-        ap_75 = torch.tensor(average_precision_open_vocab(labels=true_presence.view(-1, 1), logits=pred_presence.view(-1, 2), threshold=0.75))
-        ap_90 = torch.tensor(average_precision_open_vocab(labels=true_presence.view(-1, 1), logits=pred_presence.view(-1, 2), threshold=0.90))
-        logger.debug(msg="- Average precision @0.50: %s." % ap_50)
-        logger.debug(msg="- Average precision @0.75: %s." % ap_75)
-        logger.debug(msg="- Average precision @0.90: %s." % ap_90)
+        # Compute F1 accuracy.
+        f1_50 = torch.tensor(f1_accuracy_open_vocab(labels=new_true_presence.view(-1, 1), logits=pred_presence.view(-1, 2), threshold=0.50))
+        f1_75 = torch.tensor(f1_accuracy_open_vocab(labels=new_true_presence.view(-1, 1), logits=pred_presence.view(-1, 2), threshold=0.75))
+        f1_90 = torch.tensor(f1_accuracy_open_vocab(labels=new_true_presence.view(-1, 1), logits=pred_presence.view(-1, 2), threshold=0.90))
+        logger.debug(msg="- F1 Score @0.50: %s." % f1_50)
+        logger.debug(msg="- F1 Score @0.75: %s." % f1_75)
+        logger.debug(msg="- F1 Score @0.90: %s." % f1_90)
 
         # Compute number of points.
-        obj_idx = sorted_true_presence == 1
+        obj_idx = new_true_presence == 1
         num_points = obj_idx.sum()
         logger.debug(msg="- Number of points: %s." % num_points)
 
         # Compute presence loss with focal loss.
-        predictions = sorted_pred_presence.view(-1, 2)
-        targets = sorted_true_presence.view(-1)
+        predictions = pred_presence.view(-1, 2)
+        targets = new_true_presence.view(-1)
         if not self.__use_focal_loss:
             presence_weight = torch.tensor([1.0, self.__presence_weight], device=pred_presence.device)
             presence_loss = F.cross_entropy(input=predictions, target=targets, weight=presence_weight, reduction="mean")
         else:
-
-            log_probs = F.log_softmax(predictions, dim=-1)
-            probs = log_probs.exp()
-
-            # Targets ∈ {0,1}
-            pt = probs[torch.arange(targets.size(0)), targets]
-            log_pt = log_probs[torch.arange(targets.size(0)), targets]
-
-            alpha_t = self.__alpha * targets + (1 - self.__alpha) * (1 - targets)
-            focal_loss = -alpha_t * (1 - pt).pow(self.__presence_weight) * log_pt
-            presence_loss = focal_loss.mean()
+            presence_loss = sigmoid_focal_loss(
+                inputs=predictions,
+                targets=F.one_hot(targets, num_classes=2).float(),
+                alpha=self.__alpha,
+                gamma=self.__presence_weight,
+                reduction="mean"
+            )
         logger.debug(msg="- Presence loss: %s." % presence_loss)
 
         # Compute L1 loss.
-        l1_loss = F.l1_loss(input=sorted_pred_points, target=sorted_true_points, reduction="none")
+        l1_loss = F.mse_loss(input=pred_points, target=new_true_points, reduction="none")
         l1_loss = l1_loss.sum(dim=-1)
         l1_loss = l1_loss[obj_idx].sum() / num_points
         l1_loss = self.__l1_weight * l1_loss
@@ -257,20 +251,20 @@ class PromptableDeTRTrainer(PromptableDeTR):
         logger.info(msg="Returning the loss value.")
 
         # Compute distance accuracy.
-        filt_true = sorted_true_points[obj_idx]
-        filt_pred = sorted_pred_points[obj_idx]
-        filt_pred_presence = sorted_pred_presence[obj_idx]
-        dist_50 = dist_accuracy(labels=filt_true, logits=filt_pred, conf=filt_pred_presence, threshold=0.50)
-        dist_75 = dist_accuracy(labels=filt_true, logits=filt_pred, conf=filt_pred_presence, threshold=0.75)
-        dist_90 = dist_accuracy(labels=filt_true, logits=filt_pred, conf=filt_pred_presence, threshold=0.90)
+        pred_points = pred_points.view(-1, 2)
+        pred_presence = pred_presence.view(-1, 2)
+        new_true_points = new_true_points.view(-1, 2)
+        dist_50 = dist_accuracy(labels=new_true_points, logits=pred_points, conf=pred_presence, threshold=0.50)
+        dist_75 = dist_accuracy(labels=new_true_points, logits=pred_points, conf=pred_presence, threshold=0.75)
+        dist_90 = dist_accuracy(labels=new_true_points, logits=pred_points, conf=pred_presence, threshold=0.90)
 
         metrics = {
             "loss": loss,
             "l1_loss": l1_loss,
             "presence_loss": presence_loss,
-            "ap_50": ap_50,
-            "ap_75": ap_75,
-            "ap_90": ap_90,
+            "f1_50": f1_50,
+            "f1_75": f1_75,
+            "f1_90": f1_90,
             "dist_50": dist_50,
             "dist_75": dist_75,
             "dist_90": dist_90
@@ -293,7 +287,8 @@ class PromptableDeTRTrainer(PromptableDeTR):
         logger.info(msg="Saving the model and optimizer state.")
         
         # Define the checkpoint path.
-        ckpt_fp = os.path.join(dir_path, "step-%d.ckpt" % step)
+        # ckpt_fp = os.path.join(dir_path, "step-%d.ckpt" % step)
+        ckpt_fp = os.path.join(dir_path, "model.ckpt")
 
         # Save the model and optimizer state.
         torch.save(obj={

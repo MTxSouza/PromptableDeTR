@@ -7,18 +7,12 @@ import torch.nn as nn
 from scipy.optimize import linear_sum_assignment
 
 from logger import Logger
-from utils.data import generalized_iou
 
 # Logger.
 logger = Logger(name="model")
 
-
-# Functions.
-
-
-
 # Classes.
-class HuggarianMatcher(nn.Module):
+class HungarianMatcher(nn.Module):
 
 
     # Special methods.

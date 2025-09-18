@@ -83,10 +83,10 @@ class PromptableDeTRDataLoader:
     @staticmethod
     def convert_batch_into_tensor(batch, max_len = 500, pad_value = 0):
         """
-        Convert a list of AlignerSample objects into tensors.
+        Convert a list of Sample objects into tensors.
 
         Args:
-            batch (List[AlignerSample]): The batch of samples.
+            batch (List[Sample]): The batch of samples.
             max_len (int): Maximum number of context length and object predictions. (Default: 100)
             pad_value (int): The padding value. (Default: 0)
 
