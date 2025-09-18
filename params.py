@@ -218,6 +218,12 @@ def get_args():
         help="The weight for the presence loss. If using focal loss, this is the gamma parameter."
     )
     training_parser.add_argument(
+        "--giou-weight",
+        type=float,
+        default=3.0,
+        help="The weight for the GIoU loss."
+    )
+    training_parser.add_argument(
         "--l1-weight",
         type=float,
         default=5.0,
@@ -232,8 +238,14 @@ def get_args():
     training_parser.add_argument(
         "--hm-presence-weight",
         type=float,
-        default=5.0,
+        default=3.0,
         help="The presence loss weight for the Hungarian matcher."
+    )
+    training_parser.add_argument(
+        "--hm-giou-weight",
+        type=float,
+        default=2.0,
+        help="The GIoU loss weight for the Hungarian matcher."
     )
     training_parser.add_argument(
         "--hm-l1-weight",
