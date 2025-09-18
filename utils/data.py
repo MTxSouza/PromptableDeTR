@@ -58,17 +58,24 @@ def xywh2xyxy(boxes):
     return new_boxes
 
 
-def generalized_iou(boxes1, boxes2):
+def generalized_iou(boxes1, boxes2, conf=None, threshold=0.5):
     """
     Compute the Generalized Intersection over Union (GIoU) between two sets of boxes.
 
     Args:
         boxes1 (torch.Tensor): The first set of boxes with shape (N, 4).
         boxes2 (torch.Tensor): The second set of boxes with shape (M, 4).
+        conf (torch.Tensor): Confidence scores for boxes2 with shape (M,). (Default: None)
+        threshold (float): Confidence threshold to filter boxes2. (Default: 0.5)
 
     Returns:
         torch.Tensor: The GIoU between the two sets of boxes.
     """
+    # Filter boxes2 by confidence threshold if provided.
+    if conf is not None:
+        conf = torch.softmax(conf, dim=1)
+        boxes2 = boxes2[conf > threshold]
+
     # Convert coordinates to (x1, y1, x2, y2).
     boxes1 = xywh2xyxy(boxes=boxes1)
     boxes2 = xywh2xyxy(boxes=boxes2)

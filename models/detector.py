@@ -12,6 +12,7 @@ from torchvision.ops import sigmoid_focal_loss
 from logger import Logger
 from models.base import BasePromptableDeTR
 from models.matcher import HungarianMatcher
+from utils.data import generalized_iou
 from utils.metrics import dist_accuracy, f1_accuracy_open_vocab
 
 # Logger.
@@ -63,7 +64,7 @@ class PromptableDeTR(BasePromptableDeTR):
             nn.Linear(in_features=emb_dim * 4, out_features=emb_dim * 2),
             nn.ReLU()
         )
-        self.point_predictor = nn.Linear(in_features=emb_dim * 2, out_features=2)
+        self.bbox_predictor = nn.Linear(in_features=emb_dim * 2, out_features=4)
         self.presence_predictor = nn.Linear(in_features=emb_dim * 2, out_features=2)
 
         # Initialize weights.
@@ -81,7 +82,7 @@ class PromptableDeTR(BasePromptableDeTR):
                 nn.init.zeros_(module.bias)
         
         self.detector.apply(init_weights)
-        self.point_predictor.apply(init_weights)
+        self.bbox_predictor.apply(init_weights)
         self.presence_predictor.apply(init_weights)
 
 
@@ -113,14 +114,14 @@ class PromptableDeTR(BasePromptableDeTR):
         logger.debug(msg="- Result of the `nn.Sequential` block: %s." % (out.shape,))
 
         logger.debug(msg="- Calling `nn.Linear` block to the tensor %s." % (out.shape,))
-        point = self.point_predictor(out)
-        point = F.sigmoid(input=point)
+        bbox = self.bbox_predictor(out)
+        bbox = F.sigmoid(input=bbox)
         presence = self.presence_predictor(out)
-        logger.debug(msg="- Result of the `nn.Linear` block: %s and %s." % (point.shape, presence.shape))
+        logger.debug(msg="- Result of the `nn.Linear` block: %s and %s." % (bbox.shape, presence.shape))
 
         # Concatenate the predictions.
         logger.debug(msg="- Concatenating the predictions.")
-        outputs = torch.cat(tensors=(point, presence), dim=-1)
+        outputs = torch.cat(tensors=(bbox, presence), dim=-1)
         logger.debug(msg="- Result of the concatenation: %s." % (outputs.shape,))
 
         return outputs
@@ -151,9 +152,11 @@ class PromptableDeTRTrainer(PromptableDeTR):
             self,
             use_focal_loss=False,
             presence_loss_weight=1.0,
+            giou_loss_weight=1.0,
             l1_loss_weight=1.0,
             alpha=0.25,
             hm_presence_weight=5.0,
+            hm_giou_weight=2.0,
             hm_l1_weight=3.0,
             *args,
             **kwargs
@@ -163,13 +166,15 @@ class PromptableDeTRTrainer(PromptableDeTR):
         # Loss weights.
         self.__use_focal_loss = use_focal_loss
         self.__presence_weight = presence_loss_weight
+        self.__giou_weight = giou_loss_weight
         self.__l1_weight = l1_loss_weight
         self.__alpha = alpha
 
         # Matcher.
         self.matcher = HungarianMatcher(
             presence_loss_weight=hm_presence_weight,
-            l1_loss_weight=hm_l1_weight
+            l1_loss_weight=hm_l1_weight,
+            giou_loss_weight=hm_giou_weight
         )
 
     # Methods.
@@ -190,15 +195,15 @@ class PromptableDeTRTrainer(PromptableDeTR):
         assert self.matcher is not None, "Matcher is not defined."
 
         # Sort the logits and labels.
-        pred_presence = logits[:, :, 2:]
-        pred_points = logits[:, :, :2]
-        true_presence = labels[:, :, 2].long()
-        true_points = labels[:, :, :2]
+        pred_presence = logits[:, :, 4:]
+        pred_boxes = logits[:, :, :4]
+        true_presence = labels[:, :, 4].long()
+        true_boxes = labels[:, :, :4]
         logger.debug(msg="- Predicted presence shape: %s." % (pred_presence.shape,))
-        logger.debug(msg="- Predicted points shape: %s." % (pred_points.shape,))
+        logger.debug(msg="- Predicted boxes shape: %s." % (pred_boxes.shape,))
         logger.debug(msg="- True presence shape: %s." % (true_presence.shape,))
-        logger.debug(msg="- True points shape: %s." % (true_points.shape,))
-        batch_idx, src_idx, tgt_idx = self.matcher(predict_scores=pred_presence, predict_points=pred_points, scores=true_presence, points=true_points)
+        logger.debug(msg="- True boxes shape: %s." % (true_boxes.shape,))
+        batch_idx, src_idx, tgt_idx = self.matcher(predict_scores=pred_presence, predict_boxes=pred_boxes, scores=true_presence, boxes=true_boxes)
         logger.debug(msg="- Batch index shape: %s." % (batch_idx.shape,))
         logger.debug(msg="- Source index shape: %s." % (src_idx.shape,))
         logger.debug(msg="- Target index shape: %s." % (tgt_idx.shape,))
@@ -206,8 +211,8 @@ class PromptableDeTRTrainer(PromptableDeTR):
         # Prepare new targets.
         new_true_presence = torch.zeros_like(true_presence).long().to(true_presence.device)
         new_true_presence[batch_idx, src_idx] = 1
-        new_true_points = torch.zeros_like(pred_points).to(true_points.device)
-        new_true_points[batch_idx, src_idx] = true_points[batch_idx, tgt_idx]
+        new_true_boxes = torch.zeros_like(pred_boxes).to(true_boxes.device)
+        new_true_boxes[batch_idx, src_idx] = true_boxes[batch_idx, tgt_idx]
 
         # Compute F1 accuracy.
         f1_50 = torch.tensor(f1_accuracy_open_vocab(labels=new_true_presence.view(-1, 1), logits=pred_presence.view(-1, 2), threshold=0.50))
@@ -217,10 +222,10 @@ class PromptableDeTRTrainer(PromptableDeTR):
         logger.debug(msg="- F1 Score @0.75: %s." % f1_75)
         logger.debug(msg="- F1 Score @0.90: %s." % f1_90)
 
-        # Compute number of points.
+        # Compute number of boxes.
         obj_idx = new_true_presence == 1
-        num_points = obj_idx.sum()
-        logger.debug(msg="- Number of points: %s." % num_points)
+        num_boxes = obj_idx.sum()
+        logger.debug(msg="- Number of boxes: %s." % num_boxes)
 
         # Compute presence loss with focal loss.
         predictions = pred_presence.view(-1, 2)
@@ -238,36 +243,43 @@ class PromptableDeTRTrainer(PromptableDeTR):
             )
         logger.debug(msg="- Presence loss: %s." % presence_loss)
 
-        # Compute L1 loss.
-        l1_loss = F.mse_loss(input=pred_points, target=new_true_points, reduction="none")
-        l1_loss = l1_loss.sum(dim=-1)
-        l1_loss = l1_loss[obj_idx].sum() / num_points
-        l1_loss = self.__l1_weight * l1_loss
-        logger.debug(msg="- L1 loss: %s." % l1_loss)
+        # Compute bounding box loss.
+        bbox_loss = F.l1_loss(input=pred_boxes, target=new_true_boxes, reduction="none")
+        bbox_loss = bbox_loss.sum(dim=-1)
+        bbox_loss = bbox_loss[obj_idx].sum() / num_boxes
+        bbox_loss = self.__l1_weight * bbox_loss
+        logger.debug(msg="- Bounding box loss: %s." % bbox_loss)
+
+        # Compute GIoU loss.
+        diag_accuracy = torch.diag(generalized_iou(boxes1=pred_boxes, boxes2=new_true_boxes))
+        giou_loss = (1 - diag_accuracy)[obj_idx].sum() / num_boxes
+        giou_loss = self.__giou_weight * giou_loss
+        logger.debug(msg="- GIoU loss: %s." % giou_loss)
 
         # Compute the total loss.
-        loss = l1_loss + presence_loss
+        loss = bbox_loss + presence_loss + giou_loss
         logger.debug(msg="- Total loss: %s." % loss)
         logger.info(msg="Returning the loss value.")
 
-        # Compute distance accuracy.
-        pred_points = pred_points.view(-1, 2)
+        # Compute GIoU accuracy.
+        pred_boxes = pred_boxes.view(-1, 4)
         pred_presence = pred_presence.view(-1, 2)
-        new_true_points = new_true_points.view(-1, 2)
-        dist_50 = dist_accuracy(labels=new_true_points, logits=pred_points, conf=pred_presence, threshold=0.50)
-        dist_75 = dist_accuracy(labels=new_true_points, logits=pred_points, conf=pred_presence, threshold=0.75)
-        dist_90 = dist_accuracy(labels=new_true_points, logits=pred_points, conf=pred_presence, threshold=0.90)
+        new_true_boxes = new_true_boxes.view(-1, 4)
+        giou_50 = generalized_iou(boxes1=new_true_boxes, boxes2=pred_boxes, conf=pred_presence, threshold=0.50)
+        giou_75 = generalized_iou(boxes1=new_true_boxes, boxes2=pred_boxes, conf=pred_presence, threshold=0.75)
+        giou_90 = generalized_iou(boxes1=new_true_boxes, boxes2=pred_boxes, conf=pred_presence, threshold=0.90)
 
         metrics = {
             "loss": loss,
-            "l1_loss": l1_loss,
+            "bbox_loss": bbox_loss,
+            "giou_loss": giou_loss,
             "presence_loss": presence_loss,
             "f1_50": f1_50,
             "f1_75": f1_75,
             "f1_90": f1_90,
-            "dist_50": dist_50,
-            "dist_75": dist_75,
-            "dist_90": dist_90
+            "giou_50": giou_50,
+            "giou_75": giou_75,
+            "giou_90": giou_90
         }
 
         return metrics
