@@ -233,10 +233,10 @@ class Trainer:
         caption = caption[0]
 
         # Filter the objects.
-        logits_presence = logits_objs[:, 2:].softmax(dim=1).detach().cpu().numpy()
-        logits_boxes = logits_objs[:, :2].detach().cpu().numpy()
+        logits_presence = logits_objs[:, 4:].softmax(dim=1).detach().cpu().numpy()
+        logits_boxes = logits_objs[:, :4].detach().cpu().numpy()
 
-        y_objs = y_objs[y_objs[:, 2] == 1][:, :2]
+        y_objs = y_objs[y_objs[:, 4] == 1][:, :4]
 
         return image, caption, y_objs, logits_presence, logits_boxes
 
