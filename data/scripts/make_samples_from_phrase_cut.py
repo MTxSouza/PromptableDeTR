@@ -127,8 +127,8 @@ def get_basic_annot(annot, image_dir):
     assert isinstance(bbox, list), "Bounding box must be a list"
     assert bbox, "Bounding box cannot be empty"
 
-    # Get center points from bounding boxes.
-    points = []
+    # Get center boxes from bounding boxes.
+    boxes = []
     for box in bbox:
         assert len(box) == 4, "Bounding box must have 4 elements"
         x1, y1, w, h = box
@@ -136,16 +136,22 @@ def get_basic_annot(annot, image_dir):
         cy = y1 + h / 2
         cx = min(max(0.0, cx), width)
         cy = min(max(0.0, cy), height)
+        w = min(max(0.0, w), width)
+        h = min(max(0.0, h), height)
         cx /= width
         cy /= height
+        w /= width
+        h /= height
         assert cx <= 1.0, "Center x-coordinate must be <= 1.0"
         assert cy <= 1.0, "Center y-coordinate must be <= 1.0"
-        points.append([cx, cy])
+        assert w <= 1.0, "Width must be <= 1.0"
+        assert h <= 1.0, "Height must be <= 1.0"
+        boxes.append([cx, cy, w, h])
 
     return {
         "image_path": image_path,
         "caption": caption,
-        "points": points
+        "boxes": boxes
     }
 
 def main():
@@ -186,7 +192,7 @@ def main():
     for sample in all_samples:
         
         # Filter sample.
-        n_det = len(sample["points"])
+        n_det = len(sample["boxes"])
         words = sample["caption"].split(" ")
         n_tokens = len(tokenizer.encode_str(sample["caption"]).pop(0))
         if n_det > args.max_detections or n_tokens > args.max_tokens_per_caption:

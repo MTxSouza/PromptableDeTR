@@ -169,9 +169,9 @@ class PrepareCaption(BaseTransform):
         return sample
 
 
-class PreparePoints(BaseTransform):
+class PrepareBoxes(BaseTransform):
     """
-    This class prepares the points for training.
+    This class prepares the boxes for training.
     """
 
 
@@ -190,10 +190,10 @@ class PreparePoints(BaseTransform):
     # Methods.
     def transform(self, sample):
 
-        # Transform the points.
-        points = sample.points
-        points = torch.tensor(data=points, dtype=torch.float32)
-        sample.points_tensor = points
+        # Transform the boxes.
+        boxes = sample.boxes
+        boxes = torch.tensor(data=boxes, dtype=torch.float32)
+        sample.boxes_tensor = boxes
 
         return sample
 
@@ -214,7 +214,7 @@ class PrepareSample(BaseTransform):
         # Define the transformations.
         self.image_transform = PrepareImage()
         self.caption_transform = PrepareCaption(vocab_file=vocab_file)
-        self.points_transform = PreparePoints()
+        self.boxes_transform = PrepareBoxes()
 
 
     def __call__(self, samples):
@@ -237,8 +237,8 @@ class PrepareSample(BaseTransform):
         # Prepare the caption.
         sample = self.caption_transform.transform(sample=sample)
 
-        # Prepare the points.
-        sample = self.points_transform.transform(sample=sample)
+        # Prepare the boxes.
+        sample = self.boxes_transform.transform(sample=sample)
 
         return sample
 

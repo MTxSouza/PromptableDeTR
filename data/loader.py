@@ -125,28 +125,28 @@ class PromptableDeTRDataLoader:
         # Standardize the objects length.
         for sample in batch:
 
-            points_tensor = sample.points_tensor
+            boxes_tensor = sample.boxes_tensor
 
             # Add presence column.
-            presence = torch.ones(size=(points_tensor.size(0), 1), dtype=torch.float32)
-            points_tensor = torch.cat(tensors=[points_tensor, presence], dim=-1)
+            presence = torch.ones(size=(boxes_tensor.size(0), 1), dtype=torch.float32)
+            boxes_tensor = torch.cat(tensors=[boxes_tensor, presence], dim=-1)
 
-            if points_tensor.size(0) != max_len:
+            if boxes_tensor.size(0) != max_len:
 
                 # Pad the objects.
-                pad_len = max_len - points_tensor.size(0)
-                points_tensor = F.pad(input=points_tensor, pad=(0, 0, 0, pad_len), value=pad_value)
+                pad_len = max_len - boxes_tensor.size(0)
+                boxes_tensor = F.pad(input=boxes_tensor, pad=(0, 0, 0, pad_len), value=pad_value)
 
-            points_tensor = points_tensor.unsqueeze(dim=0)
+            boxes_tensor = boxes_tensor.unsqueeze(dim=0)
             if tensor_objects is None:
-                tensor_objects = points_tensor
+                tensor_objects = boxes_tensor
             else:
-                tensor_objects = torch.cat(tensors=(tensor_objects, points_tensor), dim=0)
+                tensor_objects = torch.cat(tensors=(tensor_objects, boxes_tensor), dim=0)
         
         # Create the extra data.
         extra_data = {
             "masked_caption": masked_captions_tensor, 
-            "points": tensor_objects
+            "boxes": tensor_objects
         }
         
         return tensor_images, tensor_captions, mask_tensors, extra_data
