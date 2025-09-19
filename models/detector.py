@@ -13,7 +13,7 @@ from logger import Logger
 from models.base import BasePromptableDeTR
 from models.matcher import HungarianMatcher
 from utils.data import generalized_iou
-from utils.metrics import dist_accuracy, f1_accuracy_open_vocab
+from utils.metrics import f1_accuracy_open_vocab, iou_accuracy
 
 # Logger.
 logger = Logger(name="model")
@@ -251,8 +251,10 @@ class PromptableDeTRTrainer(PromptableDeTR):
         logger.debug(msg="- Bounding box loss: %s." % bbox_loss)
 
         # Compute GIoU loss.
+        pred_boxes = pred_boxes.view(-1, 4)
+        new_true_boxes = new_true_boxes.view(-1, 4)
         diag_accuracy = torch.diag(generalized_iou(boxes1=pred_boxes, boxes2=new_true_boxes))
-        giou_loss = (1 - diag_accuracy)[obj_idx].sum() / num_boxes
+        giou_loss = (1 - diag_accuracy)[obj_idx.view(-1)].sum() / num_boxes
         giou_loss = self.__giou_weight * giou_loss
         logger.debug(msg="- GIoU loss: %s." % giou_loss)
 
@@ -261,13 +263,10 @@ class PromptableDeTRTrainer(PromptableDeTR):
         logger.debug(msg="- Total loss: %s." % loss)
         logger.info(msg="Returning the loss value.")
 
-        # Compute GIoU accuracy.
-        pred_boxes = pred_boxes.view(-1, 4)
-        pred_presence = pred_presence.view(-1, 2)
-        new_true_boxes = new_true_boxes.view(-1, 4)
-        giou_50 = generalized_iou(boxes1=new_true_boxes, boxes2=pred_boxes, conf=pred_presence, threshold=0.50)
-        giou_75 = generalized_iou(boxes1=new_true_boxes, boxes2=pred_boxes, conf=pred_presence, threshold=0.75)
-        giou_90 = generalized_iou(boxes1=new_true_boxes, boxes2=pred_boxes, conf=pred_presence, threshold=0.90)
+        # Compute IoU accuracy.
+        giou_50 = iou_accuracy(labels=new_true_boxes, logits=pred_boxes, threshold=0.50)
+        giou_75 = iou_accuracy(labels=new_true_boxes, logits=pred_boxes, threshold=0.75)
+        giou_90 = iou_accuracy(labels=new_true_boxes, logits=pred_boxes, threshold=0.90)
 
         metrics = {
             "loss": loss,

@@ -174,21 +174,24 @@ class Tensorboard:
         """
         tb_samples = []
         # Prepare the images for Tensorboard.
-        size = 5
         for (img, caption, label, prediction) in samples:
 
             # Draw the rectangles on the image.
-            height, width = img.shape[:2]
             img = PrepareImage.de_normalize(normalized_image=img)
             pil_img = Image.fromarray(img.astype("uint8"))
+            width, height = pil_img.size
             draw = ImageDraw.Draw(im=pil_img)
 
             for bbox in label:
-                draw.rectangle(xy=tuple(bbox), outline="lime", width=2)
+                cx, cy, w, h = bbox
+                bbox = ((cx - w / 2) * width, (cy - h / 2) * height, (cx + w / 2) * width, (cy + h / 2) * height)
+                draw.rectangle(xy=bbox, outline="lime", width=2)
             for bbox_array in prediction:
                 for bbox in bbox_array:
                     try:
-                        draw.rectangle(xy=tuple(bbox), outline="red", width=2)
+                        cx, cy, w, h = bbox
+                        bbox = ((cx - w / 2) * width, (cy - h / 2) * height, (cx + w / 2) * width, (cy + h / 2) * height)
+                        draw.rectangle(xy=bbox, outline="red", width=2)
                     except ValueError:
                         # If the bbox is invalid, skip it.
                         continue

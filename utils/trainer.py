@@ -91,6 +91,7 @@ class Trainer:
         self.__overfit_counter = 0
         self.__losses = []
         self.__bbox_losses = []
+        self.__l1_losses = []
         self.__presence_losses = []
         self.__giou_50_accuracies = []
         self.__giou_75_accuracies = []
@@ -138,6 +139,7 @@ class Trainer:
         if len(self.__losses) > self.__metric_window:
             self.__losses = self.__losses[-self.__metric_window:]
             self.__bbox_losses = self.__bbox_losses[-self.__metric_window:]
+            self.__l1_losses = self.__l1_losses[-self.__metric_window:]
             self.__presence_losses = self.__presence_losses[-self.__metric_window:]
             self.__giou_50_accuracies = self.__giou_50_accuracies[-self.__metric_window:]
             self.__giou_75_accuracies = self.__giou_75_accuracies[-self.__metric_window:]
@@ -149,6 +151,7 @@ class Trainer:
         # Compute mean loss.
         mean_loss = sum(self.__losses) / len(self.__losses)
         mean_bbox_loss = sum(self.__bbox_losses) / len(self.__bbox_losses)
+        mean_l1_loss = sum(self.__l1_losses) / len(self.__l1_losses)
         mean_presence_loss = sum(self.__presence_losses) / len(self.__presence_losses)
 
         # Compute mean accuracy.
@@ -162,6 +165,7 @@ class Trainer:
         metrics = {
             "mean_loss": mean_loss,
             "mean_bbox_loss": mean_bbox_loss,
+            "mean_l1_loss": mean_l1_loss,
             "mean_presence_loss": mean_presence_loss,
             "mean_giou_50_acc": mean_giou_50_acc,
             "mean_giou_75_acc": mean_giou_75_acc,
@@ -270,7 +274,6 @@ class Trainer:
             step=self.__current_iter
         )
 
-
     def __filter_samples_by_conf(self, sample, threshold):
         """
         It filters the samples by the confidence threshold.
@@ -311,7 +314,8 @@ class Trainer:
                 # Compute the loss.
                 metrics = self.model.compute_loss_and_accuracy(logits=logits, labels=y)
                 loss = metrics["loss"]
-                final_bbox_loss = metrics["bbox_loss"].cpu().detach().numpy().item()
+                final_l1_loss = metrics["bbox_loss"].cpu().detach().numpy().item()
+                final_bbox_loss = metrics["giou_loss"].cpu().detach().numpy().item()
                 final_presence_loss = metrics["presence_loss"].cpu().detach().numpy().item()
                 f1_50 = metrics["f1_50"].cpu().detach().numpy().item()
                 f1_75 = metrics["f1_75"].cpu().detach().numpy().item()
@@ -321,7 +325,7 @@ class Trainer:
                 giou_90 = metrics["giou_90"].cpu().detach().numpy().item()
 
                 # Backward pass.
-                torch.nn.utils.clip_grad_norm_(parameters=self.model.parameters(), max_norm=0.5)
+                # torch.nn.utils.clip_grad_norm_(parameters=self.model.parameters(), max_norm=0.8)
                 self.optimizer.zero_grad()
                 loss.backward()
                 self.optimizer.step()
@@ -341,6 +345,7 @@ class Trainer:
                 # Store the losses.
                 self.__losses.append(loss.cpu().detach().numpy().item())
                 self.__bbox_losses.append(final_bbox_loss)
+                self.__l1_losses.append(final_l1_loss)
                 self.__presence_losses.append(final_presence_loss)
 
                 # Check if it is time to log the loss.
@@ -349,6 +354,7 @@ class Trainer:
                     metrics = self.__compute_current_training_metrics()
                     current_loss = metrics["mean_loss"]
                     current_bbox_loss = metrics["mean_bbox_loss"]
+                    current_l1_loss = metrics["mean_l1_loss"]
                     current_presence_loss = metrics["mean_presence_loss"]
                     current_giou_50_acc = metrics["mean_giou_50_acc"]
                     current_giou_75_acc = metrics["mean_giou_75_acc"]
@@ -373,7 +379,7 @@ class Trainer:
                     self.__tensorboard.add_train_f1_accuracy(acc=current_f1_75_acc, step=self.__current_iter, th=0.75)
                     self.__tensorboard.add_train_f1_accuracy(acc=current_f1_90_acc, step=self.__current_iter, th=0.90)
 
-                    print("Loss: %.4f - L1 Loss: %.4f - Presence Loss: %.4f" % (current_loss, current_bbox_loss, current_presence_loss))
+                    print("Loss: %.4f - GIoU Loss: %.4f - L1 Loss: %.4f - Presence Loss: %.4f" % (current_loss, current_bbox_loss, current_l1_loss, current_presence_loss))
                     print("GIoU@0.50: %.4f - GIoU@0.75: %.4f - GIoU@0.90: %.4f | F1@0.50: %.4f - F1@0.75: %.4f - F1@0.90: %.4f" % (current_giou_50_acc, current_giou_75_acc, current_giou_90_acc, current_f1_50_acc, current_f1_75_acc, current_f1_90_acc))
                     print("-" * 100)
 
@@ -385,6 +391,7 @@ class Trainer:
                     # Loop over the validation data loader.
                     total_loss = 0.0
                     total_bbox_loss = 0.0
+                    total_l1_loss = 0.0
                     total_presence_loss = 0.0
                     total_giou_50_acc = 0.0
                     total_giou_75_acc = 0.0
@@ -401,15 +408,16 @@ class Trainer:
 
                         # Compute the loss.
                         metrics = self.model.compute_loss_and_accuracy(logits=logits, labels=y)
-                        total_loss += metrics["loss"]
-                        total_bbox_loss += metrics["bbox_loss"]
-                        total_presence_loss += metrics["presence_loss"]
-                        total_f1_50_acc += metrics["f1_50"]
-                        total_f1_75_acc += metrics["f1_75"]
-                        total_f1_90_acc += metrics["f1_90"]
-                        total_giou_50_acc += metrics["giou_50"]
-                        total_giou_75_acc += metrics["giou_75"]
-                        total_giou_90_acc += metrics["giou_90"]
+                        total_loss += metrics["loss"].cpu().detach().numpy().item()
+                        total_l1_loss += metrics["bbox_loss"].cpu().detach().numpy().item()
+                        total_bbox_loss += metrics["giou_loss"].cpu().detach().numpy().item()
+                        total_presence_loss += metrics["presence_loss"].cpu().detach().numpy().item()
+                        total_f1_50_acc += metrics["f1_50"].cpu().detach().numpy().item()
+                        total_f1_75_acc += metrics["f1_75"].cpu().detach().numpy().item()
+                        total_f1_90_acc += metrics["f1_90"].cpu().detach().numpy().item()
+                        total_giou_50_acc += metrics["giou_50"].cpu().detach().numpy().item()
+                        total_giou_75_acc += metrics["giou_75"].cpu().detach().numpy().item()
+                        total_giou_90_acc += metrics["giou_90"].cpu().detach().numpy().item()
 
                         # Get a random sample.
                         small_samples = [self.__get_sample(images=images[idx_batch], captions=captions[idx_batch], y=y[idx_batch], logits=logits[idx_batch]) for idx_batch in range(images.size(0))]
@@ -430,6 +438,7 @@ class Trainer:
                     del samples
 
                     total_loss /= len(self.valid_dataset)
+                    total_l1_loss /= len(self.valid_dataset)
                     total_bbox_loss /= len(self.valid_dataset)
                     total_presence_loss /= len(self.valid_dataset)
                     total_giou_50_acc /= len(self.valid_dataset)
@@ -460,13 +469,13 @@ class Trainer:
                     self.__tensorboard.add_valid_f1_accuracy(acc=total_f1_90_acc, step=self.__current_iter, th=0.90)
 
                     # Display the samples on Tensorboard.
-                    self.__tensorboard.add_image(samples=samples_giou_50_acc, step=self.__current_iter, bbox_loss_th=0.50)
-                    self.__tensorboard.add_image(samples=samples_giou_75_acc, step=self.__current_iter, bbox_loss_th=0.75)
-                    self.__tensorboard.add_image(samples=samples_giou_90_acc, step=self.__current_iter, bbox_loss_th=0.90)
+                    self.__tensorboard.add_image(samples=samples_giou_50_acc, step=self.__current_iter, giou_th=0.50)
+                    self.__tensorboard.add_image(samples=samples_giou_75_acc, step=self.__current_iter, giou_th=0.75)
+                    self.__tensorboard.add_image(samples=samples_giou_90_acc, step=self.__current_iter, giou_th=0.90)
 
                     print("Validation time: %.2f minutes" % end_time)
                     print("Overfit counter: %d" % self.__overfit_counter)
-                    print("Validation loss: %.4f - L1 Loss: %.4f - Presence Loss: %.4f" % (total_loss, total_bbox_loss, total_presence_loss))
+                    print("Validation loss: %.4f - GIoU Loss: %.4f - L1 Loss: %.4f - Presence Loss: %.4f" % (total_loss, total_bbox_loss, total_l1_loss, total_presence_loss))
                     print("GIoU@0.5: %.4f - GIoU@0.75: %.4f - GIoU@0.90: %.4f | F1@0.5: %.4f - F1@0.75: %.4f - F1@0.90: %.4f" % (total_giou_50_acc, total_giou_75_acc, total_giou_90_acc, total_f1_50_acc, total_f1_75_acc, total_f1_90_acc))
                     print("=" * 100)
 

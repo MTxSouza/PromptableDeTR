@@ -3,6 +3,7 @@ This module contains all evaluation metrics used to validate the PromptableDeTR 
 """
 import numpy as np
 import torch
+from torchvision.ops.boxes import box_iou
 
 
 # Functions.
@@ -106,3 +107,34 @@ def f1_accuracy_open_vocab(labels, logits, threshold=0.5):
 
     f1 = 2 * (precision * recall) / (precision + recall) if precision + recall > 0 else torch.tensor(data=0.0)
     return f1.item()
+
+def iou_accuracy(labels, logits, threshold=0.5):
+    """
+    Computes the accuracy of the model based on the Intersection over Union (IoU) 
+    between the ground truth and the predicted bounding boxes.
+
+    Args:
+        labels (torch.Tensor): The true labels with shape (N, 4).
+        logits (torch.Tensor): The logits from the model with shape (N, 4).
+        threshold (float): IoU threshold. (Default: 0.5)
+
+    Returns:
+        torch.Tensor: The IoU accuracy score.
+    """
+    # Check if the labels and logits are empty.
+    if not labels.size(0) and not logits.size(0):
+        return torch.tensor(1.0)
+    elif labels.size(0) and not logits.size(0):
+        return torch.tensor(0.0)
+    elif not labels.size(0) and logits.size(0):
+        return torch.tensor(0.0)
+
+    # Compute the accuracy.
+    iou_score = box_iou(labels, logits)
+    iou_score = torch.diag(iou_score)
+    iou_score = iou_score[iou_score >= threshold]
+    iou_score = iou_score.float().mean()
+    if torch.isnan(iou_score):
+        iou_score = torch.tensor(0)
+
+    return iou_score
