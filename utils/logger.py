@@ -23,7 +23,6 @@ class LevelName(Enum):
     error = logging.ERROR
     critical = logging.CRITICAL
 
-
 # Functions.
 def get_logger(name, level = "info"):
     """
@@ -51,10 +50,8 @@ def get_logger(name, level = "info"):
 
     return log
 
-
 # Classes.
 class Tensorboard:
-
 
     # Special methods.
     def __init__(self, log_dir):
@@ -67,9 +64,8 @@ class Tensorboard:
         log_dir = os.path.join(log_dir, "tensorboard")
         self.writer = SummaryWriter(log_dir=log_dir)
 
-
     # Methods.
-    def add_current_lr(self, lr, step):
+    def add_current_lr(self, lr, name, step):
         """
         Adds the current learning rate to the Tensorboard writer.
 
@@ -77,23 +73,25 @@ class Tensorboard:
             lr (float): Current learning rate value.
             step (int): Step number.
         """
-        self.writer.add_scalar(tag="lr", scalar_value=lr, global_step=step)
+        self.writer.add_scalar(tag="lr/%s" % name, scalar_value=lr, global_step=step)
 
-
-    def add_train_losses(self, loss, bbox_loss, presence_loss, step):
+    def add_train_losses(self, loss, l1_loss, bbox_loss, presence_loss, contrastive_loss, step):
         """
         Adds the training loss to the Tensorboard writer.
 
         Args:
             loss (float): Total training loss value.
-            bbox_loss (float): Training L1 loss value.
+            l1_loss (float): Training L1 loss value.
+            bbox_loss (float): Training bounding box loss value.
             presence_loss (float): Training presence loss value.
+            contrastive_loss (float): Training contrastive loss value.
             step (int): Step number.
         """
         self.writer.add_scalar(tag="train_loss", scalar_value=loss, global_step=step)
-        self.writer.add_scalar(tag="train_l1_loss", scalar_value=bbox_loss, global_step=step)
+        self.writer.add_scalar(tag="train_l1_loss", scalar_value=l1_loss, global_step=step)
+        self.writer.add_scalar(tag="train_bbox_loss", scalar_value=bbox_loss, global_step=step)
         self.writer.add_scalar(tag="train_presence_loss", scalar_value=presence_loss, global_step=step)
-
+        self.writer.add_scalar(tag="train_contrastive_loss", scalar_value=contrastive_loss, global_step=step)
 
     def add_train_giou_accuracy(self, acc, step, th):
         """
@@ -107,7 +105,6 @@ class Tensorboard:
         tag = "train_GIoU@%f" % th
         self.writer.add_scalar(tag=tag, scalar_value=acc, global_step=step)
 
-
     def add_train_f1_accuracy(self, acc, step, th):
         """
         Adds the training F1 accuracy to the Tensorboard writer.
@@ -120,21 +117,23 @@ class Tensorboard:
         tag = "train_F1@%f" % th
         self.writer.add_scalar(tag=tag, scalar_value=acc, global_step=step)
 
-
-    def add_valid_losses(self, loss, bbox_loss, presence_loss, step):
+    def add_valid_losses(self, loss, l1_loss, bbox_loss, presence_loss, contrastive_loss, step):
         """
         Adds the validation loss to the Tensorboard writer.
 
         Args:
             loss (float): Total validation loss value.
-            bbox_loss (float): Validation L1 loss value.
+            l1_loss (float): Validation L1 loss value.
+            bbox_loss (float): Validation bounding box loss value.
             presence_loss (float): Validation presence loss value.
+            contrastive_loss (float): Validation contrastive loss value.
             step (int): Step number.
         """
         self.writer.add_scalar(tag="valid_loss", scalar_value=loss, global_step=step)
-        self.writer.add_scalar(tag="valid_l1_loss", scalar_value=bbox_loss, global_step=step)
+        self.writer.add_scalar(tag="valid_l1_loss", scalar_value=l1_loss, global_step=step)
+        self.writer.add_scalar(tag="valid_bbox_loss", scalar_value=bbox_loss, global_step=step)
         self.writer.add_scalar(tag="valid_presence_loss", scalar_value=presence_loss, global_step=step)
-
+        self.writer.add_scalar(tag="valid_contrastive_loss", scalar_value=contrastive_loss, global_step=step)
 
     def add_valid_giou_accuracy(self, acc, step, th):
         """
@@ -148,7 +147,6 @@ class Tensorboard:
         tag = "valid_GIoU@%f" % th
         self.writer.add_scalar(tag=tag, scalar_value=acc, global_step=step)
 
-
     def add_valid_f1_accuracy(self, acc, step, th):
         """
         Adds the validation F1 accuracy to the Tensorboard writer.
@@ -160,7 +158,6 @@ class Tensorboard:
         """
         tag = "valid_F1@%f" % th
         self.writer.add_scalar(tag=tag, scalar_value=acc, global_step=step)
-
 
     def add_image(self, samples, step, giou_th):
         """
@@ -186,15 +183,14 @@ class Tensorboard:
                 cx, cy, w, h = bbox
                 bbox = ((cx - w / 2) * width, (cy - h / 2) * height, (cx + w / 2) * width, (cy + h / 2) * height)
                 draw.rectangle(xy=bbox, outline="lime", width=2)
-            for bbox_array in prediction:
-                for bbox in bbox_array:
-                    try:
-                        cx, cy, w, h = bbox
-                        bbox = ((cx - w / 2) * width, (cy - h / 2) * height, (cx + w / 2) * width, (cy + h / 2) * height)
-                        draw.rectangle(xy=bbox, outline="red", width=2)
-                    except ValueError:
-                        # If the bbox is invalid, skip it.
-                        continue
+            for bbox in prediction:
+                try:
+                    cx, cy, w, h = bbox
+                    bbox = ((cx - w / 2) * width, (cy - h / 2) * height, (cx + w / 2) * width, (cy + h / 2) * height)
+                    draw.rectangle(xy=bbox, outline="red", width=2)
+                except ValueError:
+                    # If the bbox is invalid, skip it.
+                    continue
 
             # Write the caption on the image.
             font = ImageFont.load_default()
@@ -208,6 +204,18 @@ class Tensorboard:
         # Add the images to the Tensorboard writer.
         for idx, sample in enumerate(iterable=tb_samples):
             self.writer.add_image(tag=f"[{idx} - GIoU@{giou_th}]", img_tensor=np.asarray(sample), global_step=step, dataformats="HWC")
+
+    def add_grad(self, model, step):
+        """
+        Adds the gradients of the model to the Tensorboard writer.
+
+        Args:
+            model (torch.nn.Module): Model to be used.
+            step (int): Step number.
+        """
+        for name, param in model.named_parameters():
+            if param.grad is not None:
+                self.writer.add_histogram(tag="gradients/%s" % name, values=param.grad, global_step=step)
 
     def close(self):
         """

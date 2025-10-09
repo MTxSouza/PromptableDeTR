@@ -90,6 +90,7 @@ class BasePromptableDeTR(Encoder):
     def __init__(
             self, 
             image_size, 
+            num_queries = 10,
             vocab_size = 30522, 
             emb_dim = 512, 
             num_heads = 8, 
@@ -102,13 +103,13 @@ class BasePromptableDeTR(Encoder):
         # Joiner.
         self.joiner = Joiner(
             image_size=image_size, 
+            num_queries=num_queries,
             emb_dim=emb_dim, 
             num_heads=num_heads, 
             ff_dim=ff_dim, 
             num_joins=num_joiner_layers
         )
         self.image_size = image_size
-
 
     # Methods.
     def load_base_weights(self, image_encoder_weights = None, text_encoder_weights = None):
@@ -132,7 +133,6 @@ class BasePromptableDeTR(Encoder):
         if text_encoder_weights is not None:
             logger.debug(msg="- Loading the text encoder weights.")
             self.text_encoder.load_state_dict(torch.load(f=text_encoder_weights, weights_only=True))
-    
 
     def load_full_weights(self, base_model_weights):
         """
@@ -151,7 +151,6 @@ class BasePromptableDeTR(Encoder):
 
         self.load_state_dict(filtered_weights, strict=False)
 
-
     def forward(self, image, prompt, prompt_mask = None):
         """
         Forward pass of the PromptableDeTR model.
@@ -162,7 +161,7 @@ class BasePromptableDeTR(Encoder):
             prompt_mask (torch.Tensor): Prompt mask tensor. (Default: None)
 
         Returns:
-            PromptableDeTROutput: Bounding box and presence predictions.
+            Tuple[PromptableDeTROutput, torch.Tensor, torch.Tensor]: Bounding box and presence predictions and the text and image embeddings.
         """
         logger.info(msg="Calling `BasePromptableDeTR` forward method.")
         logger.debug(msg="- Image shape: %s" % (image.shape,))
@@ -173,9 +172,9 @@ class BasePromptableDeTR(Encoder):
 
         # Join image and text embeddings.
         logger.debug(msg="- Calling `Joiner` block to the image and text tensors.")
-        joint_emb = self.joiner(image_emb, text_emb)
+        joint_emb, text_emb, image_emb = self.joiner(image_emb, text_emb)
         logger.debug(msg="- Result of the `Joiner` block: %s." % (joint_emb.shape,))
 
         logger.info(msg="Returning the final output of the `BasePromptableDeTR` model with one tensor.")
         logger.debug(msg="- Joint embeddings shape: %s" % (joint_emb.shape,))
-        return joint_emb
+        return joint_emb, text_emb, image_emb

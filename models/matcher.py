@@ -15,7 +15,6 @@ logger = Logger(name="model")
 # Classes.
 class HungarianMatcher(nn.Module):
 
-
     # Special methods.
     def __init__(self, presence_loss_weight = 1.0, giou_loss_weight = 1.0, l1_loss_weight = 1.0):
         """
@@ -32,7 +31,6 @@ class HungarianMatcher(nn.Module):
         self.presence_loss_weight = presence_loss_weight
         self.giou_loss_weight = giou_loss_weight
         self.l1_loss_weight = l1_loss_weight
-
 
     # Methods.
     @torch.no_grad()
@@ -51,7 +49,7 @@ class HungarianMatcher(nn.Module):
             Tuple[torch.Tensor, torch.Tensor, torch.Tensor]: The batch, source, and target indices.
         """
         # Get the batch size and number of predicted objects.
-        B, _ = predict_scores.size()[:2]
+        B = predict_scores.size(dim=0)
         indices = []
 
         for batch in range(B):

@@ -19,7 +19,6 @@ class BaseTransform(ABC):
     Base class for all transformations.
     """
 
-
     # Special methods.
     @abstractmethod
     def __call__(self, samples):
@@ -30,7 +29,6 @@ class BaseTransform(ABC):
             samples (Sample | List[Sample]): The sample or list of samples to transform.
         """
         pass
-
 
     # Methods.
     @abstractmethod
@@ -45,7 +43,6 @@ class BaseTransform(ABC):
             Sample: The transformed sample.
         """
         pass
-
 
     def validate_samples(self, samples):
         """
@@ -67,7 +64,6 @@ class BaseTransform(ABC):
                 raise ValueError("All objects in the list must be a Sample.")
 
         return samples
-
 
 class PrepareImage(BaseTransform):
     """
@@ -127,12 +123,10 @@ class PrepareImage(BaseTransform):
 
         return sample
 
-
 class PrepareCaption(BaseTransform):
     """
     This class prepares the caption for training.
     """
-
 
     # Special methods.
     def __init__(self, vocab_file):
@@ -145,7 +139,6 @@ class PrepareCaption(BaseTransform):
         # Load the tokenizer.
         self.tokenizer = Tokenizer(vocab_filepath=vocab_file)
 
-
     def __call__(self, samples):
 
         # Validate the samples.
@@ -155,7 +148,6 @@ class PrepareCaption(BaseTransform):
         samples = [self.transform(sample=sample) for sample in samples]
 
         return samples
-
 
     # Methods.
     def transform(self, sample):
@@ -168,12 +160,10 @@ class PrepareCaption(BaseTransform):
 
         return sample
 
-
 class PrepareBoxes(BaseTransform):
     """
     This class prepares the boxes for training.
     """
-
 
     # Special methods.
     def __call__(self, samples):
@@ -186,7 +176,6 @@ class PrepareBoxes(BaseTransform):
 
         return samples
 
-
     # Methods.
     def transform(self, sample):
 
@@ -197,9 +186,7 @@ class PrepareBoxes(BaseTransform):
 
         return sample
 
-
 class PrepareSample(BaseTransform):
-
 
     # Special methods.
     def __init__(self, vocab_file):
@@ -216,7 +203,6 @@ class PrepareSample(BaseTransform):
         self.caption_transform = PrepareCaption(vocab_file=vocab_file)
         self.boxes_transform = PrepareBoxes()
 
-
     def __call__(self, samples):
         
         # Validate the samples.
@@ -226,7 +212,6 @@ class PrepareSample(BaseTransform):
         samples = [self.transform(sample=sample) for sample in samples]
 
         return samples
-
 
     # Methods.
     def transform(self, sample):
@@ -242,9 +227,7 @@ class PrepareSample(BaseTransform):
 
         return sample
 
-
 class ReshapeImage(BaseTransform):
-
 
     # Special methods.
     def __init__(self, image_size):
@@ -260,7 +243,6 @@ class ReshapeImage(BaseTransform):
 
         self.image_size = image_size
 
-
     def __call__(self, samples):
         
         # Validate the samples.
@@ -270,7 +252,6 @@ class ReshapeImage(BaseTransform):
         samples = [self.transform(sample=sample) for sample in samples]
 
         return samples
-
 
     # Methods.
     def transform(self, sample):
@@ -286,5 +267,47 @@ class ReshapeImage(BaseTransform):
             mode="bilinear", 
             align_corners=False
         ).squeeze(0)
+
+        return sample
+
+class DisableCaption(BaseTransform):
+    """
+    This class disables randomly the caption and erases 
+    all boxes with a given probability.
+    """
+
+    # Special methods.
+    def __init__(self, vocab_file: str, prob: float = 0.3):
+        """
+        Initialize the class.
+
+        Args:
+            vocab (str): The path to the vocabulary file.
+            prob (float): The probability of disabling the caption. (Default: 0.3)
+        """
+        # Load the tokenizer.
+        self.tokenizer = Tokenizer(vocab_filepath=vocab_file)
+
+        self.prob = prob
+
+    def __call__(self, samples):
+
+        # Validate the samples.
+        samples = self.validate_samples(samples=samples)
+
+        # Prepare the samples.
+        samples = [self.transform(sample=sample) for sample in samples]
+
+        return samples
+
+    # Methods.
+    def transform(self, sample):
+
+        # Disable the caption with a given probability.
+        if np.random.rand() < self.prob:
+            sample.caption = ""
+            sample.caption_tokens = torch.tensor(data=self.tokenizer.encode(texts="")[0])
+            sample.boxes = []
+            sample.boxes_tensor = torch.zeros((0, 4), dtype=torch.float32)
 
         return sample

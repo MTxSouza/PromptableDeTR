@@ -2,7 +2,27 @@
 This module contains the arguments used for most parts of the project, including training.
 """
 import argparse
+import os
 
+
+# Functions.
+def get_dataset_args(value):
+    """
+    Get the dataset arguments from a comma-separated string.
+
+    Args:
+        value (str): The comma-separated string.
+
+    Returns:
+        tuple[str, float]: The dataset path and weight.
+    """
+    split = value.split(",")
+    assert len(split) == 2, "The dataset argument must contain two paths separated by a comma."
+    data_path, weight = split
+    assert os.path.isdir(data_path), "The dataset path must be a valid directory."
+    weight = float(weight)
+    assert weight > 0, "The dataset weight must be a positive number."
+    return data_path, weight
 
 # Arguments.
 def get_args():
@@ -29,7 +49,7 @@ def get_args():
         "--train-dataset-dir",
         "--train-dataset",
         "-td",
-        type=str,
+        type=get_dataset_args,
         nargs="+",
         required=True,
         help="List of paths to the train dataset directory."
@@ -38,7 +58,7 @@ def get_args():
         "--valid-dataset-dir",
         "--valid-dataset",
         "-vd",
-        type=str,
+        type=get_dataset_args,
         nargs="+",
         required=True,
         help="List of paths to the valid dataset directory."
@@ -74,11 +94,11 @@ def get_args():
         help="Path to the text encoder weights."
     )
     model_parser.add_argument(
-        "--base-model-weights",
+        "--model-weights",
         "--bmw",
         type=str,
         default=None,
-        help="Path to the full base model weights."
+        help="Path to the model weights to start training from."
     )
     model_parser.add_argument(
         "--image-size",
@@ -89,12 +109,12 @@ def get_args():
         help="The image size."
     )
     model_parser.add_argument(
-        "--caption-length",
-        "--cap-len",
+        "--num-queries",
+        "--nq",
         type=int,
         default=10,
-        choices=list(range(10, 51, 5)),
-        help="The caption length."
+        choices=list(range(5, 51, 5)),
+        help="The number of queries."
     )
     model_parser.add_argument(
         "--proj-dim",
@@ -140,8 +160,14 @@ def get_args():
     training_parser.add_argument(
         "--max-iter",
         type=int,
-        default=50000,
+        default=80000,
         help="The maximum number of iterations."
+    )
+    training_parser.add_argument(
+        "--curve-limit",
+        type=int,
+        default=55000,
+        help="The maximum number of iterations for the LR curve."
     )
     training_parser.add_argument(
         "--batch-size",
@@ -151,16 +177,16 @@ def get_args():
         help="The batch size for the training process."
     )
     training_parser.add_argument(
-        "--lr",
+        "--max-lr",
         type=float,
-        default=1e-4,
-        help="The learning rate for the optimizer."
+        default=5e-5,
+        help="Maximum learning rate for the Joiner optimizer."
     )
     training_parser.add_argument(
-        "--lr-factor",
+        "--min-lr",
         type=float,
-        default=0.1,
-        help="The factor to reduce the learning rate."
+        default=1e-5,
+        help="Minimum learning rate for the Joiner optimizer."
     )
     training_parser.add_argument(
         "--warmup-steps",
@@ -230,6 +256,12 @@ def get_args():
         help="The weight for the L1 loss."
     )
     training_parser.add_argument(
+        "--contrastive-weight",
+        type=float,
+        default=1.0,
+        help="The weight for the contrastive loss."
+    )
+    training_parser.add_argument(
         "--alpha",
         type=float,
         default=0.25,
@@ -254,9 +286,20 @@ def get_args():
         help="The L1 loss weight for the Hungarian matcher."
     )
     training_parser.add_argument(
+        "--disable-caption-prob",
+        type=float,
+        default=0.3,
+        help="The probability of disabling the caption during training."
+    )
+    training_parser.add_argument(
         "--save-logs",
         action="store_true",
         help="Whether to save the logs."
+    )
+    training_parser.add_argument(
+        "--log-grads",
+        action="store_true",
+        help="Whether to log the gradients."
     )
 
     # Parse the arguments.

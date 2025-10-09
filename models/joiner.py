@@ -316,7 +316,7 @@ class Joiner(nn.Module):
 
 
     # Special methods.
-    def __init__(self, image_size, emb_dim = 512, num_heads = 8, ff_dim = 1024, num_joins = 3):
+    def __init__(self, image_size, num_queries = 10, emb_dim = 512, num_heads = 8, ff_dim = 1024, num_joins = 3):
         super().__init__()
 
         # Define number of image tokens based on the image size.
@@ -331,7 +331,6 @@ class Joiner(nn.Module):
             raise ValueError("Unsupported image size. Supported sizes are: 640, 480, 320, 224.")
 
         # Prepare query vector.
-        num_queries = 10 # HARDCODED.
         self.query_vector = nn.Parameter(data=torch.Tensor(num_queries, emb_dim))
         self.query_layer = nn.Linear(in_features=emb_dim, out_features=emb_dim)
 
@@ -346,6 +345,9 @@ class Joiner(nn.Module):
         num_image_feature_levels = len(self.__image_tokens)
         self.level_emb = nn.Parameter(data=torch.Tensor(num_image_feature_levels, emb_dim))
 
+        # Attributes.
+        self.__txt_emb = None
+        self.__img_emb = None
 
     # Properties.
     @property
@@ -358,6 +360,35 @@ class Joiner(nn.Module):
         """
         return [joiner_block.multi_head_attention.attentions for joiner_block in self.joiner_blocks]
 
+    @property
+    def text_embedding(self):
+        """
+        Get the text embedding tensor.
+
+        Returns:
+            torch.Tensor: Text embedding tensor.
+        """
+        return self.__txt_emb
+    
+    @property
+    def image_embedding(self):
+        """
+        Get the image embedding tensor.
+
+        Returns:
+            torch.Tensor: Image embedding tensor.
+        """
+        return self.__img_emb
+
+    @property
+    def image_embedding(self):
+        """
+        Get the image embedding tensor.
+
+        Returns:
+            torch.Tensor: Image embedding tensor.
+        """
+        return self.__img_emb
 
     # Methods.
     def forward(self, image_features, text_embedding):
@@ -369,7 +400,7 @@ class Joiner(nn.Module):
             text_embedding (torch.Tensor): Text embedding tensor.
 
         Returns:
-            torch.Tensor: Joined embedding tensor.
+            Tuple[torch.Tensor, torch.Tensor, torch.Tensor]: Joined embedding tensor and the text and image embedding tensors.
         """
         logger.debug(msg="Calling `Joiner` forward method.")
 
@@ -415,4 +446,4 @@ class Joiner(nn.Module):
             query_vector = joiner_block(query_vector, memory, memory)
             logger.debug(msg="Text embedding shape: %s" % (query_vector.shape,))
 
-        return query_vector
+        return query_vector, text_embedding, processed_image_features
