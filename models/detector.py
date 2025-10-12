@@ -193,7 +193,7 @@ class PromptableDeTRTrainer(PromptableDeTR):
         )
 
     # Methods.
-    def compute_loss_and_accuracy(self, logits, labels, fusion_emb, txt_emb, img_emb):
+    def compute_loss_and_accuracy(self, logits, labels, fusion_emb, txt_emb, img_emb, txt_mask = None):
         """
         Compute the loss needed to train the detector model and
         it also computes the accuracy of the model.
@@ -204,6 +204,7 @@ class PromptableDeTRTrainer(PromptableDeTR):
             fusion_emb (torch.Tensor): The joint embeddings.
             txt_emb (torch.Tensor): The text embeddings.
             img_emb (torch.Tensor): The image embeddings.
+            txt_mask (torch.Tensor): The text mask tensor. (Default: None)
 
         Returns:
             dict: A dictionary containing the loss and accuracy values.
@@ -249,47 +250,53 @@ class PromptableDeTRTrainer(PromptableDeTR):
         num_boxes = obj_idx.sum()
         logger.debug(msg="- Number of boxes: %s." % num_boxes)
 
-        # Compute contrastive loss for real objects.
-        global_contrastive_loss = torch.tensor(0.0, device=pred_boxes.device)
-        local_contrastive_loss = torch.tensor(0.0, device=pred_boxes.device)
-        n_pos = 0
-        fusion_emb = F.normalize(input=fusion_emb, dim=-1)
-        txt_emb = F.normalize(input=txt_emb, dim=-1)
-        img_emb = F.normalize(input=img_emb, dim=-1)
-        for batch_index in range(txt_emb.size(0)):
+        # Compute Global and Local Contrastive Loss.
+        valid_obj = obj_idx.any(dim=1) # (B,)
+        if valid_obj.any():
+            txt_emb = txt_emb[valid_obj] # (num_valid_obj, Tt, D)
+            img_emb = img_emb[valid_obj] # (num_valid_obj, Ti, D)
+            fusion_emb = fusion_emb[valid_obj] # (num_valid_obj, n_detections, D)
+            tk_emb = txt_emb.clone()
 
-            if not obj_idx[batch_index].any():
-                continue
-
-            # Global contrastive loss.
-            global_cos_sim = txt_emb[batch_index] @ img_emb[batch_index].t()
-            global_txt_tgt = torch.arange(start=0, end=global_cos_sim.size(dim=0), device=txt_emb.device)
-            global_img_tgt = torch.arange(start=0, end=global_cos_sim.size(dim=1), device=img_emb.device) % global_cos_sim.size(0)
-
-            global_txt_loss = F.cross_entropy(input=global_cos_sim, target=global_txt_tgt)
-            global_img_loss = F.cross_entropy(input=global_cos_sim.t(), target=global_img_tgt)
-            global_contrastive_loss += (global_txt_loss + global_img_loss) / 2
-
-            # Object-level contrastive loss.
-            local_cos_sim = fusion_emb[batch_index, obj_idx[batch_index]] @ txt_emb[batch_index].t()
-            local_txt_tgt = torch.arange(start=0, end=local_cos_sim.size(dim=0), device=txt_emb.device)
-            local_obj_tgt = torch.arange(start=0, end=local_cos_sim.size(dim=1), device=fusion_emb.device)
-            if local_cos_sim.size(1) > local_cos_sim.size(0):
-                local_obj_tgt = local_obj_tgt % local_cos_sim.size(0)
+            if txt_mask is not None:
+                txt_mask = txt_mask[valid_obj] # (num_valid_obj, Tt)
+                denom = txt_mask.sum(dim=1, keepdim=True).clamp(min=1e-6).to(txt_emb.device)
+                txt_emb = (txt_emb * (txt_mask).unsqueeze(dim=-1)).sum(dim=1) / denom
+                tk_emb = tk_emb * (txt_mask).unsqueeze(dim=-1)
             else:
-                local_txt_tgt = local_txt_tgt % local_cos_sim.size(1)
+                txt_emb = txt_emb.mean(dim=1)
+            txt_emb = F.normalize(input=txt_emb, dim=-1)
+            img_emb = F.normalize(input=img_emb.mean(dim=1), dim=-1)
 
-            local_txt_loss = F.cross_entropy(input=local_cos_sim, target=local_txt_tgt)
-            local_obj_loss = F.cross_entropy(input=local_cos_sim.t(), target=local_obj_tgt)
-            local_contrastive_loss += (local_txt_loss + local_obj_loss) / 2
+            global_cos_sim = txt_emb @ img_emb.t()
+            targets = torch.arange(global_cos_sim.size(0), device=global_cos_sim.device)
+            global_txt_loss = F.cross_entropy(global_cos_sim, targets)
+            global_img_loss = F.cross_entropy(global_cos_sim.t(), targets)
+            global_contrastive_loss = (global_txt_loss + global_img_loss) / 2
+            global_contrastive_loss = self.__contrastive_weight * global_contrastive_loss
 
-            n_pos += 1
+            tk_emb = F.normalize(input=tk_emb, dim=-1)
+            fusion_emb = F.normalize(input=fusion_emb, dim=-1)
+            local_cos_sim = tk_emb @ fusion_emb.transpose(-2, -1)
+            local_txt_loss = 0
+            local_obj_loss = 0
+            for batch in range(local_cos_sim.size(0)):
+                cos_sim = local_cos_sim[batch]
+                txt_targets = torch.arange(cos_sim.size(0), device=cos_sim.device) % cos_sim.size(1)
+                obj_targets = torch.arange(cos_sim.size(1), device=cos_sim.device) % cos_sim.size(0)
+                local_txt_loss += F.cross_entropy(cos_sim, txt_targets)
+                local_obj_loss += F.cross_entropy(cos_sim.t(), obj_targets)
+            local_txt_loss /= local_cos_sim.size(0)
+            local_obj_loss /= local_cos_sim.size(0)
+            local_contrastive_loss = (local_txt_loss + local_obj_loss) / 2
+            local_contrastive_loss = self.__contrastive_weight * local_contrastive_loss
+        
+        else:
+            global_contrastive_loss = torch.tensor(0.0, device=pred_boxes.device)
+            local_contrastive_loss = torch.tensor(0.0, device=pred_boxes.device)
 
-        if n_pos > 0:
-            global_contrastive_loss /= n_pos
-            local_contrastive_loss /= n_pos
-        contrastive_loss = self.__contrastive_weight * global_contrastive_loss + self.__contrastive_weight * local_contrastive_loss
-        logger.debug(msg="- Contrastive loss: %s." % global_contrastive_loss)
+        logger.debug(msg="- Global Contrastive loss: %s." % global_contrastive_loss)
+        logger.debug(msg="- Local Contrastive loss: %s." % local_contrastive_loss)
 
         # Compute presence loss with focal loss.
         predictions = pred_presence.view(-1, 2)
@@ -331,7 +338,7 @@ class PromptableDeTRTrainer(PromptableDeTR):
         logger.debug(msg="- GIoU loss: %s." % giou_loss)
 
         # Compute the total loss.
-        loss = bbox_loss + presence_loss + giou_loss + contrastive_loss
+        loss = bbox_loss + presence_loss + giou_loss + global_contrastive_loss + local_contrastive_loss
         logger.debug(msg="- Total loss: %s." % loss)
         logger.info(msg="Returning the loss value.")
 
@@ -345,7 +352,8 @@ class PromptableDeTRTrainer(PromptableDeTR):
             "bbox_loss": bbox_loss,
             "giou_loss": giou_loss,
             "presence_loss": presence_loss,
-            "contrastive_loss": contrastive_loss,
+            "global_contrastive_loss": global_contrastive_loss,
+            "local_contrastive_loss": local_contrastive_loss,
             "f1_50": f1_50,
             "f1_75": f1_75,
             "f1_90": f1_90,

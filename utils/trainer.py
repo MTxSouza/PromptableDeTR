@@ -118,7 +118,7 @@ class Trainer:
         self.min_lr = min_lr
         self.lr_factor = min_lr / max_lr
         self.warmup_steps = warmup_steps
-        self.frozen_steps = frozen_steps
+        self.frozen_steps = warmup_steps + frozen_steps
         self.log_interval = log_interval
         self.eval_interval = eval_interval
         self.max_iter = max_iter
@@ -141,7 +141,8 @@ class Trainer:
         self.__bbox_losses = []
         self.__l1_losses = []
         self.__presence_losses = []
-        self.__contrastive_losses = []
+        self.__global_contrastive_losses = []
+        self.__local_contrastive_losses = []
         self.__giou_50_accuracies = []
         self.__giou_75_accuracies = []
         self.__giou_90_accuracies = []
@@ -181,7 +182,7 @@ class Trainer:
                                     list(self.model.joiner.parameters()) + \
                                     list(self.model.bbox_predictor.parameters()) + \
                                     list(self.model.presence_predictor.parameters()),
-                                    lr=self.min_lr
+                                    lr=self.max_lr
                                     )
             }
         }
@@ -234,7 +235,8 @@ class Trainer:
             self.__bbox_losses = self.__bbox_losses[-self.log_interval:]
             self.__l1_losses = self.__l1_losses[-self.log_interval:]
             self.__presence_losses = self.__presence_losses[-self.log_interval:]
-            self.__contrastive_losses = self.__contrastive_losses[-self.log_interval:]
+            self.__global_contrastive_losses = self.__global_contrastive_losses[-self.log_interval:]
+            self.__local_contrastive_losses = self.__local_contrastive_losses[-self.log_interval:]
             self.__giou_50_accuracies = self.__giou_50_accuracies[-self.log_interval:]
             self.__giou_75_accuracies = self.__giou_75_accuracies[-self.log_interval:]
             self.__giou_90_accuracies = self.__giou_90_accuracies[-self.log_interval:]
@@ -247,7 +249,8 @@ class Trainer:
         mean_bbox_loss = sum(self.__bbox_losses) / len(self.__bbox_losses)
         mean_l1_loss = sum(self.__l1_losses) / len(self.__l1_losses)
         mean_presence_loss = sum(self.__presence_losses) / len(self.__presence_losses)
-        mean_contrastive_loss = sum(self.__contrastive_losses) / len(self.__contrastive_losses)
+        mean_global_contrastive_loss = sum(self.__global_contrastive_losses) / len(self.__global_contrastive_losses)
+        mean_local_contrastive_loss = sum(self.__local_contrastive_losses) / len(self.__local_contrastive_losses)
 
         # Compute mean accuracy.
         mean_giou_50_acc = sum(self.__giou_50_accuracies) / len(self.__giou_50_accuracies)
@@ -262,7 +265,8 @@ class Trainer:
             "mean_bbox_loss": mean_bbox_loss,
             "mean_l1_loss": mean_l1_loss,
             "mean_presence_loss": mean_presence_loss,
-            "mean_contrastive_loss": mean_contrastive_loss,
+            "mean_global_contrastive_loss": mean_global_contrastive_loss,
+            "mean_local_contrastive_loss": mean_local_contrastive_loss,
             "mean_giou_50_acc": mean_giou_50_acc,
             "mean_giou_75_acc": mean_giou_75_acc,
             "mean_giou_90_acc": mean_giou_90_acc,
@@ -283,7 +287,7 @@ class Trainer:
             is_training (bool): Whether the model is training or not.
 
         Returns:
-            Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]: The images, labels, logits and the joiner, text and image embeddings.
+            Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]: The images, labels, logits and the joiner, text and image embeddings and the text mask.
         """
         # Convert the batch into tensors.
         images, captions, mask, extra_data = PromptableDeTRDataLoader.convert_batch_into_tensor(batch=batch, max_queries=self.max_queries)
@@ -294,18 +298,18 @@ class Trainer:
         def run_forward(model, images, captions, extra_data):
             boxes = extra_data["boxes"].to(device=self.device)
             logits, joiner_emb, txt_emb, img_emb = model(images, captions, mask) # Input: Image, caption and the mask to occlude padded tokens.
-            return logits, boxes, joiner_emb, txt_emb, img_emb # Output: Pred boxes and presences and the true boxes and presences.
+            return logits, boxes, joiner_emb, txt_emb, img_emb, mask
 
         # Run the forward pass.
         if not is_training:
             model.eval()
             with torch.no_grad():
-                logits, labels, joiner_emb, txt_emb, img_emb = run_forward(model, images, captions, extra_data)
+                logits, labels, joiner_emb, txt_emb, img_emb, mask = run_forward(model, images, captions, extra_data)
         else:
             model.train()
-            logits, labels, joiner_emb, txt_emb, img_emb = run_forward(model, images, captions, extra_data)
+            logits, labels, joiner_emb, txt_emb, img_emb, mask = run_forward(model, images, captions, extra_data)
 
-        return images, captions, labels, logits, joiner_emb, txt_emb, img_emb
+        return images, captions, labels, logits, joiner_emb, txt_emb, img_emb, mask
 
     def __get_sample(self, images, captions, y, logits):
         """
@@ -444,15 +448,16 @@ class Trainer:
             batch_metrics = self.__get_batch_metrics(batch=training_batch)
 
             # Run the forward pass.
-            images, captions, y, logits, joiner_emb, txt_emb, img_emb = self.__run_forward(model=self.model, batch=training_batch, is_training=True)
+            images, captions, y, logits, joiner_emb, txt_emb, img_emb, txt_mask = self.__run_forward(model=self.model, batch=training_batch, is_training=True)
 
             # Compute the loss.
-            metrics = self.model.compute_loss_and_accuracy(logits=logits, labels=y, fusion_emb=joiner_emb, txt_emb=txt_emb, img_emb=img_emb)
+            metrics = self.model.compute_loss_and_accuracy(logits=logits, labels=y, fusion_emb=joiner_emb, txt_emb=txt_emb, img_emb=img_emb, txt_mask=txt_mask)
             loss = metrics["loss"]
             final_l1_loss = metrics["bbox_loss"].cpu().detach().numpy().item()
             final_bbox_loss = metrics["giou_loss"].cpu().detach().numpy().item()
             final_presence_loss = metrics["presence_loss"].cpu().detach().numpy().item()
-            final_contrastive_loss = metrics["contrastive_loss"].cpu().detach().numpy().item()
+            final_global_contrastive_loss = metrics["global_contrastive_loss"].cpu().detach().numpy().item()
+            final_local_contrastive_loss = metrics["local_contrastive_loss"].cpu().detach().numpy().item()
             f1_50 = metrics["f1_50"].cpu().detach().numpy().item()
             f1_75 = metrics["f1_75"].cpu().detach().numpy().item()
             f1_90 = metrics["f1_90"].cpu().detach().numpy().item()
@@ -476,7 +481,8 @@ class Trainer:
             self.__bbox_losses.append(final_bbox_loss)
             self.__l1_losses.append(final_l1_loss)
             self.__presence_losses.append(final_presence_loss)
-            self.__contrastive_losses.append(final_contrastive_loss)
+            self.__global_contrastive_losses.append(final_global_contrastive_loss)
+            self.__local_contrastive_losses.append(final_local_contrastive_loss)
 
             # Check if it is time to log the loss.
             print("Iteration [%d/%d] : Num. Samples: %d - Max. Caption length: %d - Num. Objects: %d - Num. Empty Captions: %d - Num. No Objects: %d" % (
@@ -493,7 +499,8 @@ class Trainer:
                 current_bbox_loss = metrics["mean_bbox_loss"]
                 current_l1_loss = metrics["mean_l1_loss"]
                 current_presence_loss = metrics["mean_presence_loss"]
-                current_contrastive_loss = metrics["mean_contrastive_loss"]
+                current_global_contrastive_loss = metrics["mean_global_contrastive_loss"]
+                current_local_contrastive_loss = metrics["mean_local_contrastive_loss"]
                 current_giou_50_acc = metrics["mean_giou_50_acc"]
                 current_giou_75_acc = metrics["mean_giou_75_acc"]
                 current_giou_90_acc = metrics["mean_giou_90_acc"]
@@ -507,7 +514,8 @@ class Trainer:
                     l1_loss=current_l1_loss,
                     bbox_loss=current_bbox_loss, 
                     presence_loss=current_presence_loss, 
-                    contrastive_loss=current_contrastive_loss, 
+                    global_contrastive_loss=current_global_contrastive_loss, 
+                    local_contrastive_loss=current_local_contrastive_loss, 
                     step=self.__current_iter
                 )
 
@@ -523,7 +531,7 @@ class Trainer:
                 if self.log_grads:
                     self.__tensorboard.add_grad(model=self.model, step=self.__current_iter)
 
-                print("Loss: %.4f - GIoU Loss: %.4f - L1 Loss: %.4f - Presence Loss: %.4f - Contrastive Loss: %.4f" % (current_loss, current_bbox_loss, current_l1_loss, current_presence_loss, current_contrastive_loss))
+                print("Loss: %.4f - GIoU Loss: %.4f - L1 Loss: %.4f - Presence Loss: %.4f - Global Contrastive Loss: %.4f - Local Contrastive Loss: %.4f" % (current_loss, current_bbox_loss, current_l1_loss, current_presence_loss, current_global_contrastive_loss, current_local_contrastive_loss))
                 print("GIoU@0.50: %.4f - GIoU@0.75: %.4f - GIoU@0.90: %.4f | F1@0.50: %.4f - F1@0.75: %.4f - F1@0.90: %.4f" % (current_giou_50_acc, current_giou_75_acc, current_giou_90_acc, current_f1_50_acc, current_f1_75_acc, current_f1_90_acc))
                 print("-" * 100)
 
@@ -537,7 +545,8 @@ class Trainer:
                 total_bbox_loss = 0.0
                 total_l1_loss = 0.0
                 total_presence_loss = 0.0
-                total_contrastive_loss = 0.0
+                total_global_contrastive_loss = 0.0
+                total_local_contrastive_loss = 0.0
                 total_giou_50_acc = 0.0
                 total_giou_75_acc = 0.0
                 total_giou_90_acc = 0.0
@@ -550,15 +559,16 @@ class Trainer:
                     validation_batch = next(self.valid_dataset)
 
                     # Run the forward pass.
-                    images, captions, y, logits, joiner_emb, txt_emb, img_emb = self.__run_forward(model=self.model, batch=validation_batch, is_training=False)
+                    images, captions, y, logits, joiner_emb, txt_emb, img_emb, txt_mask = self.__run_forward(model=self.model, batch=validation_batch, is_training=False)
 
                     # Compute the loss.
-                    metrics = self.model.compute_loss_and_accuracy(logits=logits, labels=y, fusion_emb=joiner_emb, txt_emb=txt_emb, img_emb=img_emb)
+                    metrics = self.model.compute_loss_and_accuracy(logits=logits, labels=y, fusion_emb=joiner_emb, txt_emb=txt_emb, img_emb=img_emb, txt_mask=txt_mask)
                     total_loss += metrics["loss"].cpu().detach().numpy().item()
                     total_l1_loss += metrics["bbox_loss"].cpu().detach().numpy().item()
                     total_bbox_loss += metrics["giou_loss"].cpu().detach().numpy().item()
                     total_presence_loss += metrics["presence_loss"].cpu().detach().numpy().item()
-                    total_contrastive_loss += metrics["contrastive_loss"].cpu().detach().numpy().item()
+                    total_global_contrastive_loss += metrics["global_contrastive_loss"].cpu().detach().numpy().item()
+                    total_local_contrastive_loss += metrics["local_contrastive_loss"].cpu().detach().numpy().item()
                     total_f1_50_acc += metrics["f1_50"].cpu().detach().numpy().item()
                     total_f1_75_acc += metrics["f1_75"].cpu().detach().numpy().item()
                     total_f1_90_acc += metrics["f1_90"].cpu().detach().numpy().item()
@@ -588,7 +598,8 @@ class Trainer:
                 total_l1_loss /= len(self.valid_dataset)
                 total_bbox_loss /= len(self.valid_dataset)
                 total_presence_loss /= len(self.valid_dataset)
-                total_contrastive_loss /= len(self.valid_dataset)
+                total_global_contrastive_loss /= len(self.valid_dataset)
+                total_local_contrastive_loss /= len(self.valid_dataset)
                 total_giou_50_acc /= len(self.valid_dataset)
                 total_giou_75_acc /= len(self.valid_dataset)
                 total_giou_90_acc /= len(self.valid_dataset)
@@ -606,7 +617,8 @@ class Trainer:
                     l1_loss=total_l1_loss,
                     bbox_loss=total_bbox_loss, 
                     presence_loss=total_presence_loss, 
-                    contrastive_loss=total_contrastive_loss, 
+                    global_contrastive_loss=total_global_contrastive_loss, 
+                    local_contrastive_loss=total_local_contrastive_loss, 
                     step=self.__current_iter
                 )
 
@@ -625,7 +637,7 @@ class Trainer:
 
                 print("Validation time: %.2f minutes" % end_time)
                 print("Overfit counter: %d" % self.__overfit_counter)
-                print("Validation loss: %.4f - GIoU Loss: %.4f - L1 Loss: %.4f - Presence Loss: %.4f - Contrastive Loss: %.4f" % (total_loss, total_bbox_loss, total_l1_loss, total_presence_loss, total_contrastive_loss))
+                print("Validation loss: %.4f - GIoU Loss: %.4f - L1 Loss: %.4f - Presence Loss: %.4f - Global Contrastive Loss: %.4f - Local Contrastive Loss: %.4f" % (total_loss, total_bbox_loss, total_l1_loss, total_presence_loss, total_global_contrastive_loss, total_local_contrastive_loss))
                 print("GIoU@0.5: %.4f - GIoU@0.75: %.4f - GIoU@0.90: %.4f | F1@0.5: %.4f - F1@0.75: %.4f - F1@0.90: %.4f" % (total_giou_50_acc, total_giou_75_acc, total_giou_90_acc, total_f1_50_acc, total_f1_75_acc, total_f1_90_acc))
                 print("=" * 100)
 

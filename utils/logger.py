@@ -75,7 +75,7 @@ class Tensorboard:
         """
         self.writer.add_scalar(tag="lr/%s" % name, scalar_value=lr, global_step=step)
 
-    def add_train_losses(self, loss, l1_loss, bbox_loss, presence_loss, contrastive_loss, step):
+    def add_train_losses(self, loss, l1_loss, bbox_loss, presence_loss, global_contrastive_loss, local_contrastive_loss, step):
         """
         Adds the training loss to the Tensorboard writer.
 
@@ -84,14 +84,16 @@ class Tensorboard:
             l1_loss (float): Training L1 loss value.
             bbox_loss (float): Training bounding box loss value.
             presence_loss (float): Training presence loss value.
-            contrastive_loss (float): Training contrastive loss value.
+            global_contrastive_loss (float): Training global contrastive loss value.
+            local_contrastive_loss (float): Training local contrastive loss value.
             step (int): Step number.
         """
         self.writer.add_scalar(tag="train_loss", scalar_value=loss, global_step=step)
         self.writer.add_scalar(tag="train_l1_loss", scalar_value=l1_loss, global_step=step)
         self.writer.add_scalar(tag="train_bbox_loss", scalar_value=bbox_loss, global_step=step)
         self.writer.add_scalar(tag="train_presence_loss", scalar_value=presence_loss, global_step=step)
-        self.writer.add_scalar(tag="train_contrastive_loss", scalar_value=contrastive_loss, global_step=step)
+        self.writer.add_scalar(tag="train_global_contrastive_loss", scalar_value=global_contrastive_loss, global_step=step)
+        self.writer.add_scalar(tag="train_local_contrastive_loss", scalar_value=local_contrastive_loss, global_step=step)
 
     def add_train_giou_accuracy(self, acc, step, th):
         """
@@ -117,7 +119,7 @@ class Tensorboard:
         tag = "train_F1@%f" % th
         self.writer.add_scalar(tag=tag, scalar_value=acc, global_step=step)
 
-    def add_valid_losses(self, loss, l1_loss, bbox_loss, presence_loss, contrastive_loss, step):
+    def add_valid_losses(self, loss, l1_loss, bbox_loss, presence_loss, global_contrastive_loss, local_contrastive_loss, step):
         """
         Adds the validation loss to the Tensorboard writer.
 
@@ -126,14 +128,16 @@ class Tensorboard:
             l1_loss (float): Validation L1 loss value.
             bbox_loss (float): Validation bounding box loss value.
             presence_loss (float): Validation presence loss value.
-            contrastive_loss (float): Validation contrastive loss value.
+            global_contrastive_loss (float): Validation global contrastive loss value.
+            local_contrastive_loss (float): Validation local contrastive loss value.
             step (int): Step number.
         """
         self.writer.add_scalar(tag="valid_loss", scalar_value=loss, global_step=step)
         self.writer.add_scalar(tag="valid_l1_loss", scalar_value=l1_loss, global_step=step)
         self.writer.add_scalar(tag="valid_bbox_loss", scalar_value=bbox_loss, global_step=step)
         self.writer.add_scalar(tag="valid_presence_loss", scalar_value=presence_loss, global_step=step)
-        self.writer.add_scalar(tag="valid_contrastive_loss", scalar_value=contrastive_loss, global_step=step)
+        self.writer.add_scalar(tag="valid_global_contrastive_loss", scalar_value=global_contrastive_loss, global_step=step)
+        self.writer.add_scalar(tag="valid_local_contrastive_loss", scalar_value=local_contrastive_loss, global_step=step)
 
     def add_valid_giou_accuracy(self, acc, step, th):
         """
