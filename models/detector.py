@@ -167,7 +167,8 @@ class PromptableDeTRTrainer(PromptableDeTR):
             presence_loss_weight=1.0,
             giou_loss_weight=1.0,
             l1_loss_weight=1.0,
-            contrastive_loss_weight=1.0,
+            global_contrastive_loss_weight=1.0,
+            local_contrastive_loss_weight=1.0,
             alpha=0.25,
             hm_presence_weight=5.0,
             hm_giou_weight=2.0,
@@ -182,7 +183,8 @@ class PromptableDeTRTrainer(PromptableDeTR):
         self.__presence_weight = presence_loss_weight
         self.__giou_weight = giou_loss_weight
         self.__l1_weight = l1_loss_weight
-        self.__contrastive_weight = contrastive_loss_weight
+        self.__global_contrastive_weight = global_contrastive_loss_weight
+        self.__local_contrastive_weight = local_contrastive_loss_weight
         self.__alpha = alpha
 
         # Matcher.
@@ -273,7 +275,7 @@ class PromptableDeTRTrainer(PromptableDeTR):
             global_txt_loss = F.cross_entropy(global_cos_sim, targets)
             global_img_loss = F.cross_entropy(global_cos_sim.t(), targets)
             global_contrastive_loss = (global_txt_loss + global_img_loss) / 2
-            global_contrastive_loss = self.__contrastive_weight * global_contrastive_loss
+            global_contrastive_loss = self.__global_contrastive_weight * global_contrastive_loss
 
             tk_emb = F.normalize(input=tk_emb, dim=-1)
             fusion_emb = F.normalize(input=fusion_emb, dim=-1)
@@ -289,7 +291,7 @@ class PromptableDeTRTrainer(PromptableDeTR):
             local_txt_loss /= local_cos_sim.size(0)
             local_obj_loss /= local_cos_sim.size(0)
             local_contrastive_loss = (local_txt_loss + local_obj_loss) / 2
-            local_contrastive_loss = self.__contrastive_weight * local_contrastive_loss
+            local_contrastive_loss = self.__local_contrastive_weight * local_contrastive_loss
         
         else:
             global_contrastive_loss = torch.tensor(0.0, device=pred_boxes.device)

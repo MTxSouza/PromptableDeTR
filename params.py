@@ -170,6 +170,11 @@ def get_args():
         help="The maximum number of iterations for the LR curve."
     )
     training_parser.add_argument(
+        "--disable-lr-curve",
+        action="store_true",
+        help="Whether to disable the learning rate curve. If it is True, the learning rate will be constant, using the `--min-lr` value."
+    )
+    training_parser.add_argument(
         "--batch-size",
         "-b",
         type=int,
@@ -256,10 +261,16 @@ def get_args():
         help="The weight for the L1 loss."
     )
     training_parser.add_argument(
-        "--contrastive-weight",
+        "--global-contrastive-weight",
         type=float,
         default=1.0,
-        help="The weight for the contrastive loss."
+        help="The weight for the global contrastive loss."
+    )
+    training_parser.add_argument(
+        "--local-contrastive-weight",
+        type=float,
+        default=1.0,
+        help="The weight for the local contrastive loss."
     )
     training_parser.add_argument(
         "--alpha",

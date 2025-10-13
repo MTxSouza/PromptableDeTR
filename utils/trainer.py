@@ -76,6 +76,7 @@ class Trainer:
             eval_interval,
             max_iter,
             curve_limit, 
+            disable_lr_curve,
             overfit_threshold,
             overfit_patience,
             exp_dir,
@@ -100,6 +101,7 @@ class Trainer:
             eval_interval (int): Period to evaluate the model.
             max_iter (int): The maximum number of iterations.
             curve_limit (int): The maximum number of iterations for the LR curve.
+            disable_lr_curve (bool): Whether to disable the learning rate curve.
             overfit_threshold (float): The threshold to consider overfitting.
             overfit_patience (int): The number of iterations to wait before considering overfitting.
             exp_dir (str): The directory to save the experiment.
@@ -123,6 +125,7 @@ class Trainer:
         self.eval_interval = eval_interval
         self.max_iter = max_iter
         self.curve_limit = curve_limit
+        self.disable_lr_curve = disable_lr_curve
         self.overfit_threshold = overfit_threshold
         self.overfit_patience = overfit_patience
         self.exp_dir = exp_dir
@@ -177,12 +180,12 @@ class Trainer:
                                     )
             },
             "head": {
-                "add_scheduler": True,
+                "add_scheduler": True if not self.disable_lr_curve else False,
                 "opt": self.optimizer(params=\
                                     list(self.model.joiner.parameters()) + \
                                     list(self.model.bbox_predictor.parameters()) + \
                                     list(self.model.presence_predictor.parameters()),
-                                    lr=self.max_lr
+                                    lr=self.max_lr if not self.disable_lr_curve else self.min_lr
                                     )
             }
         }
@@ -690,6 +693,10 @@ class Trainer:
                 self.optimizers[name]["opt"].load_state_dict(opt_data["opt"])
                 if self.optimizers[name]["scheduler"] is not None:
                     self.optimizers[name]["scheduler"].load_state_dict(opt_data["scheduler"])
+                
+                if name == "head" and self.disable_lr_curve:
+                    for param_group in self.optimizers[name]["opt"].param_groups:
+                        param_group["lr"] = self.min_lr
 
         # Restore the training step.
         self.__current_iter = checkpoint["step"]
