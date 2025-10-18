@@ -149,8 +149,11 @@ class PromptableDeTR(BasePromptableDeTR):
 
         # Load weights.
         state_dict = torch.load(f=model_weights, map_location="cpu")
-        if "model_state_dict" in state_dict:
-            state_dict = state_dict["model_state_dict"]
+        if model_weights.endswith(".pt"):
+            assert "weights" in state_dict
+            state_dict["model_state_dict"] = state_dict.pop("weights")
+        assert "model_state_dict" in state_dict
+        state_dict = state_dict["model_state_dict"]
         self.load_state_dict(state_dict=state_dict, strict=True)
 
 class PromptableDeTRTrainer(PromptableDeTR):
@@ -193,6 +196,51 @@ class PromptableDeTRTrainer(PromptableDeTR):
             l1_loss_weight=hm_l1_weight,
             giou_loss_weight=hm_giou_weight
         )
+
+    # Private methods.
+    def __compute_infonce_loss(self, object_emb, tk_emb, obj_idx):
+        """
+        Compute the InfoNCE loss based on the MDeTR paper.
+
+        Args:
+            object_emb (torch.Tensor): The object embeddings of shape (B, N, D).
+            tk_emb (torch.Tensor): The token embeddings of shape (B, 1, D).
+            obj_idx (torch.Tensor): The object index tensor (B, N).
+
+        Returns:
+            torch.Tensor: The computed InfoNCE loss.
+        """
+        # Compute cosine similarity.
+        tk_emb = F.normalize(input=tk_emb, p=2, dim=-1)
+        object_emb = F.normalize(input=object_emb, p=2, dim=-1)
+        logits_token_to_object = (tk_emb @ object_emb.transpose(-2, -1)) / 0.07
+        logits_object_to_token = logits_token_to_object.permute(0, 2, 1)
+
+        # Prepare positive indices.
+        pos_mask = obj_idx.unsqueeze(dim=1) == torch.ones(tk_emb.size(dim=1), device=tk_emb.device).view(1, tk_emb.size(dim=1), 1)
+
+        def compute_infonce_loss(logits, pos_idx, eps = 1e-8):
+
+            log_prob = F.log_softmax(logits, dim=-1)
+
+            pos_log_prob = log_prob * pos_idx
+            sum_pos_log_prob = pos_log_prob.sum(dim=-1)
+            pos_count = pos_idx.sum(dim=-1).clamp(min=0.0)
+
+            per_loss = -(sum_pos_log_prob / (pos_count + eps))
+            valid_mask = (pos_count > 0).float()
+            total_valid = valid_mask.sum()
+
+            return (per_loss * valid_mask).sum() / (total_valid + eps)
+
+        # Compute loss for token to object.
+        token_to_object_loss = compute_infonce_loss(logits=logits_token_to_object, pos_idx=pos_mask)
+
+        # Compute loss for object to token.
+        object_to_token_loss = compute_infonce_loss(logits=logits_object_to_token, pos_idx=pos_mask.permute(0, 2, 1))
+
+        # Final loss.
+        return (token_to_object_loss + object_to_token_loss) / 2
 
     # Methods.
     def compute_loss_and_accuracy(self, logits, labels, fusion_emb, txt_emb, img_emb, txt_mask = None):
@@ -255,43 +303,20 @@ class PromptableDeTRTrainer(PromptableDeTR):
         # Compute Global and Local Contrastive Loss.
         valid_obj = obj_idx.any(dim=1) # (B,)
         if valid_obj.any():
-            txt_emb = txt_emb[valid_obj] # (num_valid_obj, Tt, D)
-            img_emb = img_emb[valid_obj] # (num_valid_obj, Ti, D)
-            fusion_emb = fusion_emb[valid_obj] # (num_valid_obj, n_detections, D)
-            tk_emb = txt_emb.clone()
 
             if txt_mask is not None:
-                txt_mask = txt_mask[valid_obj] # (num_valid_obj, Tt)
                 denom = txt_mask.sum(dim=1, keepdim=True).clamp(min=1e-6).to(txt_emb.device)
-                txt_emb = (txt_emb * (txt_mask).unsqueeze(dim=-1)).sum(dim=1) / denom
-                tk_emb = tk_emb * (txt_mask).unsqueeze(dim=-1)
+                txt_emb = (txt_emb * txt_mask.unsqueeze(dim=-1)).sum(dim=1, keepdim=True) / denom
             else:
-                txt_emb = txt_emb.mean(dim=1)
-            txt_emb = F.normalize(input=txt_emb, dim=-1)
-            img_emb = F.normalize(input=img_emb.mean(dim=1), dim=-1)
+                txt_emb = txt_emb.mean(dim=1, keepdim=True)
 
-            global_cos_sim = txt_emb @ img_emb.t()
-            targets = torch.arange(global_cos_sim.size(0), device=global_cos_sim.device)
-            global_txt_loss = F.cross_entropy(global_cos_sim, targets)
-            global_img_loss = F.cross_entropy(global_cos_sim.t(), targets)
-            global_contrastive_loss = (global_txt_loss + global_img_loss) / 2
-            global_contrastive_loss = self.__global_contrastive_weight * global_contrastive_loss
+            global_contrastive_loss = torch.tensor(0.0, device=pred_boxes.device)
 
-            tk_emb = F.normalize(input=tk_emb, dim=-1)
-            fusion_emb = F.normalize(input=fusion_emb, dim=-1)
-            local_cos_sim = tk_emb @ fusion_emb.transpose(-2, -1)
-            local_txt_loss = 0
-            local_obj_loss = 0
-            for batch in range(local_cos_sim.size(0)):
-                cos_sim = local_cos_sim[batch]
-                txt_targets = torch.arange(cos_sim.size(0), device=cos_sim.device) % cos_sim.size(1)
-                obj_targets = torch.arange(cos_sim.size(1), device=cos_sim.device) % cos_sim.size(0)
-                local_txt_loss += F.cross_entropy(cos_sim, txt_targets)
-                local_obj_loss += F.cross_entropy(cos_sim.t(), obj_targets)
-            local_txt_loss /= local_cos_sim.size(0)
-            local_obj_loss /= local_cos_sim.size(0)
-            local_contrastive_loss = (local_txt_loss + local_obj_loss) / 2
-            local_contrastive_loss = self.__local_contrastive_weight * local_contrastive_loss
+            local_contrastive_loss = self.__compute_infonce_loss(
+                object_emb=fusion_emb,
+                tk_emb=txt_emb,
+                obj_idx=obj_idx
+            ) * self.__local_contrastive_weight
         
         else:
             global_contrastive_loss = torch.tensor(0.0, device=pred_boxes.device)

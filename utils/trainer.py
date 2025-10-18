@@ -212,7 +212,7 @@ class Trainer:
             opt_data["opt"].zero_grad()
         
         loss.backward()
-        torch.nn.utils.clip_grad_norm_(parameters=self.model.parameters(), max_norm=0.2) # HARDCODED.
+        torch.nn.utils.clip_grad_norm_(parameters=self.model.parameters(), max_norm=0.3) # HARDCODED.
 
         # Update model.
         for name, opt_data in self.optimizers.items():
@@ -373,6 +373,9 @@ class Trainer:
             if self.__overfit_counter >= self.overfit_patience:
                 print("Overfitting detected. Stopping training.")
                 self.__is_overfitting = True
+        
+        elif self.__overfit_counter > 0:
+            self.__overfit_counter -= 1
 
         self.model.save_checkpoint(
             model=self.model,
@@ -455,12 +458,12 @@ class Trainer:
 
             # Compute the loss.
             metrics = self.model.compute_loss_and_accuracy(logits=logits, labels=y, fusion_emb=joiner_emb, txt_emb=txt_emb, img_emb=img_emb, txt_mask=txt_mask)
+
+            # Backward pass.
             loss = metrics["loss"]
-            final_l1_loss = metrics["bbox_loss"].cpu().detach().numpy().item()
-            final_bbox_loss = metrics["giou_loss"].cpu().detach().numpy().item()
-            final_presence_loss = metrics["presence_loss"].cpu().detach().numpy().item()
-            final_global_contrastive_loss = metrics["global_contrastive_loss"].cpu().detach().numpy().item()
-            final_local_contrastive_loss = metrics["local_contrastive_loss"].cpu().detach().numpy().item()
+            self.__optimize_model(loss=loss)
+
+            # Store accuracy.
             f1_50 = metrics["f1_50"].cpu().detach().numpy().item()
             f1_75 = metrics["f1_75"].cpu().detach().numpy().item()
             f1_90 = metrics["f1_90"].cpu().detach().numpy().item()
@@ -468,10 +471,6 @@ class Trainer:
             giou_75 = metrics["giou_75"].cpu().detach().numpy().item()
             giou_90 = metrics["giou_90"].cpu().detach().numpy().item()
 
-            # Backward pass.
-            self.__optimize_model(loss=loss)
-
-            # Store accuracy.
             self.__giou_50_accuracies.append(giou_50)
             self.__giou_75_accuracies.append(giou_75)
             self.__giou_90_accuracies.append(giou_90)
@@ -480,6 +479,12 @@ class Trainer:
             self.__f1_90_accuracies.append(f1_90)
 
             # Store the losses.
+            final_l1_loss = metrics["bbox_loss"].cpu().detach().numpy().item()
+            final_bbox_loss = metrics["giou_loss"].cpu().detach().numpy().item()
+            final_presence_loss = metrics["presence_loss"].cpu().detach().numpy().item()
+            final_global_contrastive_loss = metrics["global_contrastive_loss"].cpu().detach().numpy().item()
+            final_local_contrastive_loss = metrics["local_contrastive_loss"].cpu().detach().numpy().item()
+
             self.__losses.append(loss.cpu().detach().numpy().item())
             self.__bbox_losses.append(final_bbox_loss)
             self.__l1_losses.append(final_l1_loss)

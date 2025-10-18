@@ -1,6 +1,8 @@
 """
 Main module that contains the PromptableDeTR model class.
 """
+import os
+
 import numpy as np
 import torch
 import torch.nn.functional as F
@@ -46,6 +48,7 @@ class PromptableDeTRModel:
         self.__description = None
         self.__description_embedding = None
         self.__image_size = model_config["image_size"]
+        self.__model_weights = model_weights
 
         if force_cpu:
             self.__device = torch.device(device="cpu")
@@ -74,6 +77,16 @@ class PromptableDeTRModel:
     @property
     def emb(self):
         return self.__description_embedding
+    
+    @property
+    def weight_size(self) -> int:
+        """
+        Get the size of the model weights in bytes.
+
+        Returns:
+            int: The size of the model weights in bytes.
+        """
+        return os.path.getsize(filename=self.__model_weights)
 
     # Methods.
     def set_description(self, description: str) -> None:
@@ -92,13 +105,14 @@ class PromptableDeTRModel:
         self.__description_embedding = self.__estimator.text_encoder(desc_tokens)
         self.__description = description
 
-    def infer_image(self, image: str | np.ndarray | torch.Tensor, confidence_threshold: float = 0.5) -> list:
+    def infer_image(self, image: str | np.ndarray | torch.Tensor, min_confidence_threshold: float | None = None, get_highest_conf: bool = False) -> list:
         """
         Perform inference on a single image.
 
         Args:
             image (str | np.ndarray | torch.Tensor): The input image, which can be a file path, a NumPy array, or a PyTorch tensor.
-            confidence_threshold (float): The confidence threshold for filtering detections. (Default: 0.5)
+            min_confidence_threshold (float | None): The minimum confidence threshold for filtering detections. (Default: None)
+            get_highest_conf (bool): If True, returns only the detection with the highest confidence. (Default: False)
 
         Returns:
             list: A list of detected objects with their bounding boxes and labels.
@@ -133,7 +147,13 @@ class PromptableDeTRModel:
         # Post-process output.
         logits = torch.cat(tensors=(bbox, presence), dim=-1)
         logits[:, :, 4:] = logits[:, :, 4:].softmax(dim=-1)
-        logits = logits[logits[:, :, 5] >= confidence_threshold]
+        if min_confidence_threshold is not None:
+            logits = logits[logits[:, :, 5] >= min_confidence_threshold]
+        elif get_highest_conf:
+            print(logits.size())
+            logits = logits[:, logits[:, :, 5].argmax(dim=-1), :].squeeze(dim=0)
+        else:
+            logits = logits.squeeze(dim=0)
         logits = logits.cpu().numpy().tolist()
 
         # Convert logits to Output format.
