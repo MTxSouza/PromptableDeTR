@@ -2,10 +2,8 @@
 This module contains all data transformations and augmentations to be used in 
 the training process.
 """
-import random
 from abc import ABC, abstractmethod
 
-import nltk
 import numpy as np
 import torch
 import torch.nn.functional as F
@@ -21,7 +19,6 @@ class BaseTransform(ABC):
     Base class for all transformations.
     """
 
-
     # Special methods.
     @abstractmethod
     def __call__(self, samples):
@@ -32,7 +29,6 @@ class BaseTransform(ABC):
             samples (Sample | List[Sample]): The sample or list of samples to transform.
         """
         pass
-
 
     # Methods.
     @abstractmethod
@@ -47,7 +43,6 @@ class BaseTransform(ABC):
             Sample: The transformed sample.
         """
         pass
-
 
     def validate_samples(self, samples):
         """
@@ -70,12 +65,13 @@ class BaseTransform(ABC):
 
         return samples
 
-
 class PrepareImage(BaseTransform):
     """
     This class prepares the image for training.
     """
 
+    mean = torch.tensor([0.485, 0.456, 0.406]).view(1, 3, 1, 1)
+    std = torch.tensor([0.229, 0.224, 0.225]).view(1, 3, 1, 1)
 
     # Special methods.
     def __call__(self, samples):
@@ -88,11 +84,29 @@ class PrepareImage(BaseTransform):
 
         return samples
 
+    # Class methods.
+    @classmethod
+    def de_normalize(cls, normalized_image):
+        """
+        De-normalizes the image.
+
+        Args:
+            normalized_image (numpy.ndarray): The normalized image.
+
+        Returns:
+            numpy.ndarray: The de-normalized image.
+        """
+        if isinstance(normalized_image, np.ndarray):
+            normalized_image = torch.from_numpy(normalized_image).permute(2, 0, 1).unsqueeze(0)
+        de_normalized_image = (normalized_image * cls.std) + cls.mean
+        de_normalized_image = de_normalized_image.squeeze(0).permute(1, 2, 0).clamp(0, 255)
+        return de_normalized_image.numpy()
 
     # Methods.
     def transform(self, sample):
 
         # Load the image.
+        sample.image_path = str(sample.image_path).replace("/home/msouza011201/bucket/images/phrase_cut_dataset", "/home/mtxsouza/workspace/PhraseCutDataset/data/VGPhraseCut_v0/images")
         with Image.open(fp=sample.image_path, mode="r") as pil_img:
             # Convert the image to RGB.
             if pil_img.mode != "RGB":
@@ -105,17 +119,14 @@ class PrepareImage(BaseTransform):
         sample.image = torch.from_numpy(np_img).permute(2, 0, 1)
 
         # Normalize the image.
-        if sample.image.max() > 1:
-            sample.image /= 255
+        sample.image = (sample.image - self.mean) / self.std
 
         return sample
-
 
 class PrepareCaption(BaseTransform):
     """
     This class prepares the caption for training.
     """
-
 
     # Special methods.
     def __init__(self, vocab_file):
@@ -128,7 +139,6 @@ class PrepareCaption(BaseTransform):
         # Load the tokenizer.
         self.tokenizer = Tokenizer(vocab_filepath=vocab_file)
 
-
     def __call__(self, samples):
 
         # Validate the samples.
@@ -138,7 +148,6 @@ class PrepareCaption(BaseTransform):
         samples = [self.transform(sample=sample) for sample in samples]
 
         return samples
-
 
     # Methods.
     def transform(self, sample):
@@ -151,12 +160,10 @@ class PrepareCaption(BaseTransform):
 
         return sample
 
-
-class PrepareBBox(BaseTransform):
+class PrepareBoxes(BaseTransform):
     """
-    This class prepares the bounding box for training.
+    This class prepares the boxes for training.
     """
-
 
     # Special methods.
     def __call__(self, samples):
@@ -169,27 +176,17 @@ class PrepareBBox(BaseTransform):
 
         return samples
 
-
     # Methods.
     def transform(self, sample):
 
-        # Transform the bounding box.
-        bbox = sample.bbox
-        bbox = torch.tensor(data=bbox, dtype=torch.float32)
-
-        # Normalize the bounding box.
-        _, h, w = sample.image.shape
-        bbox[:, 0] /= w
-        bbox[:, 1] /= h
-        bbox[:, 2] /= w
-        bbox[:, 3] /= h
-        sample.bbox_tensor = bbox
+        # Transform the boxes.
+        boxes = sample.boxes
+        boxes = torch.tensor(data=boxes, dtype=torch.float32)
+        sample.boxes_tensor = boxes
 
         return sample
 
-
 class PrepareSample(BaseTransform):
-
 
     # Special methods.
     def __init__(self, vocab_file):
@@ -204,8 +201,7 @@ class PrepareSample(BaseTransform):
         # Define the transformations.
         self.image_transform = PrepareImage()
         self.caption_transform = PrepareCaption(vocab_file=vocab_file)
-        self.bbox_transform = PrepareBBox()
-
+        self.boxes_transform = PrepareBoxes()
 
     def __call__(self, samples):
         
@@ -217,7 +213,6 @@ class PrepareSample(BaseTransform):
 
         return samples
 
-
     # Methods.
     def transform(self, sample):
         
@@ -227,14 +222,12 @@ class PrepareSample(BaseTransform):
         # Prepare the caption.
         sample = self.caption_transform.transform(sample=sample)
 
-        # Prepare the bounding box.
-        sample = self.bbox_transform.transform(sample=sample)
+        # Prepare the boxes.
+        sample = self.boxes_transform.transform(sample=sample)
 
         return sample
 
-
 class ReshapeImage(BaseTransform):
-
 
     # Special methods.
     def __init__(self, image_size):
@@ -250,7 +243,6 @@ class ReshapeImage(BaseTransform):
 
         self.image_size = image_size
 
-
     def __call__(self, samples):
         
         # Validate the samples.
@@ -260,7 +252,6 @@ class ReshapeImage(BaseTransform):
         samples = [self.transform(sample=sample) for sample in samples]
 
         return samples
-
 
     # Methods.
     def transform(self, sample):
@@ -276,5 +267,47 @@ class ReshapeImage(BaseTransform):
             mode="bilinear", 
             align_corners=False
         ).squeeze(0)
+
+        return sample
+
+class DisableCaption(BaseTransform):
+    """
+    This class disables randomly the caption and erases 
+    all boxes with a given probability.
+    """
+
+    # Special methods.
+    def __init__(self, vocab_file: str, prob: float = 0.3):
+        """
+        Initialize the class.
+
+        Args:
+            vocab (str): The path to the vocabulary file.
+            prob (float): The probability of disabling the caption. (Default: 0.3)
+        """
+        # Load the tokenizer.
+        self.tokenizer = Tokenizer(vocab_filepath=vocab_file)
+
+        self.prob = prob
+
+    def __call__(self, samples):
+
+        # Validate the samples.
+        samples = self.validate_samples(samples=samples)
+
+        # Prepare the samples.
+        samples = [self.transform(sample=sample) for sample in samples]
+
+        return samples
+
+    # Methods.
+    def transform(self, sample):
+
+        # Disable the caption with a given probability.
+        if np.random.rand() < self.prob:
+            sample.caption = ""
+            sample.caption_tokens = torch.tensor(data=self.tokenizer.encode(texts="")[0])
+            sample.boxes = []
+            sample.boxes_tensor = torch.zeros((0, 4), dtype=torch.float32)
 
         return sample

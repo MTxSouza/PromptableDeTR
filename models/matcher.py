@@ -12,32 +12,25 @@ from utils.data import generalized_iou
 # Logger.
 logger = Logger(name="model")
 
-
-# Functions.
-
-
-
 # Classes.
-class HuggarianMatcher(nn.Module):
-
+class HungarianMatcher(nn.Module):
 
     # Special methods.
-    def __init__(self, presence_loss_weight = 1.0, l1_loss_weight = 1.0, giou_loss_weight = 1.0):
+    def __init__(self, presence_loss_weight = 1.0, giou_loss_weight = 1.0, l1_loss_weight = 1.0):
         """
         Class constructor for the HungarianMatcher class.
 
         Args:
             presence_loss_weight (float): The weight for the presence loss. (Default: 1.0)
-            l1_loss_weight (float): The weight for the L1 loss. (Default: 1.0)
             giou_loss_weight (float): The weight for the GIoU loss. (Default: 1.0)
+            l1_loss_weight (float): The weight for the L1 loss. (Default: 1.0)
         """
         super().__init__()
 
         # Attribute.
         self.presence_loss_weight = presence_loss_weight
-        self.l1_loss_weight = l1_loss_weight
         self.giou_loss_weight = giou_loss_weight
-
+        self.l1_loss_weight = l1_loss_weight
 
     # Methods.
     @torch.no_grad()
@@ -56,7 +49,7 @@ class HuggarianMatcher(nn.Module):
             Tuple[torch.Tensor, torch.Tensor, torch.Tensor]: The batch, source, and target indices.
         """
         # Get the batch size and number of predicted objects.
-        B, N = predict_scores.size()[:2]
+        B = predict_scores.size(dim=0)
         indices = []
 
         for batch in range(B):
@@ -81,7 +74,9 @@ class HuggarianMatcher(nn.Module):
             giou_loss = 1 - generalized_iou(batch_predict_boxes, batch_boxes)
 
             # Compute matrix loss.
-            mtx_loss = self.presence_loss_weight * presence_loss + self.l1_loss_weight * l1_loss + self.giou_loss_weight * giou_loss
+            mtx_loss = self.presence_loss_weight * presence_loss + \
+                        self.l1_loss_weight * l1_loss + \
+                        self.giou_loss_weight * giou_loss
             row_idx, col_idx = linear_sum_assignment(mtx_loss.cpu())
             indices.append((row_idx, col_idx))
 

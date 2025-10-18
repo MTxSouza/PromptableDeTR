@@ -450,7 +450,7 @@ if __name__ == "__main__":
         return path
 
     parser = argparse.ArgumentParser(prog="MobileNetV3 model", description=__doc__)
-    parser.add_argument("--weight-path", "-w", type=check_weight_file, required=True, help="The path to the pre-trained weights.")
+    parser.add_argument("--weight-path", "-w", type=check_weight_file, required=False, help="The path to the pre-trained weights.")
 
     args = parser.parse_args()
 
@@ -458,5 +458,6 @@ if __name__ == "__main__":
     encoder = MobileNetV3()
 
     # Load the pre-trained weights.
-    encoder.load_state_dict(state_dict=torch.load(f=args.weight_path, weights_only=True))
-    summary(model=encoder, input_data=(3, 640, 640))
+    if args.weight_path:
+        encoder.load_state_dict(state_dict=torch.load(f=args.weight_path, weights_only=True))
+    summary(model=encoder, input_data=(3, 320, 320))

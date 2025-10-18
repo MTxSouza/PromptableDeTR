@@ -1,64 +1,75 @@
 """
 This module contains all evaluation metrics used to validate the PromptableDeTR model.
 """
+import numpy as np
 import torch
 from torchvision.ops.boxes import box_iou
 
-from utils.data import xywh_to_xyxy
-
 
 # Functions.
-def iou_accuracy(labels, logits, threshold=0.5):
+def dist_accuracy(labels, logits, conf, threshold=0.5, return_logits=False):
     """
-    Computes the accuracy of the model based on the Intersection over Union (IoU) 
-    between the ground truth and the predicted bounding boxes.
+    Computes the accuracy of the model based on the L1 distance
+    between the ground truth and the predicted bounding points.
 
     Args:
-        labels (numpy.ndarray): The true labels with shape (N, 4).
-        logits (numpy.ndarray): The logits from the model with shape (N, 4).
-        threshold (float): The IoU threshold for positive samples. (Default: 0.5)
+        labels (numpy.ndarray): The true labels with shape (N, 2).
+        logits (numpy.ndarray): The logits from the model with shape (N, 2).
+        conf (numpy.ndarray): The confidence scores with shape (N, 2).
+        threshold (float): The presence threshold for positive samples. (Default: 0.5)
+        return_logits (bool): Whether to return the filtered logits. (Default: False)
 
     Returns:
-        float: The accuracy of the model.
+        tensor: The distance accuracy score.
     """
+    # Check types.
+    if isinstance(labels, np.ndarray):
+        labels = torch.from_numpy(labels)
+    if isinstance(logits, np.ndarray):
+        logits = torch.from_numpy(logits)
+    if isinstance(conf, np.ndarray):
+        conf = torch.from_numpy(conf)
+
+    # Filter out the points based on confidence.
+    conf = torch.softmax(conf, dim=1)
+    logits = logits[conf[:, 1] >= threshold]
+
     # Check if the labels and logits are empty.
-    if not labels.shape[0] and not logits.shape[0]:
-        return 1.0
-    elif labels.shape[0] and not logits.shape[0]:
-        return 0.0
-    elif not labels.shape[0] and logits.shape[0]:
-        return 0.0
+    if not labels.size(0) and not logits.size(0):
+        if return_logits:
+            return torch.tensor(1.0), logits
+        return torch.tensor(1.0)
+    elif (labels.size(0) and not logits.size(0)) or (not labels.size(0) and logits.size(0)):
+        if return_logits:
+            return torch.tensor(0.0), logits
+        return torch.tensor(0.0)
 
     # Compute the accuracy.
-    iou_score = box_iou(
-        torch.from_numpy(labels),
-        torch.from_numpy(logits)
-    )
-    iou_score = iou_score[iou_score > threshold]
-    iou_score = iou_score.float().mean()
+    dist_score = 1 - torch.cdist(
+        logits,
+        labels
+    ).mean().cpu()
 
-    # Check if the IoU score is NaN.
-    if torch.isnan(iou_score):
-        iou_score = torch.tensor(0.0)
+    # Check if the distance score is NaN.
+    if torch.isnan(dist_score):
+        dist_score = torch.tensor(0.0)
 
-    return iou_score.item()
+    if return_logits:
+        return dist_score, logits
+    return dist_score
 
 
-def average_precision_open_vocab(labels, logits, iou_threshold=0.5, fix_boxes=False, height=None, width=None):
+def f1_accuracy_open_vocab(labels, logits, threshold=0.5):
     """
-    Computes the average precision for open vocabulary object detection. The metric
-    is based on the paper https://arxiv.org/pdf/2102.01066.
+    Computes the F1 accuracy for open vocabulary object detection.
 
     Args:
-        labels (numpy.ndarray): The true labels with shape (N, 4).
-        logits (numpy.ndarray): The logits from the model with shape (N, 4).
-        iou_threshold (float): The IoU threshold for positive samples. (Default: 0.5)
-        fix_boxes (bool): Whether to fix the boxes before computing the average precision. (Default: False)
-        height (int): The height of the image. Used only if fix_boxes is True. (Default: None)
-        width (int): The width of the image. Used only if fix_boxes is True. (Default: None)
+        labels (numpy.ndarray): The true labels with shape (N, 1).
+        logits (numpy.ndarray): The logits from the model with shape (N, 2).
+        threshold (float): Threshold for positive samples. (Default: 0.5)
 
     Returns:
-        float: The average precision score.
+        float: The F1 accuracy score.
     """
     # Check types.
     if isinstance(labels, torch.Tensor):
@@ -72,51 +83,58 @@ def average_precision_open_vocab(labels, logits, iou_threshold=0.5, fix_boxes=Fa
     if logits.ndim == 2:
         logits = logits[None, :, :]
 
-    labels = labels.reshape((-1, 4))
-    logits = logits.reshape((-1, 4))
+    labels = labels.reshape((-1,))
+    logits = logits.reshape((-1, 2))
 
-    # Fix the boxes if needed.
-    if fix_boxes:
+    # Filter out the invalid points.
+    logits = torch.softmax(torch.from_numpy(logits), dim=1).numpy()
+    logits = (logits[:, 1] >= threshold).astype(int)
 
-        assert height is not None and width is not None, "Height and width must be provided if fix_boxes is True."
+    # Compute precision and recall.
+    true_positive = torch.tensor((labels == 1) & (logits == 1), dtype=torch.float32).sum()
+    false_positive = torch.tensor((labels == 0) & (logits == 1), dtype=torch.float32).sum()
+    false_negative = torch.tensor((labels == 1) & (logits == 0), dtype=torch.float32).sum()
 
-        # Convert the bounding boxes from xywh to xyxy format.
-        labels = xywh_to_xyxy(boxes=labels, height=height, width=width)
-        logits = xywh_to_xyxy(boxes=logits, height=height, width=width)
-
-    # Compute the IoU between the predicted and true boxes.
-    iou_matrix = box_iou(
-        torch.from_numpy(logits),
-        torch.from_numpy(labels)
-    )
-
-    # Compute precision and recall based on the IoU threashold.
-    n_pred, n_true = iou_matrix.shape
-    matched = set()
-    true_positive = torch.zeros(n_pred)
-    false_positive = torch.zeros(n_pred)
-
-    for idx_iou in range(n_pred):
-        iou_vec = iou_matrix[idx_iou]
-        max_iou, idx = iou_vec.max(0)
-        idx = idx.item()
-        if max_iou >= iou_threshold and idx not in matched:
-            matched.add(idx)
-            true_positive[idx_iou] = 1
-        else:
-            false_positive[idx_iou] = 1
+    if true_positive + false_positive == 0:
+        precision = 0.0
+    else:
+        precision = true_positive / (true_positive + false_positive)
     
-    true_positive = torch.cumsum(true_positive, dim=0)
-    false_positive = torch.cumsum(false_positive, dim=0)
-    recall = true_positive / n_true
-    precision = true_positive / (true_positive + false_positive)
+    if true_positive + false_negative == 0:
+        recall = 0.0
+    else:
+        recall = true_positive / (true_positive + false_negative)
 
-    recall = torch.cat(tensors=[torch.tensor([0.0]), recall, torch.tensor([1.0])])
-    precision = torch.cat(tensors=[torch.tensor([1.0]), precision, torch.tensor([0.0])])
+    f1 = 2 * (precision * recall) / (precision + recall) if precision + recall > 0 else torch.tensor(data=0.0)
+    return f1.item()
 
-    for i in range(precision.size(0) - 2, -1, -1):
-        precision[i] = max(precision[i], precision[i+1])
+def iou_accuracy(labels, logits, threshold=0.5):
+    """
+    Computes the accuracy of the model based on the Intersection over Union (IoU) 
+    between the ground truth and the predicted bounding boxes.
 
-    ap = torch.sum((recall[1:] - recall[:-1]) * precision[1:]).item()
+    Args:
+        labels (torch.Tensor): The true labels with shape (N, 4).
+        logits (torch.Tensor): The logits from the model with shape (N, 4).
+        threshold (float): IoU threshold. (Default: 0.5)
 
-    return ap
+    Returns:
+        torch.Tensor: The IoU accuracy score.
+    """
+    # Check if the labels and logits are empty.
+    if not labels.size(0) and not logits.size(0):
+        return torch.tensor(1.0)
+    elif labels.size(0) and not logits.size(0):
+        return torch.tensor(0.0)
+    elif not labels.size(0) and logits.size(0):
+        return torch.tensor(0.0)
+
+    # Compute the accuracy.
+    iou_score = box_iou(labels, logits)
+    iou_score = torch.diag(iou_score)
+    iou_score = iou_score[iou_score >= threshold]
+    iou_score = iou_score.float().mean()
+    if torch.isnan(iou_score):
+        iou_score = torch.tensor(0)
+
+    return iou_score

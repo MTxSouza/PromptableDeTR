@@ -6,6 +6,7 @@ import itertools
 import json
 import multiprocessing
 import os
+import random
 
 import numpy as np
 import torch
@@ -21,15 +22,15 @@ class PromptableDeTRDataLoader:
     Data loader class for the Promptable DeTR model.
     """
 
-
     # Class methods.
     @classmethod
-    def get_samples_from_dir(cls, dirpath):
+    def get_samples_from_dir(cls, dirpath, max_obj = None):
         """
         Get all valid samples from the directory.
 
         Args:
             dirpath (str): The path to the directory containing the samples.
+            max_obj (int | None): Maximum number of objects to consider a sample valid. (Default: None)
 
         Returns:
             list: A list of valid sample file paths.
@@ -41,11 +42,11 @@ class PromptableDeTRDataLoader:
         # Create chunk to load samples in parallel.
         n_cpu = os.cpu_count()
         dir_data = np.array_split(ary=dir_data, indices_or_sections=n_cpu)
-        dir_data = [chunk.tolist() for chunk in dir_data]
+        dir_data = [(chunk.tolist(), max_obj) for chunk in dir_data]
 
         # Create pool to load samples in parallel.
         pool = multiprocessing.Pool(processes=n_cpu)
-        samples = pool.map(PromptableDeTRDataLoader.get_samples, dir_data)
+        samples = pool.starmap(PromptableDeTRDataLoader.get_samples, dir_data)
         pool.close()
         pool.join()
 
@@ -55,10 +56,9 @@ class PromptableDeTRDataLoader:
 
         return samples
 
-
     # Static methods.
     @staticmethod
-    def get_samples(data):
+    def get_samples(data, max_obj = None):
         samples = []
         for sample_file in data:
 
@@ -71,28 +71,34 @@ class PromptableDeTRDataLoader:
                 raw_sample = json.load(fp=f)
 
             # Check if the samples are valid.
-            Sample(**raw_sample)
+            obj = Sample(**raw_sample)
             del raw_sample
+
+            # Filter samples.
+            if max_obj is not None and len(obj.boxes) > max_obj:
+                continue
 
             # Append the samples.
             samples.append(sample_file)
             
         return samples
 
-
     @staticmethod
-    def convert_batch_into_tensor(batch, max_len = 500, pad_value = 0):
+    def convert_batch_into_tensor(batch, max_queries = 10, pad_value = 0):
         """
-        Convert a list of AlignerSample objects into tensors.
+        Convert a list of Sample objects into tensors.
 
         Args:
-            batch (List[AlignerSample]): The batch of samples.
-            max_len (int): Maximum number of context length and object predictions. (Default: 100)
+            batch (List[Sample]): The batch of samples.
+            max_queries (int): Maximum number of object predictions. (Default: 10)
             pad_value (int): The padding value. (Default: 0)
 
         Returns:
             Tuple[torch.Tensor, torch.Tensor, torch.Tensor, dict]: The image, caption, mask to occlude the caption and the extra data needed for the model.
         """
+        # Get the maximum caption length.
+        max_len = max(sample.caption_tokens.size(0) for sample in batch)
+
         # Standardize the captions length.
         tensor_captions = None
         masked_captions_tensor = None
@@ -124,39 +130,41 @@ class PromptableDeTRDataLoader:
 
         # Standardize the objects length.
         for sample in batch:
-            
-            bbox_tensor = sample.bbox_tensor
 
-            # Add presence column.
-            presence = torch.ones(size=(bbox_tensor.size(0), 1), dtype=torch.float32)
-            bbox_tensor = torch.cat(tensors=[bbox_tensor, presence], dim=-1)
+            boxes_tensor = sample.boxes_tensor
 
-            if bbox_tensor.size(0) != max_len:
+            # Check if there are no boxes.
+            if boxes_tensor.size(0) == 0:
+                boxes_tensor = torch.zeros(size=(0, 5), dtype=torch.float32)
+            else:
+                # Add presence column.
+                presence = torch.ones(size=(boxes_tensor.size(0), 1), dtype=torch.float32)
+                boxes_tensor = torch.cat(tensors=[boxes_tensor, presence], dim=-1)
+
+            if boxes_tensor.size(0) != max_queries:
 
                 # Pad the objects.
-                pad_len = max_len - bbox_tensor.size(0)
-                bbox_tensor = F.pad(input=bbox_tensor, pad=(0, 0, 0, pad_len), value=pad_value)
+                pad_len = max_queries - boxes_tensor.size(0)
+                boxes_tensor = F.pad(input=boxes_tensor, pad=(0, 0, 0, pad_len), value=pad_value)
 
-            bbox_tensor = bbox_tensor.unsqueeze(dim=0)
+            boxes_tensor = boxes_tensor.unsqueeze(dim=0)
             if tensor_objects is None:
-                tensor_objects = bbox_tensor
+                tensor_objects = boxes_tensor
             else:
-                tensor_objects = torch.cat(tensors=(tensor_objects, bbox_tensor), dim=0)
-        
+                tensor_objects = torch.cat(tensors=(tensor_objects, boxes_tensor), dim=0)
+
         # Create the extra data.
         extra_data = {
             "masked_caption": masked_captions_tensor, 
-            "bbox": tensor_objects
+            "boxes": tensor_objects
         }
-        
-        return tensor_images, tensor_captions, mask_tensors, extra_data
 
+        return tensor_images, tensor_captions, mask_tensors, extra_data
 
     # Special methods.
     def __init__(
             self, 
             sample_file_paths, 
-            image_directory,
             batch_size, 
             transformations = None, 
             shuffle = True, 
@@ -167,15 +175,11 @@ class PromptableDeTRDataLoader:
 
         Args:
             sample_file_paths (list): The list of sample file paths.
-            image_directory (str): The path to the image directory where the images are stored.
             batch_size (int): The batch size.
             transformations (List[BaseTransform]): The transforms to apply to the data. (Default: None)
             shuffle (bool): Whether to shuffle the samples. (Default: True)
             seed (int): The seed for the random number generator. (Default: 42)
         """
-
-        # Compute the number of batches.
-        self.num_batches = len(sample_file_paths) // batch_size + 1
 
         # Check transformations.
         if transformations is None:
@@ -184,19 +188,26 @@ class PromptableDeTRDataLoader:
         if not isinstance(transformations[0], PrepareSample):
             raise ValueError("Transformations must be a list containing the PrepareSample class.")
 
-        # Shuffle the samples.
-        if shuffle:
-            np.random.seed(seed=seed)
-            sample_file_paths = np.random.permutation(sample_file_paths).tolist()
+        # Organize sets.
+        self.dataset = {dirpath: (samples, weight) for dirpath, samples, weight in sample_file_paths}
+
+        # Normalize weights.
+        total_weight = sum(weight for _, weight in self.dataset.values())
+        self.dataset = {dirpath: (samples, int(batch_size * (weight / total_weight))) for dirpath, (samples, weight) in self.dataset.items()}
+        print("-" * 20)
+        print("Datasets:")
+        for dirpath, (samples, n_samples) in self.dataset.items():
+            print(f"\t{dirpath} | Samples: {len(samples)} - Num Samples per batch: {n_samples}")
+        print("-" * 20)
+
+        # Compute the number of batches.
+        self.num_batches = sum(len(samples) for samples, _ in self.dataset.values()) // batch_size + 1
 
         # Attributes.
-        self.sample_file_paths = sample_file_paths
-        self.image_directory = image_directory
         self.batch_size = batch_size
         self.shuffle = shuffle
         self.transformations = transformations
         self.seed = seed
-
 
     def __len__(self):
         """
@@ -204,36 +215,42 @@ class PromptableDeTRDataLoader:
         """
         return self.num_batches
 
+    def __next__(self):
+        """
+        Returns the next batch of samples.
+        """
+        return next(iter(self))
 
     def __iter__(self):
         """
         Returns the iterator object.
         """
-        for i in range(0, len(self.sample_file_paths), self.batch_size):
+        # Get samples based on weights.
+        sample_file_paths = []
+        for samples, n_samples in self.dataset.values():
+            if n_samples > len(samples):
+                n_samples = len(samples)
+            selected_samples = random.sample(population=samples, k=n_samples)
+            sample_file_paths += selected_samples
 
-            curr_sample_files = self.sample_file_paths[i:i + self.batch_size]
-            curr_samples = []
-            for file in curr_sample_files:
+        curr_samples = []
+        for curr_sample_file in sample_file_paths:
 
-                # Load the samples.
-                with open(file=file, mode="r") as f:
-                    raw_sample = json.load(fp=f)
+            # Load the samples.
+            with open(file=curr_sample_file, mode="r") as f:
+                raw_sample = json.load(fp=f)
 
-                # Define sample.
-                sample = Sample(**raw_sample)
+            # Define sample.
+            sample = Sample(**raw_sample)
 
-                # Update the image path.
-                sample.image_path = os.path.join(self.image_directory, sample.image_path)
+            # Append the samples.
+            curr_samples.append(sample)
 
-                # Append the samples.
-                curr_samples.append(sample)
-            
-            # Apply transformations.
-            for transform in self.transformations:
-                curr_samples = transform(samples=curr_samples)
+        # Apply transformations.
+        for transform in self.transformations:
+            curr_samples = transform(samples=curr_samples)
 
-            yield curr_samples
-
+        yield curr_samples
 
     # Methods.
     def get_tokenizer(self):

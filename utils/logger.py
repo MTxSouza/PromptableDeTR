@@ -9,6 +9,8 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 from torch.utils.tensorboard import SummaryWriter
 
+from data.daug import PrepareImage
+
 
 # Enums.
 class LevelName(Enum):
@@ -20,7 +22,6 @@ class LevelName(Enum):
     warning = logging.WARNING
     error = logging.ERROR
     critical = logging.CRITICAL
-
 
 # Functions.
 def get_logger(name, level = "info"):
@@ -49,10 +50,8 @@ def get_logger(name, level = "info"):
 
     return log
 
-
 # Classes.
 class Tensorboard:
-
 
     # Special methods.
     def __init__(self, log_dir):
@@ -65,9 +64,8 @@ class Tensorboard:
         log_dir = os.path.join(log_dir, "tensorboard")
         self.writer = SummaryWriter(log_dir=log_dir)
 
-
     # Methods.
-    def add_current_lr(self, lr, step):
+    def add_current_lr(self, lr, name, step):
         """
         Adds the current learning rate to the Tensorboard writer.
 
@@ -75,25 +73,27 @@ class Tensorboard:
             lr (float): Current learning rate value.
             step (int): Step number.
         """
-        self.writer.add_scalar(tag="lr", scalar_value=lr, global_step=step)
+        self.writer.add_scalar(tag="lr/%s" % name, scalar_value=lr, global_step=step)
 
-
-    def add_train_losses(self, loss, l1_loss, giou_loss, presence_loss, step):
+    def add_train_losses(self, loss, l1_loss, bbox_loss, presence_loss, global_contrastive_loss, local_contrastive_loss, step):
         """
         Adds the training loss to the Tensorboard writer.
 
         Args:
             loss (float): Total training loss value.
             l1_loss (float): Training L1 loss value.
-            giou_loss (float): Training GIoU loss value.
+            bbox_loss (float): Training bounding box loss value.
             presence_loss (float): Training presence loss value.
+            global_contrastive_loss (float): Training global contrastive loss value.
+            local_contrastive_loss (float): Training local contrastive loss value.
             step (int): Step number.
         """
         self.writer.add_scalar(tag="train_loss", scalar_value=loss, global_step=step)
         self.writer.add_scalar(tag="train_l1_loss", scalar_value=l1_loss, global_step=step)
-        self.writer.add_scalar(tag="train_giou_loss", scalar_value=giou_loss, global_step=step)
+        self.writer.add_scalar(tag="train_bbox_loss", scalar_value=bbox_loss, global_step=step)
         self.writer.add_scalar(tag="train_presence_loss", scalar_value=presence_loss, global_step=step)
-
+        self.writer.add_scalar(tag="train_global_contrastive_loss", scalar_value=global_contrastive_loss, global_step=step)
+        self.writer.add_scalar(tag="train_local_contrastive_loss", scalar_value=local_contrastive_loss, global_step=step)
 
     def add_train_giou_accuracy(self, acc, step, th):
         """
@@ -107,36 +107,37 @@ class Tensorboard:
         tag = "train_GIoU@%f" % th
         self.writer.add_scalar(tag=tag, scalar_value=acc, global_step=step)
 
-
-    def add_train_ap_accuracy(self, acc, step, th):
+    def add_train_f1_accuracy(self, acc, step, th):
         """
-        Adds the training AP accuracy to the Tensorboard writer.
+        Adds the training F1 accuracy to the Tensorboard writer.
 
         Args:
             acc (float): Total training accuracy value.
             step (int): Step number.
-            th (float): Threshold used for the AP accuracy.
+            th (float): Threshold used for the F1 accuracy.
         """
-        tag = "train_AP@%f" % th
+        tag = "train_F1@%f" % th
         self.writer.add_scalar(tag=tag, scalar_value=acc, global_step=step)
 
-
-    def add_valid_losses(self, loss, l1_loss, giou_loss, presence_loss, step):
+    def add_valid_losses(self, loss, l1_loss, bbox_loss, presence_loss, global_contrastive_loss, local_contrastive_loss, step):
         """
         Adds the validation loss to the Tensorboard writer.
 
         Args:
             loss (float): Total validation loss value.
             l1_loss (float): Validation L1 loss value.
-            giou_loss (float): Validation GIoU loss value.
+            bbox_loss (float): Validation bounding box loss value.
             presence_loss (float): Validation presence loss value.
+            global_contrastive_loss (float): Validation global contrastive loss value.
+            local_contrastive_loss (float): Validation local contrastive loss value.
             step (int): Step number.
         """
         self.writer.add_scalar(tag="valid_loss", scalar_value=loss, global_step=step)
         self.writer.add_scalar(tag="valid_l1_loss", scalar_value=l1_loss, global_step=step)
-        self.writer.add_scalar(tag="valid_giou_loss", scalar_value=giou_loss, global_step=step)
+        self.writer.add_scalar(tag="valid_bbox_loss", scalar_value=bbox_loss, global_step=step)
         self.writer.add_scalar(tag="valid_presence_loss", scalar_value=presence_loss, global_step=step)
-
+        self.writer.add_scalar(tag="valid_global_contrastive_loss", scalar_value=global_contrastive_loss, global_step=step)
+        self.writer.add_scalar(tag="valid_local_contrastive_loss", scalar_value=local_contrastive_loss, global_step=step)
 
     def add_valid_giou_accuracy(self, acc, step, th):
         """
@@ -150,19 +151,17 @@ class Tensorboard:
         tag = "valid_GIoU@%f" % th
         self.writer.add_scalar(tag=tag, scalar_value=acc, global_step=step)
 
-
-    def add_valid_ap_accuracy(self, acc, step, th):
+    def add_valid_f1_accuracy(self, acc, step, th):
         """
-        Adds the validation AP accuracy to the Tensorboard writer.
+        Adds the validation F1 accuracy to the Tensorboard writer.
 
         Args:
             acc (float): Total validation accuracy value.
             step (int): Step number.
-            th (float): Threshold used for the AP accuracy.
+            th (float): Threshold used for the F1 accuracy.
         """
-        tag = "valid_AP@%f" % th
+        tag = "valid_F1@%f" % th
         self.writer.add_scalar(tag=tag, scalar_value=acc, global_step=step)
-
 
     def add_image(self, samples, step, giou_th):
         """
@@ -179,16 +178,22 @@ class Tensorboard:
         for (img, caption, label, prediction) in samples:
 
             # Draw the rectangles on the image.
-            pil_img = Image.fromarray((img * 255).astype("uint8"))
+            img = PrepareImage.de_normalize(normalized_image=img)
+            pil_img = Image.fromarray(img.astype("uint8"))
+            width, height = pil_img.size
             draw = ImageDraw.Draw(im=pil_img)
 
-            for box in label:
-                draw.rectangle(xy=tuple(box), outline="green", width=2)
-            for box in prediction:
+            for bbox in label:
+                cx, cy, w, h = bbox
+                bbox = ((cx - w / 2) * width, (cy - h / 2) * height, (cx + w / 2) * width, (cy + h / 2) * height)
+                draw.rectangle(xy=bbox, outline="lime", width=2)
+            for bbox in prediction:
                 try:
-                    draw.rectangle(xy=tuple(box), outline="red", width=2)
+                    cx, cy, w, h = bbox
+                    bbox = ((cx - w / 2) * width, (cy - h / 2) * height, (cx + w / 2) * width, (cy + h / 2) * height)
+                    draw.rectangle(xy=bbox, outline="red", width=2)
                 except ValueError:
-                    # If the box is invalid, skip it.
+                    # If the bbox is invalid, skip it.
                     continue
 
             # Write the caption on the image.
@@ -203,6 +208,18 @@ class Tensorboard:
         # Add the images to the Tensorboard writer.
         for idx, sample in enumerate(iterable=tb_samples):
             self.writer.add_image(tag=f"[{idx} - GIoU@{giou_th}]", img_tensor=np.asarray(sample), global_step=step, dataformats="HWC")
+
+    def add_grad(self, model, step):
+        """
+        Adds the gradients of the model to the Tensorboard writer.
+
+        Args:
+            model (torch.nn.Module): Model to be used.
+            step (int): Step number.
+        """
+        for name, param in model.named_parameters():
+            if param.grad is not None:
+                self.writer.add_histogram(tag="gradients/%s" % name, values=param.grad, global_step=step)
 
     def close(self):
         """
