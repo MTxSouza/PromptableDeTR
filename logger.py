@@ -32,7 +32,8 @@ class Logger(logging.Logger):
             filename=os.path.join(self.LOG_DIR, "%s.log" % name), 
             mode="w", 
             maxBytes=max_bytes, 
-            backupCount=5
+            backupCount=5,
+            delay=True
         )
         handler.setLevel(level=logging.DEBUG)
 
@@ -45,3 +46,20 @@ class Logger(logging.Logger):
     
         # Set logger level.
         self.setLevel(level=logging.DEBUG)
+
+
+    # HOT FIX: Override logging methods to prevent errors when logging is not set up.
+    def debug(self, *args, **kargs):
+        pass
+
+    def info(self, *args, **kargs):
+        pass
+
+    def warning(self, *args, **kargs):
+        pass
+
+    def error(self, *args, **kargs):
+        pass
+
+    def critical(self, *args, **kargs):
+        pass

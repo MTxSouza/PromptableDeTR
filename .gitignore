@@ -4,8 +4,11 @@ __pycache__
 
 # Logs
 logs/
-*exp/
+*exp*/
 
 # Environment
 .venv
 .env
+
+# Dataset.
+*dataset*/

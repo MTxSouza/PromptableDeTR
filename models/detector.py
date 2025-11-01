@@ -7,10 +7,13 @@ import os
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torchvision.ops import sigmoid_focal_loss
 
 from logger import Logger
 from models.base import BasePromptableDeTR
-from models.matcher import HuggarianMatcher, generalized_iou
+from models.matcher import HungarianMatcher
+from utils.data import generalized_iou
+from utils.metrics import f1_accuracy_open_vocab, iou_accuracy
 
 # Logger.
 logger = Logger(name="model")
@@ -19,16 +22,15 @@ logger = Logger(name="model")
 # Classes.
 class PromptableDeTR(BasePromptableDeTR):
 
-
     # Special methods.
     def __init__(
             self, 
-            image_tokens, 
+            image_size = 320, 
+            num_queries = 10,
             vocab_size = 30522, 
-            emb_dim = 128, 
-            proj_dim = 512, 
+            emb_dim = 512, 
             num_heads = 8, 
-            ff_dim = 2048, 
+            ff_dim = 1024, 
             emb_dropout_rate = 0.1, 
             num_joiner_layers = 3
         ):
@@ -37,13 +39,19 @@ class PromptableDeTR(BasePromptableDeTR):
         of objects in the image.
 
         Args:
-            proj_dim (int): The projection dimension of the image and text embeddings. (Default: 512)
+            image_size (int): The size of the input image. (Default: 320)
+            vocab_size (int): The size of the vocabulary. (Default: 30522)
+            emb_dim (int): The projection dimension of the image and text embeddings. (Default: 512)
+            num_heads (int): The number of attention heads. (Default: 8)
+            ff_dim (int): The dimension of the feed-forward network. (Default: 1024)
+            emb_dropout_rate (float): The dropout rate for the embeddings. (Default: 0.1)
+            num_joiner_layers (int): The number of joiner layers in the model. (Default: 3)
         """
         super().__init__(
-            image_tokens=image_tokens, 
+            image_size=image_size, 
+            num_queries=num_queries,
             vocab_size=vocab_size, 
             emb_dim=emb_dim, 
-            proj_dim=proj_dim, 
             num_heads=num_heads, 
             ff_dim=ff_dim, 
             emb_dropout_rate=emb_dropout_rate, 
@@ -51,24 +59,22 @@ class PromptableDeTR(BasePromptableDeTR):
         )
 
         # Layers.
-        self.detector = nn.Sequential(
-            nn.Linear(in_features=proj_dim, out_features=proj_dim * 4),
-            nn.ReLU(),
-            nn.Linear(in_features=proj_dim * 4, out_features=proj_dim * 2),
-            nn.ReLU()
-        )
-        self.bbox_predictor = nn.Linear(in_features=proj_dim * 2, out_features=4)
-        self.presence_predictor = nn.Linear(in_features=proj_dim * 2, out_features=2)
+        self.bbox_predictor = nn.Linear(in_features=emb_dim, out_features=4)
+        self.presence_predictor = nn.Linear(in_features=emb_dim, out_features=2)
 
         # Initialize weights.
         self.__initialize_weights()
 
-        # Matcher.
-        self.__presence_weight = None
-        self.__l1_weight = None
-        self.__giou_weight = None
-        self.matcher = None
-
+        self.params = {
+            "image_size": image_size,
+            "num_queries": num_queries,
+            "vocab_size": vocab_size,
+            "emb_dim": emb_dim,
+            "num_heads": num_heads,
+            "ff_dim": ff_dim,
+            "emb_dropout_rate": emb_dropout_rate,
+            "num_joiner_layers": num_joiner_layers
+        }
 
     # Private methods.
     def __initialize_weights(self):
@@ -79,50 +85,11 @@ class PromptableDeTR(BasePromptableDeTR):
             if isinstance(module, nn.Linear):
                 nn.init.xavier_uniform_(module.weight)
                 nn.init.zeros_(module.bias)
-        
-        self.detector.apply(init_weights)
+
         self.bbox_predictor.apply(init_weights)
         self.presence_predictor.apply(init_weights)
 
-
-    def __get_indices(self, matcher_indices):
-        """
-        Organize the indices to be used in the loss computation.
-
-        Args:
-            matcher_indices (List[Tuple[torch.Tensor, torch.Tensor]]): The indices from the matcher.
-
-        Returns:
-            Tuple[torch.Tensor, torch.Tensor, torch.Tensor]: The batch, source, and target indices.
-        """
-        batch_idx = torch.cat([torch.full_like(src, i) for i, (src, _) in enumerate(matcher_indices)])
-        src_idx = torch.cat([src for (src, _) in matcher_indices])
-        tgt_idx = torch.cat([tgt for (_, tgt) in matcher_indices])
-        return batch_idx, src_idx, tgt_idx
-
-
     # Methods.
-    def define_matcher(self, presence_loss_weight = 1.0, l1_loss_weight = 1.0, giou_loss_weight = 1.0):
-        """
-        Define the matcher used to align the bounding boxes with the respective label. It is only 
-        defined during the training phase.
-
-        Args:
-            presence_loss_weight (float): The weight for the presence loss. (Default: 1.0)
-            l1_loss_weight (float): The weight for the L1 loss. (Default: 1.0)
-            giou_loss_weight (float): The weight for the GIoU loss. (Default: 1.0)
-        """
-        logger.info(msg="Defining the matcher for the detector.")
-        self.__presence_weight = presence_loss_weight
-        self.__l1_weight = l1_loss_weight
-        self.__giou_weight = giou_loss_weight
-        self.matcher = HuggarianMatcher(
-            presence_loss_weight=presence_loss_weight,
-            l1_loss_weight=l1_loss_weight,
-            giou_loss_weight=giou_loss_weight
-        )
-
-
     def forward(self, image, prompt, prompt_mask = None):
         """
         Forward pass of the detector.
@@ -133,7 +100,7 @@ class PromptableDeTR(BasePromptableDeTR):
             prompt_mask (torch.Tensor): Prompt mask tensor. (Default: None)
 
         Returns:
-            torch.Tensor: The predicted bounding boxes and presence.
+            Tuple[torch.Tensor, torch.Tensor, torch.Tensor]: The predicted bounding boxes and presence and the text and image embeddings.
         """
         logger.info(msg="Calling `Detector` forward method.")
         logger.debug(msg="- Image shape: %s" % (image.shape,))
@@ -141,18 +108,13 @@ class PromptableDeTR(BasePromptableDeTR):
 
         # Compute joint embeddings.
         logger.debug(msg="- Calling `BasePromptableDeTR` forward method.")
-        joint = super().forward(image=image, prompt=prompt, prompt_mask=prompt_mask)
+        joint, text_emb, img_emb = super().forward(image=image, prompt=prompt, prompt_mask=prompt_mask)
         logger.debug(msg="- Result of the `BasePromptableDeTR` forward method: %s." % (joint.shape,))
 
-        # Predict bounding boxes and presence.
-        logger.debug(msg="- Calling `nn.Sequential` block to the tensor %s." % (joint.shape,))
-        out = self.detector(joint)
-        logger.debug(msg="- Result of the `nn.Sequential` block: %s." % (out.shape,))
-
-        logger.debug(msg="- Calling `nn.Linear` block to the tensor %s." % (out.shape,))
-        bbox = self.bbox_predictor(out)
+        logger.debug(msg="- Calling `nn.Linear` blocks to the tensor %s." % (joint.shape,))
+        bbox = self.bbox_predictor(joint)
         bbox = F.sigmoid(input=bbox)
-        presence = self.presence_predictor(out)
+        presence = self.presence_predictor(joint)
         logger.debug(msg="- Result of the `nn.Linear` block: %s and %s." % (bbox.shape, presence.shape))
 
         # Concatenate the predictions.
@@ -160,37 +122,7 @@ class PromptableDeTR(BasePromptableDeTR):
         outputs = torch.cat(tensors=(bbox, presence), dim=-1)
         logger.debug(msg="- Result of the concatenation: %s." % (outputs.shape,))
 
-        return outputs
-
-
-    def save_model(self, dir_path, ckpt_step = None, is_best = False):
-        """
-        Save the model weights.
-
-        Args:
-            dir_path (str): The path to the directory where the weights will be saved.
-            ckpt_step (int): The checkpoint step. (Default: None)
-            is_best (bool): Flag to indicate if the checkpoint is the best. (Default: False)
-        """
-        logger.info(msg="Saving the model weights.")
-        
-        # Define the checkpoint path.
-        name = "promptable-detr"
-
-        # Check if the model is the best.
-        if is_best:
-            name += "-best"
-        
-        if ckpt_step is not None:
-            name += "-ckpt-%d" % ckpt_step
-        
-        os.makedirs(name=dir_path, exist_ok=True)
-        ckpt_fp = os.path.join(dir_path, name + ".pth")
-        log_fp = os.path.join(dir_path, name + ".log")
-
-        # Save the weights.
-        torch.save(obj=self.state_dict(), f=ckpt_fp)
-
+        return outputs, joint, text_emb, img_emb
 
     def load_base_model(self, base_model_weights):
         """
@@ -205,8 +137,111 @@ class PromptableDeTR(BasePromptableDeTR):
         # Load weights.
         super().load_full_weights(base_model_weights=base_model_weights)
 
+    def load_weights(self, model_weights):
+        """
+        Load the weights of the entire model.
 
-    def compute_loss_and_accuracy(self, logits, labels):
+        Args:
+            model_weights (str): Path to the model weights.
+        """
+        logger.info(msg="Loading the model weights.")
+        logger.debug(msg="- Model weights: %s" % model_weights)
+
+        # Load weights.
+        state_dict = torch.load(f=model_weights, map_location="cpu")
+        if model_weights.endswith(".pt"):
+            assert "weights" in state_dict
+            state_dict["model_state_dict"] = state_dict.pop("weights")
+        assert "model_state_dict" in state_dict
+        state_dict = state_dict["model_state_dict"]
+        self.load_state_dict(state_dict=state_dict, strict=True)
+
+class PromptableDeTRTrainer(PromptableDeTR):
+    """
+    A subclass of PromptableDeTR that is used for training the model.
+    It inherits from PromptableDeTR and adds the functionality to compute
+    the loss and accuracy of the model.
+    """
+
+    # Special methods.
+    def __init__(
+            self,
+            use_focal_loss=False,
+            presence_loss_weight=1.0,
+            giou_loss_weight=1.0,
+            l1_loss_weight=1.0,
+            local_contrastive_loss_weight=1.0,
+            alpha=0.25,
+            hm_presence_weight=5.0,
+            hm_giou_weight=2.0,
+            hm_l1_weight=3.0,
+            *args,
+            **kwargs
+        ):
+        super().__init__(*args, **kwargs)
+
+        # Loss weights.
+        self.__use_focal_loss = use_focal_loss
+        self.__presence_weight = presence_loss_weight
+        self.__giou_weight = giou_loss_weight
+        self.__l1_weight = l1_loss_weight
+        self.__local_contrastive_weight = local_contrastive_loss_weight
+        self.__alpha = alpha
+
+        # Matcher.
+        self.matcher = HungarianMatcher(
+            presence_loss_weight=hm_presence_weight,
+            l1_loss_weight=hm_l1_weight,
+            giou_loss_weight=hm_giou_weight
+        )
+
+    # Private methods.
+    def __compute_infonce_loss(self, object_emb, tk_emb, obj_idx):
+        """
+        Compute the InfoNCE loss based on the MDeTR paper.
+
+        Args:
+            object_emb (torch.Tensor): The object embeddings of shape (B, N, D).
+            tk_emb (torch.Tensor): The token embeddings of shape (B, 1, D).
+            obj_idx (torch.Tensor): The object index tensor (B, N).
+
+        Returns:
+            torch.Tensor: The computed InfoNCE loss.
+        """
+        # Compute cosine similarity.
+        tk_emb = F.normalize(input=tk_emb, p=2, dim=-1)
+        object_emb = F.normalize(input=object_emb, p=2, dim=-1)
+        logits_token_to_object = (tk_emb @ object_emb.transpose(-2, -1)) / 0.07
+        logits_object_to_token = logits_token_to_object.permute(0, 2, 1)
+
+        # Prepare positive indices.
+        pos_mask = obj_idx.unsqueeze(dim=1) == torch.ones(tk_emb.size(dim=1), device=tk_emb.device).view(1, tk_emb.size(dim=1), 1)
+
+        def compute_infonce_loss(logits, pos_idx, eps = 1e-8):
+
+            log_prob = F.log_softmax(logits, dim=-1)
+
+            pos_log_prob = log_prob * pos_idx
+            sum_pos_log_prob = pos_log_prob.sum(dim=-1)
+            pos_count = pos_idx.sum(dim=-1).clamp(min=0.0)
+
+            per_loss = -(sum_pos_log_prob / (pos_count + eps))
+            valid_mask = (pos_count > 0).float()
+            total_valid = valid_mask.sum()
+
+            return (per_loss * valid_mask).sum() / (total_valid + eps)
+
+        # Compute loss for token to object.
+        token_to_object_loss = compute_infonce_loss(logits=logits_token_to_object, pos_idx=pos_mask)
+
+        # Compute loss for object to token.
+        object_to_token_loss = compute_infonce_loss(logits=logits_object_to_token, pos_idx=pos_mask.permute(0, 2, 1))
+
+        # Final loss.
+        return (token_to_object_loss + object_to_token_loss) / 2
+
+    # Methods.
+    def compute_loss_and_accuracy(self, logits, labels, fusion_emb, txt_emb, img_emb, txt_mask = None):
         """
         Compute the loss needed to train the detector model and
         it also computes the accuracy of the model.
@@ -214,13 +249,21 @@ class PromptableDeTR(BasePromptableDeTR):
         Args:
             logits torch.Tensor): The predicted tensor.
             labels (torch.Tensor): The true tensor.
+            fusion_emb (torch.Tensor): The joint embeddings.
+            txt_emb (torch.Tensor): The text embeddings.
+            img_emb (torch.Tensor): The image embeddings.
+            txt_mask (torch.Tensor): The text mask tensor. (Default: None)
 
         Returns:
-            Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]: The losses of model.
+            dict: A dictionary containing the loss and accuracy values.
         """
         logger.info(msg="Computing the detector loss.")
 
         assert self.matcher is not None, "Matcher is not defined."
+
+        # Check if the model outputs has nan values.
+        if torch.isnan(logits).any():
+            raise ValueError("The model outputs contains NaN values.")
 
         # Sort the logits and labels.
         pred_presence = logits[:, :, 4:]
@@ -231,55 +274,152 @@ class PromptableDeTR(BasePromptableDeTR):
         logger.debug(msg="- Predicted boxes shape: %s." % (pred_boxes.shape,))
         logger.debug(msg="- True presence shape: %s." % (true_presence.shape,))
         logger.debug(msg="- True boxes shape: %s." % (true_boxes.shape,))
-        indices = self.matcher(predict_scores=pred_presence, predict_boxes=pred_boxes, scores=true_presence, boxes=true_boxes)
-        batch_idx, src_idx, tgt_idx = self.__get_indices(matcher_indices=indices)
+        batch_idx, src_idx, tgt_idx = self.matcher(predict_scores=pred_presence, predict_boxes=pred_boxes, scores=true_presence, boxes=true_boxes)
         logger.debug(msg="- Batch index shape: %s." % (batch_idx.shape,))
         logger.debug(msg="- Source index shape: %s." % (src_idx.shape,))
         logger.debug(msg="- Target index shape: %s." % (tgt_idx.shape,))
 
-        sorted_pred_presence = pred_presence[(batch_idx, src_idx)]
-        sorted_pred_boxes = pred_boxes[(batch_idx, src_idx)]
-        sorted_true_presence = true_presence[(batch_idx, tgt_idx)]
-        sorted_true_boxes = true_boxes[(batch_idx, tgt_idx)]
-        logger.debug(msg="- Sorted predicted presence shape: %s." % (sorted_pred_presence.shape,))
-        logger.debug(msg="- Sorted predicted boxes shape: %s." % (sorted_pred_boxes.shape,))
-        logger.debug(msg="- Sorted true presence shape: %s." % (sorted_true_presence.shape,))
-        logger.debug(msg="- Sorted true boxes shape: %s." % (sorted_true_boxes.shape,))
+        # Prepare new targets.
+        new_true_presence = torch.zeros_like(true_presence).long().to(true_presence.device)
+        new_true_presence[batch_idx, src_idx] = 1
+        new_true_boxes = torch.zeros_like(pred_boxes).to(true_boxes.device)
+        new_true_boxes[batch_idx, src_idx] = true_boxes[batch_idx, tgt_idx]
 
-        # Define new scores labels.
-        new_scores = torch.full(size=pred_presence.shape[:2], fill_value=0, device=sorted_pred_presence.device).long()
-        logger.debug(msg="- New scores shape: %s." % (new_scores.shape,))
-        new_scores[(batch_idx, tgt_idx)] = sorted_true_presence
+        # Compute F1 accuracy.
+        f1_50 = torch.tensor(f1_accuracy_open_vocab(labels=new_true_presence.view(-1, 1), logits=pred_presence.view(-1, 2), threshold=0.50))
+        f1_75 = torch.tensor(f1_accuracy_open_vocab(labels=new_true_presence.view(-1, 1), logits=pred_presence.view(-1, 2), threshold=0.75))
+        f1_90 = torch.tensor(f1_accuracy_open_vocab(labels=new_true_presence.view(-1, 1), logits=pred_presence.view(-1, 2), threshold=0.90))
+        logger.debug(msg="- F1 Score @0.50: %s." % f1_50)
+        logger.debug(msg="- F1 Score @0.75: %s." % f1_75)
+        logger.debug(msg="- F1 Score @0.90: %s." % f1_90)
 
         # Compute number of boxes.
-        obj_idx = new_scores == 1
+        obj_idx = new_true_presence == 1
         num_boxes = obj_idx.sum()
         logger.debug(msg="- Number of boxes: %s." % num_boxes)
 
-        # Compute presence loss.
-        presence_weight = None
-        if self.__presence_weight != 1.0:
+        # Compute Local Contrastive Loss.
+        valid_obj = obj_idx.any(dim=1) # (B,)
+        if valid_obj.any():
+
+            if txt_mask is not None:
+                denom = txt_mask.sum(dim=1, keepdim=True).clamp(min=1e-6).to(txt_emb.device)
+                txt_emb = (txt_emb * txt_mask.unsqueeze(dim=-1)).sum(dim=1, keepdim=True) / denom
+            else:
+                txt_emb = txt_emb.mean(dim=1, keepdim=True)
+
+            local_contrastive_loss = self.__compute_infonce_loss(
+                object_emb=fusion_emb,
+                tk_emb=txt_emb,
+                obj_idx=obj_idx
+            ) * self.__local_contrastive_weight
+        
+        else:
+            local_contrastive_loss = torch.tensor(0.0, device=pred_boxes.device)
+
+        logger.debug(msg="- Local Contrastive loss: %s." % local_contrastive_loss)
+
+        # Compute presence loss with focal loss.
+        predictions = pred_presence.view(-1, 2)
+        targets = new_true_presence.view(-1)
+        if not self.__use_focal_loss:
             presence_weight = torch.tensor([1.0, self.__presence_weight], device=pred_presence.device)
-        B, N, C = pred_presence.shape
-        presence_loss = F.cross_entropy(input=pred_presence.view(B * N, C), target=new_scores.view(-1), weight=presence_weight, reduction="mean")
+            presence_loss = F.cross_entropy(input=predictions, target=targets, weight=presence_weight, reduction="mean")
+        else:
+            presence_loss = sigmoid_focal_loss(
+                inputs=predictions,
+                targets=F.one_hot(targets, num_classes=2).float(),
+                alpha=self.__alpha,
+                gamma=self.__presence_weight,
+                reduction="mean"
+            )
         logger.debug(msg="- Presence loss: %s." % presence_loss)
 
         # Compute bounding box loss.
-        bbox_loss = F.l1_loss(input=sorted_pred_boxes, target=sorted_true_boxes, reduction="none")
-        bbox_loss = bbox_loss.sum() / num_boxes
+        bbox_loss = F.l1_loss(input=pred_boxes, target=new_true_boxes, reduction="none")
+        bbox_loss = bbox_loss.sum(dim=-1)
+        if num_boxes == 0:
+            bbox_loss = torch.tensor(0.0, device=pred_boxes.device)
+        else:
+            bbox_loss = bbox_loss[obj_idx].sum() / num_boxes
+        bbox_loss = self.__l1_weight * bbox_loss
         logger.debug(msg="- Bounding box loss: %s." % bbox_loss)
 
-        diag_acc = torch.diag(input=generalized_iou(sorted_pred_boxes, sorted_true_boxes))
-        giou_loss = 1 - diag_acc
-        giou_loss = giou_loss.sum() / num_boxes
+        # Compute GIoU loss.
+        pred_boxes = pred_boxes.view(-1, 4)
+        new_true_boxes = new_true_boxes.view(-1, 4)
+        diag_accuracy = torch.diag(generalized_iou(boxes1=pred_boxes, boxes2=new_true_boxes))
+        diag_accuracy = (1 - diag_accuracy)
+        if num_boxes == 0:
+            giou_loss = torch.tensor(0.0, device=pred_boxes.device)
+        else:
+            diag_accuracy = diag_accuracy[obj_idx.view(-1)]
+            giou_loss = diag_accuracy.sum() / num_boxes
+        giou_loss = self.__giou_weight * giou_loss
         logger.debug(msg="- GIoU loss: %s." % giou_loss)
 
         # Compute the total loss.
-        final_l1_loss = self.__l1_weight * bbox_loss
-        final_giou_loss = self.__giou_weight * giou_loss
-        final_presence_loss = self.__presence_weight * presence_loss
-        loss = final_l1_loss + final_presence_loss + final_giou_loss
+        loss = bbox_loss + presence_loss + giou_loss + local_contrastive_loss
         logger.debug(msg="- Total loss: %s." % loss)
         logger.info(msg="Returning the loss value.")
 
-        return loss, final_l1_loss, final_giou_loss, final_presence_loss
+        # Compute IoU accuracy.
+        giou_50 = iou_accuracy(labels=new_true_boxes, logits=pred_boxes, threshold=0.50)
+        giou_75 = iou_accuracy(labels=new_true_boxes, logits=pred_boxes, threshold=0.75)
+        giou_90 = iou_accuracy(labels=new_true_boxes, logits=pred_boxes, threshold=0.90)
+
+        metrics = {
+            "loss": loss,
+            "bbox_loss": bbox_loss,
+            "giou_loss": giou_loss,
+            "presence_loss": presence_loss,
+            "local_contrastive_loss": local_contrastive_loss,
+            "f1_50": f1_50,
+            "f1_75": f1_75,
+            "f1_90": f1_90,
+            "giou_50": giou_50,
+            "giou_75": giou_75,
+            "giou_90": giou_90
+        }
+
+        return metrics
+
+    def save_checkpoint(self, model, optimizers, dir_path, step, is_best = False):
+        """
+        Save the model and optimizer state.
+
+        Args:
+            model (PromptableDeTRTrainer): The model to save.
+            optimizers (dict): Dictionary containing the optimizers to save.
+            dir_path (str): The path to the directory where the checkpoint will be saved.
+            step (int): The current training step.
+        """
+        logger.info(msg="Saving the model and optimizer state.")
+        
+        # Define the checkpoint path.
+        if is_best:
+            ckpt_fp = os.path.join(dir_path, "best_model.ckpt")
+        else:
+            ckpt_fp = os.path.join(dir_path, "model.ckpt")
+
+        # Get state dict of the optimizers and schedulers.
+        opt_state_dict = {}
+        for name, opt_data in optimizers.items():
+            if opt_data["scheduler"] is not None:
+                opt_state_dict[name] = {
+                    "opt": opt_data["opt"].state_dict(),
+                    "scheduler": opt_data["scheduler"].state_dict()
+                }
+            else:
+                opt_state_dict[name] = {
+                    "opt": opt_data["opt"].state_dict(),
+                    "scheduler": None
+                }
+
+        # Save the model and optimizer state.
+        torch.save(obj={
+            "model_state_dict": model.state_dict(),
+            "optimizer_state_dict": opt_state_dict,
+            "step": step,
+            "configs": self.params
+        }, f=ckpt_fp)

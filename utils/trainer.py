@@ -2,21 +2,62 @@
 This module contains the main class used to train all models. It defines the training loop and the 
 evaluation loop.
 """
+import os
 import random
 import time
 
+import numpy as np
 import torch
+import torch.optim as optim
 from tqdm import tqdm
 
 from data.loader import PromptableDeTRDataLoader
-from utils.data import xywh_to_xyxy
 from utils.logger import Tensorboard
-from utils.metrics import iou_accuracy
 
+
+# Functions.
+def convert_ckpt_into_pt(ckpt_file_path: str, output_dir: str):
+    """
+    Convert a checkpoint file path into a .pt file that
+    can be used to instantiate the entire model using the
+    `PromptableDeTRModel` class.
+
+    Args:
+        ckpt_file_path (str): Path to the ckpt file.
+        output_dir (str): Directory to save the .pt file.
+    """
+    assert os.path.exists(ckpt_file_path), "The checkpoints does not exist."
+    assert os.path.isdir(output_dir), "Directory path is invalid."
+
+    # Load checkpoint.
+    ckpt = torch.load(f=ckpt_file_path, map_location="cpu")
+    assert "model_state_dict" in ckpt
+    assert "configs" in ckpt
+
+    # Define new state dict.
+    model_pt = {"weights": ckpt.pop("model_state_dict"), "configs": ckpt.pop("configs")}
+    pt_file_path = os.path.join(output_dir, "promptabledetr.pt")
+    torch.save(obj=model_pt, f=pt_file_path)
 
 # Classes.
 class Trainer:
 
+    # Static methods.
+    @staticmethod
+    def project_lr_curve(curve_limit, warmup_steps, frozen_steps, lr_factor):
+
+        def lr_curve(step):
+            if step < warmup_steps:
+                return lr_factor + (1.0 - lr_factor) * step / warmup_steps
+            elif step <= frozen_steps:
+                return 1.0
+            elif step >= curve_limit:
+                return lr_factor
+            decay_progress = (step - frozen_steps) / (curve_limit - frozen_steps)
+            decay_factor = (1 - decay_progress) ** 2
+            return lr_factor + (1.0 - lr_factor) * decay_factor
+
+        return lr_curve
 
     # Special methods.
     def __init__(
@@ -26,13 +67,21 @@ class Trainer:
             optimizer, 
             train_dataset, 
             valid_dataset, 
-            lr,
+            max_queries,
+            max_lr,
+            min_lr,
+            warmup_steps,
+            frozen_steps,
             log_interval,
             eval_interval,
-            max_iter, 
+            max_iter,
+            curve_limit, 
+            disable_lr_curve,
             overfit_threshold,
             overfit_patience,
-            exp_dir
+            exp_dir,
+            log_grads,
+            device
         ):
         """
         Initializes the Trainer class used to train models.
@@ -43,46 +92,67 @@ class Trainer:
             optimizer (torch.optim.Optimizer): The optimizer to use.
             train_dataset (PromptableDeTRDataLoader): The training dataset.
             valid_dataset (PromptableDeTRDataLoader): The validation dataset.
-            lr (float): The learning rate.
+            max_queries (int): The maximum number of object queries.
+            max_lr (float): Maximum learning rate for the Joiner optimizer.
+            min_lr (float): Minimum learning rate for the Joiner optimizer.
+            warmup_steps (int): The number of warmup steps for the learning rate scheduler.
+            frozen_steps (int): The number of steps to freeze the learning rate.
             log_interval (int): Period to log the training status.
             eval_interval (int): Period to evaluate the model.
             max_iter (int): The maximum number of iterations.
+            curve_limit (int): The maximum number of iterations for the LR curve.
+            disable_lr_curve (bool): Whether to disable the learning rate curve.
             overfit_threshold (float): The threshold to consider overfitting.
             overfit_patience (int): The number of iterations to wait before considering overfitting.
             exp_dir (str): The directory to save the experiment.
+            log_grads (bool): Whether to log the gradients.
+            device (torch.device): The device to use for training.
         """
         # Attributes.
         self.trainer_name = trainer_name
         self.model = model
         self.optimizer = optimizer
+        self.optimizers = None
         self.train_dataset = train_dataset
         self.valid_dataset = valid_dataset
-        self.lr = lr
+        self.max_queries = max_queries
+        self.max_lr = max_lr
+        self.min_lr = min_lr
+        self.lr_factor = min_lr / max_lr
+        self.warmup_steps = warmup_steps
+        self.frozen_steps = warmup_steps + frozen_steps
         self.log_interval = log_interval
         self.eval_interval = eval_interval
         self.max_iter = max_iter
+        self.curve_limit = curve_limit
+        self.disable_lr_curve = disable_lr_curve
         self.overfit_threshold = overfit_threshold
         self.overfit_patience = overfit_patience
         self.exp_dir = exp_dir
+        self.log_grads = log_grads
         self.tokenizer = None
     
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.device = device
 
         # Training attributes.
-        self.__total_samples = 16
-        self.__add_sample_threshold = 0.5
+        self.__total_samples = 8
         self.__current_iter = 1
-        self.__best_loss = float("inf")
+        self.__best_acc = 0.0
         self.__is_overfitting = False
         self.__overfit_counter = 0
         self.__losses = []
+        self.__bbox_losses = []
         self.__l1_losses = []
-        self.__giou_losses = []
         self.__presence_losses = []
-        self.__samples = []
+        self.__local_contrastive_losses = []
+        self.__giou_50_accuracies = []
+        self.__giou_75_accuracies = []
+        self.__giou_90_accuracies = []
+        self.__f1_50_accuracies = []
+        self.__f1_75_accuracies = []
+        self.__f1_90_accuracies = []
 
         self.__tensorboard = Tensorboard(log_dir=exp_dir)
-
 
     # Private methods.
     def __compile_model(self):
@@ -90,45 +160,121 @@ class Trainer:
         It initializes the model and the optimizer and compiles the model 
         for more efficient training.
         """
-        # Compile the model.
-        # self.model = torch.compile(model=self.model)
+        # Project optimizer and LR curve.
+        lr_curve = self.project_lr_curve(
+            curve_limit=self.curve_limit,
+            warmup_steps=self.warmup_steps,
+            frozen_steps=self.frozen_steps,
+            lr_factor=self.lr_factor
+        )
 
-        # Define the optimizer.
-        self.optimizer = self.optimizer(params=self.model.parameters(), lr=self.lr)
+        # Define the optimizers.
+        self.optimizers = {
+            "encoder": {
+                "add_scheduler": False,
+                "opt": self.optimizer(params=\
+                                    list(self.model.image_encoder.parameters()) + \
+                                    list(self.model.text_encoder.parameters()),
+                                    lr=self.min_lr
+                                    )
+            },
+            "head": {
+                "add_scheduler": True if not self.disable_lr_curve else False,
+                "opt": self.optimizer(params=\
+                                    list(self.model.joiner.parameters()) + \
+                                    list(self.model.bbox_predictor.parameters()) + \
+                                    list(self.model.presence_predictor.parameters()),
+                                    lr=self.max_lr if not self.disable_lr_curve else self.min_lr
+                                    )
+            }
+        }
+        # Add LR Scheduler.
+        for _, opt_data in self.optimizers.items():
+            if opt_data["add_scheduler"]:
+                opt_data["scheduler"] = optim.lr_scheduler.LambdaLR(optimizer=opt_data["opt"], lr_lambda=lr_curve)
+            else:
+                opt_data["scheduler"] = None
 
         # Move the model to the device.
         self.model.to(device=self.device)
 
+    def __optimize_model(self, loss):
+        """
+        Run the backpropagation algorithm and updates the
+        model parameters.
 
-    def __compute_current_training_metrics(self, reset = True):
+        Args:
+            loss (torch.Tensor): Final loss of the model.
+        """
+        # Reset gradients.
+        for opt_data in self.optimizers.values():
+            opt_data["opt"].zero_grad()
+        
+        loss.backward()
+        torch.nn.utils.clip_grad_norm_(parameters=self.model.parameters(), max_norm=0.3) # HARDCODED.
+
+        # Update model.
+        for name, opt_data in self.optimizers.items():
+            opt_data["opt"].step()
+            if opt_data["scheduler"] is not None:
+                opt_data["scheduler"].step()
+
+                # Store current LR
+                self.__tensorboard.add_current_lr(lr=opt_data["scheduler"].get_last_lr()[0], name=name, step=self.__current_iter)
+            else:
+                self.__tensorboard.add_current_lr(lr=opt_data["opt"].param_groups[0]["lr"], name=name, step=self.__current_iter)
+
+    def __compute_current_training_metrics(self):
         """
         It computes the current training metrics.
 
-        Args:
-            reset (bool): Whether to reset the metrics or not. (Default: True)
-
         Returns:
-            Tuple[float, float, float, float, float]: The current training metrics.
+            dict: A dictionary containing the current training metrics.
         """
+        # Check the length of the metrics.
+        if len(self.__losses) > self.log_interval:
+            self.__losses = self.__losses[-self.log_interval:]
+            self.__bbox_losses = self.__bbox_losses[-self.log_interval:]
+            self.__l1_losses = self.__l1_losses[-self.log_interval:]
+            self.__presence_losses = self.__presence_losses[-self.log_interval:]
+            self.__local_contrastive_losses = self.__local_contrastive_losses[-self.log_interval:]
+            self.__giou_50_accuracies = self.__giou_50_accuracies[-self.log_interval:]
+            self.__giou_75_accuracies = self.__giou_75_accuracies[-self.log_interval:]
+            self.__giou_90_accuracies = self.__giou_90_accuracies[-self.log_interval:]
+            self.__f1_50_accuracies = self.__f1_50_accuracies[-self.log_interval:]
+            self.__f1_75_accuracies = self.__f1_75_accuracies[-self.log_interval:]
+            self.__f1_90_accuracies = self.__f1_90_accuracies[-self.log_interval:]
+
         # Compute mean loss.
         mean_loss = sum(self.__losses) / len(self.__losses)
+        mean_bbox_loss = sum(self.__bbox_losses) / len(self.__bbox_losses)
         mean_l1_loss = sum(self.__l1_losses) / len(self.__l1_losses)
-        mean_giou_loss = sum(self.__giou_losses) / len(self.__giou_losses)
         mean_presence_loss = sum(self.__presence_losses) / len(self.__presence_losses)
+        mean_local_contrastive_loss = sum(self.__local_contrastive_losses) / len(self.__local_contrastive_losses)
 
         # Compute mean accuracy.
-        self.__samples = [self.__fix_bbox(sample=sample) for sample in self.__samples]
-        mean_giou_acc = [iou_accuracy(labels=y_objs, logits=logits_objs) for (_, _, y_objs, logits_objs) in self.__samples]
-        mean_giou_acc = sum(mean_giou_acc) / len(mean_giou_acc) if mean_giou_acc else 0.0
+        mean_giou_50_acc = sum(self.__giou_50_accuracies) / len(self.__giou_50_accuracies)
+        mean_giou_75_acc = sum(self.__giou_75_accuracies) / len(self.__giou_75_accuracies)
+        mean_giou_90_acc = sum(self.__giou_90_accuracies) / len(self.__giou_90_accuracies)
+        mean_f1_50_acc = sum(self.__f1_50_accuracies) / len(self.__f1_50_accuracies)
+        mean_f1_75_acc = sum(self.__f1_75_accuracies) / len(self.__f1_75_accuracies)
+        mean_f1_90_acc = sum(self.__f1_90_accuracies) / len(self.__f1_90_accuracies)
 
-        if reset:
-            self.__losses.clear()
-            self.__l1_losses.clear()
-            self.__giou_losses.clear()
-            self.__presence_losses.clear()
-            self.__samples.clear()
-        return mean_loss, mean_l1_loss, mean_giou_loss, mean_presence_loss, mean_giou_acc
+        metrics = {
+            "mean_loss": mean_loss,
+            "mean_bbox_loss": mean_bbox_loss,
+            "mean_l1_loss": mean_l1_loss,
+            "mean_presence_loss": mean_presence_loss,
+            "mean_local_contrastive_loss": mean_local_contrastive_loss,
+            "mean_giou_50_acc": mean_giou_50_acc,
+            "mean_giou_75_acc": mean_giou_75_acc,
+            "mean_giou_90_acc": mean_giou_90_acc,
+            "mean_f1_50_acc": mean_f1_50_acc,
+            "mean_f1_75_acc": mean_f1_75_acc,
+            "mean_f1_90_acc": mean_f1_90_acc
+        }
 
+        return metrics
 
     def __run_forward(self, model, batch, is_training = True):
         """
@@ -140,30 +286,31 @@ class Trainer:
             is_training (bool): Whether the model is training or not.
 
         Returns:
-            Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]: The images, labels and logits.
+            Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]: The images, labels, logits and the joiner, text and image embeddings and the text mask.
         """
         # Convert the batch into tensors.
-        images, captions, mask, extra_data = PromptableDeTRDataLoader.convert_batch_into_tensor(batch=batch)
+        images, captions, mask, extra_data = PromptableDeTRDataLoader.convert_batch_into_tensor(batch=batch, max_queries=self.max_queries)
         images = images.to(device=self.device)
         captions = captions.to(device=self.device)
         mask = mask.to(device=self.device)
 
         def run_forward(model, images, captions, extra_data):
-            bbox = extra_data["bbox"].to(device=self.device)
-            logits = model(images, captions, mask) # Input: Image, caption and the mask to occlude padded tokens.
-            return logits, bbox # Output: Pred boxes and presences and the true boxes and presences.
+            boxes = extra_data["boxes"].to(device=self.device)
+            logits, joiner_emb, txt_emb, img_emb = model(images, captions, mask) # Input: Image, caption and the mask to occlude padded tokens.
+            return logits, boxes, joiner_emb, txt_emb, img_emb, mask
 
         # Run the forward pass.
         if not is_training:
+            model.eval()
             with torch.no_grad():
-                logits, labels = run_forward(model, images, captions, extra_data)
+                logits, labels, joiner_emb, txt_emb, img_emb, mask = run_forward(model, images, captions, extra_data)
         else:
-            logits, labels = run_forward(model, images, captions, extra_data)
-        
-        return images, captions, labels, logits
+            model.train()
+            logits, labels, joiner_emb, txt_emb, img_emb, mask = run_forward(model, images, captions, extra_data)
 
+        return images, captions, labels, logits, joiner_emb, txt_emb, img_emb, mask
 
-    def __get_sample(self, images, captions, y, logits, conf_threshold = 0.5):
+    def __get_sample(self, images, captions, y, logits):
         """
         It gets a sample from the logits and the true captions to be visualized further.
 
@@ -172,10 +319,9 @@ class Trainer:
             captions (torch.Tensor): The true captions.
             y (torch.Tensor): The true captions.
             logits (torch.Tensor): The logits from the model.
-            conf_threshold (float): The confidence threshold to filter the objects. (Default: 0.5)
 
         Returns:
-            Tuple[np.ndarray, str, np.ndarray, np.ndarray]: The image, input caption, true objects, and predicted objects.
+            Tuple[np.ndarray, str, np.ndarray, np.ndarray, np.ndarray]: The image, input caption, true objects, and predicted objects.
         """
         # Retrieve samples.
         image = images.permute(1, 2, 0).detach().cpu().numpy()
@@ -185,81 +331,111 @@ class Trainer:
 
         # Decode the caption.
         caption = self.valid_dataset.get_tokenizer().decode(caption.tolist())
-        caption = caption[0]
+        caption = "" if not caption else caption[0]
 
         # Filter the objects.
-        logits_max = logits_objs[:, 4:].argmax(dim=1)
-        logits_objs = logits_objs[logits_max == 1]
-        logits_objs[:, 4:] = logits_objs[:, 4:].softmax(dim=1)
+        logits_presence = logits_objs[:, 4:].softmax(dim=1).detach().cpu().numpy()
+        logits_boxes = logits_objs[:, :4].detach().cpu().numpy()
 
-        logits_objs = logits_objs[logits_objs[:, 5] > conf_threshold]
-        logits_objs = logits_objs[:, :4]
-
-        logits_objs = logits_objs.numpy()
         y_objs = y_objs[y_objs[:, 4] == 1][:, :4]
 
-        return image, caption, y_objs, logits_objs
-    
+        return image, caption, y_objs, logits_presence, logits_boxes
 
-    def __save_model(self, valid_loss, valid_l1_loss, valid_giou_loss, valid_presence_loss, valid_acc, valid_time):
+    def __save_model(self, giou_50, giou_75, giou_90, l1_50, l1_75, l1_90):
         """
         It saves the model if the validation loss is better than the previous one.
 
         Args:
             valid_loss (float): The validation loss.
-            valid_l1_loss (float): The validation L1 loss.
-            valid_giou_loss (float): The validation GIoU loss.
-            valid_presence_loss (float): The validation presence loss.
-            valid_acc (float): The validation accuracy.
-            valid_time (float): The evaluation time.
         """
         # Save the model weights.
-        is_best = False
-        current_train_loss, _, _, _, _ = self.__compute_current_training_metrics()
-        if self.__best_loss > valid_loss:
-            self.__best_loss = valid_loss
-            is_best = True
+        metrics = self.__compute_current_training_metrics()
+
+        curr_train_l1_acc = (metrics["mean_giou_50_acc"] + metrics["mean_giou_75_acc"] + metrics["mean_giou_90_acc"]) / 3
+        curr_train_giou_acc = (metrics["mean_f1_50_acc"] + metrics["mean_f1_75_acc"] + metrics["mean_f1_90_acc"]) / 3
+        curr_train_acc = (curr_train_l1_acc + curr_train_giou_acc) / 2
+
+        curr_valid_l1_acc = (giou_50 + giou_75 + giou_90) / 3
+        curr_valid_giou_acc = (l1_50 + l1_75 + l1_90) / 3
+        curr_valid_acc = (curr_valid_l1_acc + curr_valid_giou_acc) / 2
+
+        if curr_valid_acc > self.__best_acc:
+            self.__best_acc = curr_valid_acc
             self.__overfit_counter = 0 # Reset the overfit counter.
-        
+
         # Check if it is overfitting.
-        elif valid_loss - current_train_loss > self.overfit_threshold:
+        elif curr_valid_acc - curr_train_acc > self.overfit_threshold:
             self.__overfit_counter += 1
             if self.__overfit_counter >= self.overfit_patience:
                 print("Overfitting detected. Stopping training.")
                 self.__is_overfitting = True
+        
+        elif self.__overfit_counter > 0:
+            self.__overfit_counter -= 1
 
-        print("Validation time: %.2f minutes" % valid_time)
-        print("Overfit counter: %d" % self.__overfit_counter)
-        print("Validation loss: %.4f - L1 Loss: %.4f - GIoU Loss: %.4f - Presence Loss: %.4f - Accuracy: %.4f" % (valid_loss, valid_l1_loss, valid_giou_loss, valid_presence_loss, valid_acc))
-        self.model.save_model(
-            dir_path=self.exp_dir, 
-            ckpt_step=self.__current_iter, 
-            is_best=is_best
+        self.model.save_checkpoint(
+            model=self.model,
+            optimizers=self.optimizers,
+            dir_path=self.exp_dir,
+            step=self.__current_iter
         )
-        print("=" * 100)
-    
+        if not self.__overfit_counter:
+            self.model.save_checkpoint(
+                model=self.model,
+                optimizers=self.optimizers,
+                dir_path=self.exp_dir,
+                step=self.__current_iter,
+                is_best=True
+            )
 
-    def __fix_bbox(self, sample):
+    def __filter_samples_by_conf(self, sample, threshold):
         """
-        It fixes the bounding boxes in the sample.
+        It filters the samples by the confidence threshold.
 
         Args:
-            sample (Tuple[np.ndarray, str, np.ndarray, np.ndarray]): The sample containing the image, caption, true objects, and predicted objects.
+            sample (Tuple[np.ndarray, str, np.ndarray, np.ndarray, np.ndarray]): The sample containing the image, caption, true objects, and predicted objects.
+            threshold (float): Presence threshold to filter the predicted objects.
 
         Returns:
-            Tuple[np.ndarray, str, np.ndarray, np.ndarray]: The fixed sample.
+            Tuple[np.ndarray, str, np.ndarray, np.ndarray]: The filtered samples.
         """
-        img, caption, y_objs, logits_objs = sample
+        img, cap, y, confs, boxes = sample
+        new_logits = None
+        for conf, bbox in zip(confs, boxes):
+            if len(conf.shape) == 1:
+                conf = conf[None, :]
+                bbox = bbox[None, :]
+            filt_boxes = bbox[conf[:, 1] >= threshold]
+            if new_logits is None:
+                new_logits = filt_boxes
+            else:
+                new_logits = np.concatenate((new_logits, filt_boxes), axis=0)
+        sample = (img, cap, y, new_logits)
+        return sample
 
-        # Get the image dimensions.
-        height, width = img.shape[:2]
+    def __get_batch_metrics(self, batch):
+        """
+        Extract some stats about the current batch.
 
-        # Convert the bounding boxes from xywh to xyxy format.
-        y_objs = xywh_to_xyxy(boxes=y_objs, height=height, width=width)
-        logits_objs = xywh_to_xyxy(boxes=logits_objs, height=height, width=width)
+        Args:
+            batch (List[Sample]): The batch of data.
 
-        return img, caption, y_objs, logits_objs
+        Returns:
+            dict: A dictionary containing the batch metrics.
+        """
+        num_samples = len(batch)
+        max_caption_length = max(sample.caption_tokens.size(0) for sample in batch)
+        num_objects = sum(len(sample.boxes) for sample in batch)
+        num_of_empty_captions = sum(1 for sample in batch if len(sample.caption) == 0)
+        num_of_no_objects = sum(1 for sample in batch if len(sample.boxes) == 0)
 
+        return {
+            "num_samples": num_samples,
+            "num_objects": num_objects,
+            "num_of_empty_captions": num_of_empty_captions,
+            "num_of_no_objects": num_of_no_objects,
+            "max_caption_length": max_caption_length
+        }
 
     def __main_loop(self):
         """
@@ -270,125 +446,209 @@ class Trainer:
         while self.__current_iter < self.max_iter and not self.__is_overfitting:
 
             # Loop over the training data loader.
-            for training_batch in self.train_dataset:
+            training_batch = next(self.train_dataset)
+            batch_metrics = self.__get_batch_metrics(batch=training_batch)
 
-                # Run the forward pass.
-                images, captions, y, logits = self.__run_forward(model=self.model, batch=training_batch, is_training=True)
+            # Run the forward pass.
+            images, captions, y, logits, joiner_emb, txt_emb, img_emb, txt_mask = self.__run_forward(model=self.model, batch=training_batch, is_training=True)
 
-                # Compute the loss.
-                loss, final_l1_loss, final_giou_loss, final_presence_loss = self.model.compute_loss_and_accuracy(logits=logits, labels=y)
+            # Compute the loss.
+            metrics = self.model.compute_loss_and_accuracy(logits=logits, labels=y, fusion_emb=joiner_emb, txt_emb=txt_emb, img_emb=img_emb, txt_mask=txt_mask)
 
-                # Backward pass.
-                self.optimizer.zero_grad()
-                loss.backward()
-                self.optimizer.step()
+            # Backward pass.
+            loss = metrics["loss"]
+            self.__optimize_model(loss=loss)
 
-                # Get a random sample.
-                self.__samples += [self.__get_sample(images=images[idx_batch], captions=captions[idx_batch], y=y[idx_batch], logits=logits[idx_batch]) for idx_batch in range(images.size(0))]
+            # Store accuracy.
+            f1_50 = metrics["f1_50"].cpu().detach().numpy().item()
+            f1_75 = metrics["f1_75"].cpu().detach().numpy().item()
+            f1_90 = metrics["f1_90"].cpu().detach().numpy().item()
+            giou_50 = metrics["giou_50"].cpu().detach().numpy().item()
+            giou_75 = metrics["giou_75"].cpu().detach().numpy().item()
+            giou_90 = metrics["giou_90"].cpu().detach().numpy().item()
 
-                # Store the losses.
-                self.__losses.append(loss.cpu().detach().numpy().item())
-                self.__l1_losses.append(final_l1_loss.cpu().detach().numpy().item())
-                self.__giou_losses.append(final_giou_loss.cpu().detach().numpy().item())
-                self.__presence_losses.append(final_presence_loss.cpu().detach().numpy().item())
+            self.__giou_50_accuracies.append(giou_50)
+            self.__giou_75_accuracies.append(giou_75)
+            self.__giou_90_accuracies.append(giou_90)
+            self.__f1_50_accuracies.append(f1_50)
+            self.__f1_75_accuracies.append(f1_75)
+            self.__f1_90_accuracies.append(f1_90)
 
-                # Check if it is time to log the loss.
-                if self.__current_iter % self.log_interval == 0:
-                    current_loss, current_l1_loss, current_giou_loss, current_presence_loss, current_giou_acc = self.__compute_current_training_metrics(reset=False)
+            # Store the losses.
+            final_l1_loss = metrics["bbox_loss"].cpu().detach().numpy().item()
+            final_bbox_loss = metrics["giou_loss"].cpu().detach().numpy().item()
+            final_presence_loss = metrics["presence_loss"].cpu().detach().numpy().item()
+            final_local_contrastive_loss = metrics["local_contrastive_loss"].cpu().detach().numpy().item()
 
-                    # Log the training loss.
-                    self.__tensorboard.add_train_losses(
-                        loss=current_loss, 
-                        l1_loss=current_l1_loss, 
-                        giou_loss=current_giou_loss, 
-                        presence_loss=current_presence_loss, 
-                        step=self.__current_iter
-                    )
+            self.__losses.append(loss.cpu().detach().numpy().item())
+            self.__bbox_losses.append(final_bbox_loss)
+            self.__l1_losses.append(final_l1_loss)
+            self.__presence_losses.append(final_presence_loss)
+            self.__local_contrastive_losses.append(final_local_contrastive_loss)
 
-                    # Log the training accuracy.
-                    self.__tensorboard.add_train_accuracy(acc=current_giou_acc, step=self.__current_iter)
+            # Check if it is time to log the loss.
+            print("Iteration [%d/%d] : Num. Samples: %d - Max. Caption length: %d - Num. Objects: %d - Num. Empty Captions: %d - Num. No Objects: %d" % (
+                self.__current_iter,
+                self.max_iter, batch_metrics["num_samples"],
+                batch_metrics["max_caption_length"],
+                batch_metrics["num_objects"],
+                batch_metrics["num_of_empty_captions"],
+                batch_metrics["num_of_no_objects"]
+            ))
+            if self.__current_iter % self.log_interval == 0:
+                metrics = self.__compute_current_training_metrics()
+                current_loss = metrics["mean_loss"]
+                current_bbox_loss = metrics["mean_bbox_loss"]
+                current_l1_loss = metrics["mean_l1_loss"]
+                current_presence_loss = metrics["mean_presence_loss"]
+                current_local_contrastive_loss = metrics["mean_local_contrastive_loss"]
+                current_giou_50_acc = metrics["mean_giou_50_acc"]
+                current_giou_75_acc = metrics["mean_giou_75_acc"]
+                current_giou_90_acc = metrics["mean_giou_90_acc"]
+                current_f1_50_acc = metrics["mean_f1_50_acc"]
+                current_f1_75_acc = metrics["mean_f1_75_acc"]
+                current_f1_90_acc = metrics["mean_f1_90_acc"]
 
-                    print("Iteration [%d/%d]" % (self.__current_iter, self.max_iter))
-                    print("Loss: %.4f - L1 Loss: %.4f - GIoU Loss: %.4f - Presence Loss: %.4f - GIoU Acc: %.4f" % (current_loss, current_l1_loss, current_giou_loss, current_presence_loss, current_giou_acc))
-                    print("-" * 100)
+                # Log the training loss.
+                self.__tensorboard.add_train_losses(
+                    loss=current_loss, 
+                    l1_loss=current_l1_loss,
+                    bbox_loss=current_bbox_loss, 
+                    presence_loss=current_presence_loss, 
+                    local_contrastive_loss=current_local_contrastive_loss, 
+                    step=self.__current_iter
+                )
 
-                # Check if it is time to validate the model.
-                if self.__current_iter % self.eval_interval == 0:
-                    print("=" * 100)
-                    print("Validating the model...")
+                # Log the training accuracy.
+                self.__tensorboard.add_train_giou_accuracy(acc=current_giou_50_acc, step=self.__current_iter, th=0.50)
+                self.__tensorboard.add_train_giou_accuracy(acc=current_giou_75_acc, step=self.__current_iter, th=0.75)
+                self.__tensorboard.add_train_giou_accuracy(acc=current_giou_90_acc, step=self.__current_iter, th=0.90)
+                self.__tensorboard.add_train_f1_accuracy(acc=current_f1_50_acc, step=self.__current_iter, th=0.50)
+                self.__tensorboard.add_train_f1_accuracy(acc=current_f1_75_acc, step=self.__current_iter, th=0.75)
+                self.__tensorboard.add_train_f1_accuracy(acc=current_f1_90_acc, step=self.__current_iter, th=0.90)
 
-                    # Loop over the validation data loader.
-                    total_loss = 0.0
-                    total_l1_loss = 0.0
-                    total_giou_loss = 0.0
-                    total_presence_loss = 0.0
-                    total_acc = 0.0
-                    samples = []
-                    init_time = time.time()
-                    for validation_batch in tqdm(iterable=self.valid_dataset, desc="Validating", unit="batch"):
-                        
-                        # Run the forward pass.
-                        images, captions, y, logits = self.__run_forward(model=self.model, batch=validation_batch, is_training=False)
+                # Log gradients.
+                if self.log_grads:
+                    self.__tensorboard.add_grad(model=self.model, step=self.__current_iter)
 
-                        # Compute the loss.
-                        loss, final_l1_loss, final_giou_loss, final_presence_loss = self.model.compute_loss_and_accuracy(logits=logits, labels=y)
-                        total_loss += loss.cpu().numpy().item()
-                        total_l1_loss += final_l1_loss.cpu().numpy().item()
-                        total_giou_loss += final_giou_loss.cpu().numpy().item()
-                        total_presence_loss += final_presence_loss.cpu().numpy().item()
+                print("Loss: %.4f - GIoU Loss: %.4f - L1 Loss: %.4f - Presence Loss: %.4f - Local Contrastive Loss: %.4f" % (current_loss, current_bbox_loss, current_l1_loss, current_presence_loss, current_local_contrastive_loss))
+                print("GIoU@0.50: %.4f - GIoU@0.75: %.4f - GIoU@0.90: %.4f | F1@0.50: %.4f - F1@0.75: %.4f - F1@0.90: %.4f" % (current_giou_50_acc, current_giou_75_acc, current_giou_90_acc, current_f1_50_acc, current_f1_75_acc, current_f1_90_acc))
+                print("-" * 100)
 
-                        # Get a random sample.
-                        samples += [self.__get_sample(images=images[idx_batch], captions=captions[idx_batch], y=y[idx_batch], logits=logits[idx_batch]) for idx_batch in range(images.size(0))]
+            # Check if it is time to validate the model.
+            if self.__current_iter % self.eval_interval == 0:
+                print("=" * 100)
+                print("Validating the model...")
 
-                    # Compute final accuracy.
-                    samples = [self.__fix_bbox(sample=sample) for sample in samples]
-                    total_acc = [iou_accuracy(labels=y_objs, logits=logits_objs) for (_, _, y_objs, logits_objs) in samples]
-                    total_acc = sum(total_acc) / len(total_acc) if total_acc else 0.0
+                # Loop over the validation data loader.
+                total_loss = 0.0
+                total_bbox_loss = 0.0
+                total_l1_loss = 0.0
+                total_presence_loss = 0.0
+                total_local_contrastive_loss = 0.0
+                total_giou_50_acc = 0.0
+                total_giou_75_acc = 0.0
+                total_giou_90_acc = 0.0
+                total_f1_50_acc = 0.0
+                total_f1_75_acc = 0.0
+                total_f1_90_acc = 0.0
+                samples = []
+                init_time = time.time()
+                for _ in tqdm(range(len(self.valid_dataset)), unit="batches (randomly sampled)"):
+                    validation_batch = next(self.valid_dataset)
 
-                    # Filter the samples to be visualized.
-                    samples = random.sample(samples, k=min(self.__total_samples, len(samples)))
+                    # Run the forward pass.
+                    images, captions, y, logits, joiner_emb, txt_emb, img_emb, txt_mask = self.__run_forward(model=self.model, batch=validation_batch, is_training=False)
 
-                    total_loss /= len(self.valid_dataset)
-                    total_l1_loss /= len(self.valid_dataset)
-                    total_giou_loss /= len(self.valid_dataset)
-                    total_presence_loss /= len(self.valid_dataset)
-                    end_time = (time.time() - init_time) / 60.0
+                    # Compute the loss.
+                    metrics = self.model.compute_loss_and_accuracy(logits=logits, labels=y, fusion_emb=joiner_emb, txt_emb=txt_emb, img_emb=img_emb, txt_mask=txt_mask)
+                    total_loss += metrics["loss"].cpu().detach().numpy().item()
+                    total_l1_loss += metrics["bbox_loss"].cpu().detach().numpy().item()
+                    total_bbox_loss += metrics["giou_loss"].cpu().detach().numpy().item()
+                    total_presence_loss += metrics["presence_loss"].cpu().detach().numpy().item()
+                    total_local_contrastive_loss += metrics["local_contrastive_loss"].cpu().detach().numpy().item()
+                    total_f1_50_acc += metrics["f1_50"].cpu().detach().numpy().item()
+                    total_f1_75_acc += metrics["f1_75"].cpu().detach().numpy().item()
+                    total_f1_90_acc += metrics["f1_90"].cpu().detach().numpy().item()
+                    total_giou_50_acc += metrics["giou_50"].cpu().detach().numpy().item()
+                    total_giou_75_acc += metrics["giou_75"].cpu().detach().numpy().item()
+                    total_giou_90_acc += metrics["giou_90"].cpu().detach().numpy().item()
 
-                    # Save the model weights.
-                    self.__save_model(
-                        valid_loss=total_loss,
-                        valid_l1_loss=total_l1_loss,
-                        valid_giou_loss=total_giou_loss,
-                        valid_presence_loss=total_presence_loss,
-                        valid_acc=total_acc,
-                        valid_time=end_time
-                    )
+                    # Get a random sample.
+                    small_samples = [self.__get_sample(images=images[idx_batch], captions=captions[idx_batch], y=y[idx_batch], logits=logits[idx_batch]) for idx_batch in range(images.size(0))]
+                    for sample in small_samples:
+                        if self.__total_samples > len(samples):
+                            samples.append(sample)
+                        else:
+                            i = random.randint(0, self.__total_samples - 1)
+                            j = random.randint(0, self.__total_samples - 1)
+                            if i > j:
+                                samples[i] = sample
+                    del small_samples
 
-                    # Log the valid losses.
-                    self.__tensorboard.add_valid_losses(
-                        loss=total_loss, 
-                        l1_loss=total_l1_loss, 
-                        giou_loss=total_giou_loss, 
-                        presence_loss=total_presence_loss, 
-                        step=self.__current_iter
-                    )
+                # Compute final accuracy.
+                samples_giou_50_acc = [self.__filter_samples_by_conf(sample=sample, threshold=0.50) for sample in samples]
+                samples_giou_75_acc = [self.__filter_samples_by_conf(sample=sample, threshold=0.75) for sample in samples]
+                samples_giou_90_acc = [self.__filter_samples_by_conf(sample=sample, threshold=0.90) for sample in samples]
+                del samples
 
-                    # Log the valid accuracy.
-                    self.__tensorboard.add_valid_accuracy(acc=total_acc, step=self.__current_iter)
+                total_loss /= len(self.valid_dataset)
+                total_l1_loss /= len(self.valid_dataset)
+                total_bbox_loss /= len(self.valid_dataset)
+                total_presence_loss /= len(self.valid_dataset)
+                total_local_contrastive_loss /= len(self.valid_dataset)
+                total_giou_50_acc /= len(self.valid_dataset)
+                total_giou_75_acc /= len(self.valid_dataset)
+                total_giou_90_acc /= len(self.valid_dataset)
+                total_f1_50_acc /= len(self.valid_dataset)
+                total_f1_75_acc /= len(self.valid_dataset)
+                total_f1_90_acc /= len(self.valid_dataset)
+                end_time = (time.time() - init_time) / 60.0
 
-                    # Display the samples on Tensorboard.
-                    self.__tensorboard.add_image(samples=samples, step=self.__current_iter)
+                # Save the model weights.
+                self.__save_model(giou_50=total_giou_50_acc, giou_75=total_giou_75_acc, giou_90=total_giou_90_acc, l1_50=total_f1_50_acc, l1_75=total_f1_75_acc, l1_90=total_f1_90_acc)
 
-                # Update the iteration.
-                self.__current_iter += 1
-                if self.__current_iter >= self.max_iter or self.__is_overfitting:
-                    break
+                # Log the valid losses.
+                self.__tensorboard.add_valid_losses(
+                    loss=total_loss, 
+                    l1_loss=total_l1_loss,
+                    bbox_loss=total_bbox_loss, 
+                    presence_loss=total_presence_loss, 
+                    local_contrastive_loss=total_local_contrastive_loss, 
+                    step=self.__current_iter
+                )
 
+                # Log the valid accuracy.
+                self.__tensorboard.add_valid_giou_accuracy(acc=total_giou_50_acc, step=self.__current_iter, th=0.50)
+                self.__tensorboard.add_valid_giou_accuracy(acc=total_giou_75_acc, step=self.__current_iter, th=0.75)
+                self.__tensorboard.add_valid_giou_accuracy(acc=total_giou_90_acc, step=self.__current_iter, th=0.90)
+                self.__tensorboard.add_valid_f1_accuracy(acc=total_f1_50_acc, step=self.__current_iter, th=0.50)
+                self.__tensorboard.add_valid_f1_accuracy(acc=total_f1_75_acc, step=self.__current_iter, th=0.75)
+                self.__tensorboard.add_valid_f1_accuracy(acc=total_f1_90_acc, step=self.__current_iter, th=0.90)
+
+                # Display the samples on Tensorboard.
+                self.__tensorboard.add_image(samples=samples_giou_50_acc, step=self.__current_iter, giou_th=0.50)
+                self.__tensorboard.add_image(samples=samples_giou_75_acc, step=self.__current_iter, giou_th=0.75)
+                self.__tensorboard.add_image(samples=samples_giou_90_acc, step=self.__current_iter, giou_th=0.90)
+
+                print("Validation time: %.2f minutes" % end_time)
+                print("Overfit counter: %d" % self.__overfit_counter)
+                print("Validation loss: %.4f - GIoU Loss: %.4f - L1 Loss: %.4f - Presence Loss: %.4f - Local Contrastive Loss: %.4f" % (total_loss, total_bbox_loss, total_l1_loss, total_presence_loss, total_local_contrastive_loss))
+                print("GIoU@0.5: %.4f - GIoU@0.75: %.4f - GIoU@0.90: %.4f | F1@0.5: %.4f - F1@0.75: %.4f - F1@0.90: %.4f" % (total_giou_50_acc, total_giou_75_acc, total_giou_90_acc, total_f1_50_acc, total_f1_75_acc, total_f1_90_acc))
+                print("=" * 100)
+
+            # Update the iteration.
+            self.__current_iter += 1
+            if self.__current_iter >= self.max_iter or self.__is_overfitting:
+                break
 
     # Methods.
-    def train(self):
+    def train(self, checkpoint_path=None):
         """
         It trains the model using the training and validation datasets.
+
+        Args:
+            checkpoint_path (str): The path to the checkpoint file to resume training. (Default: None)
         """
         print("=" * 100)
         print("🚀 Starting PromptableDeTR - %s training" % self.trainer_name)
@@ -397,6 +657,8 @@ class Trainer:
         try:
             # Compile the model.
             self.__compile_model()
+            if checkpoint_path is not None:
+                self.resume_training(checkpoint_path=checkpoint_path)
             # Run the main loop.
             self.__main_loop()
         except KeyboardInterrupt:
@@ -404,3 +666,30 @@ class Trainer:
             print("🛑 Training interrupted by the user.")
             print("=" * 100)
         print("🚀 Training finished.")
+
+    def resume_training(self, checkpoint_path):
+        """
+        Resume training from a checkpoint.
+
+        Args:
+            checkpoint_path (str): The path to the checkpoint file.
+        """
+        print("Resuming training from checkpoint from path: %s" % checkpoint_path)
+
+        # Load the checkpoint.
+        checkpoint = torch.load(f=checkpoint_path)
+
+        # Load the model state.
+        self.model.load_state_dict(checkpoint["model_state_dict"])
+        for name, opt_data in checkpoint["optimizer_state_dict"].items():
+            if name in self.optimizers:
+                self.optimizers[name]["opt"].load_state_dict(opt_data["opt"])
+                if self.optimizers[name]["scheduler"] is not None:
+                    self.optimizers[name]["scheduler"].load_state_dict(opt_data["scheduler"])
+                
+                if name == "head" and self.disable_lr_curve:
+                    for param_group in self.optimizers[name]["opt"].param_groups:
+                        param_group["lr"] = self.min_lr
+
+        # Restore the training step.
+        self.__current_iter = checkpoint["step"]

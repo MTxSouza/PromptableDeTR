@@ -273,6 +273,8 @@ class Tokenizer:
             if remove_special_tokens:
                 text = self.special_tokens_regex.sub(repl="", string=text)
             text = text.strip()
+            if not text:
+                continue
 
             # Append text.
             texts.append(text)
@@ -291,13 +293,17 @@ class Tokenizer:
             list: List of string tokens.
         """
         # Encode text.
-        indices = self.encode(texts=text)[0]
+        indices = self.encode(texts=text)
 
         # Decode indices.
         str_tokens = []
         for indice in indices:
-            indice = [indice]
-            str_tokens.append(self.decode(indices=indice)[0])
+            curr_str_tokens = []
+            for index in indice:
+                str_token = self.decode(indices=[index])
+                if str_token:
+                    curr_str_tokens.append(str_token.pop(0))
+            str_tokens.append(curr_str_tokens)
         
         return str_tokens
 
