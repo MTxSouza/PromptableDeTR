@@ -2,7 +2,7 @@
 
 A light weight deep learning model capable to localize multiple objects from an input prompt.
 
-<div style="display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 40px;">
+<div style="display: flex; justify-content: center; flex-direction: column;">
     <img src="./figs/architecture.png" style="height: 400px;">
 </div>
 
