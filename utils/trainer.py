@@ -144,7 +144,6 @@ class Trainer:
         self.__bbox_losses = []
         self.__l1_losses = []
         self.__presence_losses = []
-        self.__global_contrastive_losses = []
         self.__local_contrastive_losses = []
         self.__giou_50_accuracies = []
         self.__giou_75_accuracies = []
@@ -238,7 +237,6 @@ class Trainer:
             self.__bbox_losses = self.__bbox_losses[-self.log_interval:]
             self.__l1_losses = self.__l1_losses[-self.log_interval:]
             self.__presence_losses = self.__presence_losses[-self.log_interval:]
-            self.__global_contrastive_losses = self.__global_contrastive_losses[-self.log_interval:]
             self.__local_contrastive_losses = self.__local_contrastive_losses[-self.log_interval:]
             self.__giou_50_accuracies = self.__giou_50_accuracies[-self.log_interval:]
             self.__giou_75_accuracies = self.__giou_75_accuracies[-self.log_interval:]
@@ -252,7 +250,6 @@ class Trainer:
         mean_bbox_loss = sum(self.__bbox_losses) / len(self.__bbox_losses)
         mean_l1_loss = sum(self.__l1_losses) / len(self.__l1_losses)
         mean_presence_loss = sum(self.__presence_losses) / len(self.__presence_losses)
-        mean_global_contrastive_loss = sum(self.__global_contrastive_losses) / len(self.__global_contrastive_losses)
         mean_local_contrastive_loss = sum(self.__local_contrastive_losses) / len(self.__local_contrastive_losses)
 
         # Compute mean accuracy.
@@ -268,7 +265,6 @@ class Trainer:
             "mean_bbox_loss": mean_bbox_loss,
             "mean_l1_loss": mean_l1_loss,
             "mean_presence_loss": mean_presence_loss,
-            "mean_global_contrastive_loss": mean_global_contrastive_loss,
             "mean_local_contrastive_loss": mean_local_contrastive_loss,
             "mean_giou_50_acc": mean_giou_50_acc,
             "mean_giou_75_acc": mean_giou_75_acc,
@@ -482,14 +478,12 @@ class Trainer:
             final_l1_loss = metrics["bbox_loss"].cpu().detach().numpy().item()
             final_bbox_loss = metrics["giou_loss"].cpu().detach().numpy().item()
             final_presence_loss = metrics["presence_loss"].cpu().detach().numpy().item()
-            final_global_contrastive_loss = metrics["global_contrastive_loss"].cpu().detach().numpy().item()
             final_local_contrastive_loss = metrics["local_contrastive_loss"].cpu().detach().numpy().item()
 
             self.__losses.append(loss.cpu().detach().numpy().item())
             self.__bbox_losses.append(final_bbox_loss)
             self.__l1_losses.append(final_l1_loss)
             self.__presence_losses.append(final_presence_loss)
-            self.__global_contrastive_losses.append(final_global_contrastive_loss)
             self.__local_contrastive_losses.append(final_local_contrastive_loss)
 
             # Check if it is time to log the loss.
@@ -507,7 +501,6 @@ class Trainer:
                 current_bbox_loss = metrics["mean_bbox_loss"]
                 current_l1_loss = metrics["mean_l1_loss"]
                 current_presence_loss = metrics["mean_presence_loss"]
-                current_global_contrastive_loss = metrics["mean_global_contrastive_loss"]
                 current_local_contrastive_loss = metrics["mean_local_contrastive_loss"]
                 current_giou_50_acc = metrics["mean_giou_50_acc"]
                 current_giou_75_acc = metrics["mean_giou_75_acc"]
@@ -522,7 +515,6 @@ class Trainer:
                     l1_loss=current_l1_loss,
                     bbox_loss=current_bbox_loss, 
                     presence_loss=current_presence_loss, 
-                    global_contrastive_loss=current_global_contrastive_loss, 
                     local_contrastive_loss=current_local_contrastive_loss, 
                     step=self.__current_iter
                 )
@@ -539,7 +531,7 @@ class Trainer:
                 if self.log_grads:
                     self.__tensorboard.add_grad(model=self.model, step=self.__current_iter)
 
-                print("Loss: %.4f - GIoU Loss: %.4f - L1 Loss: %.4f - Presence Loss: %.4f - Global Contrastive Loss: %.4f - Local Contrastive Loss: %.4f" % (current_loss, current_bbox_loss, current_l1_loss, current_presence_loss, current_global_contrastive_loss, current_local_contrastive_loss))
+                print("Loss: %.4f - GIoU Loss: %.4f - L1 Loss: %.4f - Presence Loss: %.4f - Local Contrastive Loss: %.4f" % (current_loss, current_bbox_loss, current_l1_loss, current_presence_loss, current_local_contrastive_loss))
                 print("GIoU@0.50: %.4f - GIoU@0.75: %.4f - GIoU@0.90: %.4f | F1@0.50: %.4f - F1@0.75: %.4f - F1@0.90: %.4f" % (current_giou_50_acc, current_giou_75_acc, current_giou_90_acc, current_f1_50_acc, current_f1_75_acc, current_f1_90_acc))
                 print("-" * 100)
 
@@ -553,7 +545,6 @@ class Trainer:
                 total_bbox_loss = 0.0
                 total_l1_loss = 0.0
                 total_presence_loss = 0.0
-                total_global_contrastive_loss = 0.0
                 total_local_contrastive_loss = 0.0
                 total_giou_50_acc = 0.0
                 total_giou_75_acc = 0.0
@@ -575,7 +566,6 @@ class Trainer:
                     total_l1_loss += metrics["bbox_loss"].cpu().detach().numpy().item()
                     total_bbox_loss += metrics["giou_loss"].cpu().detach().numpy().item()
                     total_presence_loss += metrics["presence_loss"].cpu().detach().numpy().item()
-                    total_global_contrastive_loss += metrics["global_contrastive_loss"].cpu().detach().numpy().item()
                     total_local_contrastive_loss += metrics["local_contrastive_loss"].cpu().detach().numpy().item()
                     total_f1_50_acc += metrics["f1_50"].cpu().detach().numpy().item()
                     total_f1_75_acc += metrics["f1_75"].cpu().detach().numpy().item()
@@ -606,7 +596,6 @@ class Trainer:
                 total_l1_loss /= len(self.valid_dataset)
                 total_bbox_loss /= len(self.valid_dataset)
                 total_presence_loss /= len(self.valid_dataset)
-                total_global_contrastive_loss /= len(self.valid_dataset)
                 total_local_contrastive_loss /= len(self.valid_dataset)
                 total_giou_50_acc /= len(self.valid_dataset)
                 total_giou_75_acc /= len(self.valid_dataset)
@@ -625,7 +614,6 @@ class Trainer:
                     l1_loss=total_l1_loss,
                     bbox_loss=total_bbox_loss, 
                     presence_loss=total_presence_loss, 
-                    global_contrastive_loss=total_global_contrastive_loss, 
                     local_contrastive_loss=total_local_contrastive_loss, 
                     step=self.__current_iter
                 )
@@ -645,7 +633,7 @@ class Trainer:
 
                 print("Validation time: %.2f minutes" % end_time)
                 print("Overfit counter: %d" % self.__overfit_counter)
-                print("Validation loss: %.4f - GIoU Loss: %.4f - L1 Loss: %.4f - Presence Loss: %.4f - Global Contrastive Loss: %.4f - Local Contrastive Loss: %.4f" % (total_loss, total_bbox_loss, total_l1_loss, total_presence_loss, total_global_contrastive_loss, total_local_contrastive_loss))
+                print("Validation loss: %.4f - GIoU Loss: %.4f - L1 Loss: %.4f - Presence Loss: %.4f - Local Contrastive Loss: %.4f" % (total_loss, total_bbox_loss, total_l1_loss, total_presence_loss, total_local_contrastive_loss))
                 print("GIoU@0.5: %.4f - GIoU@0.75: %.4f - GIoU@0.90: %.4f | F1@0.5: %.4f - F1@0.75: %.4f - F1@0.90: %.4f" % (total_giou_50_acc, total_giou_75_acc, total_giou_90_acc, total_f1_50_acc, total_f1_75_acc, total_f1_90_acc))
                 print("=" * 100)
 

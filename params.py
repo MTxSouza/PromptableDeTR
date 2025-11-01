@@ -261,12 +261,6 @@ def get_args():
         help="The weight for the L1 loss."
     )
     training_parser.add_argument(
-        "--global-contrastive-weight",
-        type=float,
-        default=1.0,
-        help="The weight for the global contrastive loss."
-    )
-    training_parser.add_argument(
         "--local-contrastive-weight",
         type=float,
         default=1.0,

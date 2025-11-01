@@ -97,7 +97,6 @@ def get_model(args, data_loader):
         presence_loss_weight=args.presence_weight,
         giou_loss_weight=args.giou_weight,
         l1_loss_weight=args.l1_weight,
-        global_contrastive_loss_weight=args.global_contrastive_weight,
         local_contrastive_loss_weight=args.local_contrastive_weight,
         alpha=args.alpha,
         hm_presence_weight=args.hm_presence_weight,

@@ -170,7 +170,6 @@ class PromptableDeTRTrainer(PromptableDeTR):
             presence_loss_weight=1.0,
             giou_loss_weight=1.0,
             l1_loss_weight=1.0,
-            global_contrastive_loss_weight=1.0,
             local_contrastive_loss_weight=1.0,
             alpha=0.25,
             hm_presence_weight=5.0,
@@ -186,7 +185,6 @@ class PromptableDeTRTrainer(PromptableDeTR):
         self.__presence_weight = presence_loss_weight
         self.__giou_weight = giou_loss_weight
         self.__l1_weight = l1_loss_weight
-        self.__global_contrastive_weight = global_contrastive_loss_weight
         self.__local_contrastive_weight = local_contrastive_loss_weight
         self.__alpha = alpha
 
@@ -300,7 +298,7 @@ class PromptableDeTRTrainer(PromptableDeTR):
         num_boxes = obj_idx.sum()
         logger.debug(msg="- Number of boxes: %s." % num_boxes)
 
-        # Compute Global and Local Contrastive Loss.
+        # Compute Local Contrastive Loss.
         valid_obj = obj_idx.any(dim=1) # (B,)
         if valid_obj.any():
 
@@ -310,8 +308,6 @@ class PromptableDeTRTrainer(PromptableDeTR):
             else:
                 txt_emb = txt_emb.mean(dim=1, keepdim=True)
 
-            global_contrastive_loss = torch.tensor(0.0, device=pred_boxes.device)
-
             local_contrastive_loss = self.__compute_infonce_loss(
                 object_emb=fusion_emb,
                 tk_emb=txt_emb,
@@ -319,10 +315,8 @@ class PromptableDeTRTrainer(PromptableDeTR):
             ) * self.__local_contrastive_weight
         
         else:
-            global_contrastive_loss = torch.tensor(0.0, device=pred_boxes.device)
             local_contrastive_loss = torch.tensor(0.0, device=pred_boxes.device)
 
-        logger.debug(msg="- Global Contrastive loss: %s." % global_contrastive_loss)
         logger.debug(msg="- Local Contrastive loss: %s." % local_contrastive_loss)
 
         # Compute presence loss with focal loss.
@@ -365,7 +359,7 @@ class PromptableDeTRTrainer(PromptableDeTR):
         logger.debug(msg="- GIoU loss: %s." % giou_loss)
 
         # Compute the total loss.
-        loss = bbox_loss + presence_loss + giou_loss + global_contrastive_loss + local_contrastive_loss
+        loss = bbox_loss + presence_loss + giou_loss + local_contrastive_loss
         logger.debug(msg="- Total loss: %s." % loss)
         logger.info(msg="Returning the loss value.")
 
@@ -379,7 +373,6 @@ class PromptableDeTRTrainer(PromptableDeTR):
             "bbox_loss": bbox_loss,
             "giou_loss": giou_loss,
             "presence_loss": presence_loss,
-            "global_contrastive_loss": global_contrastive_loss,
             "local_contrastive_loss": local_contrastive_loss,
             "f1_50": f1_50,
             "f1_75": f1_75,
