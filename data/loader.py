@@ -167,6 +167,7 @@ class PromptableDeTRDataLoader:
             sample_file_paths, 
             batch_size, 
             transformations = None, 
+            use_sample_weights = False, 
             shuffle = True, 
             seed = 42
         ):
@@ -177,6 +178,7 @@ class PromptableDeTRDataLoader:
             sample_file_paths (list): The list of sample file paths.
             batch_size (int): The batch size.
             transformations (List[BaseTransform]): The transforms to apply to the data. (Default: None)
+            use_sample_weights (bool): Whether to use sample weights. (Default: False)
             shuffle (bool): Whether to shuffle the samples. (Default: True)
             seed (int): The seed for the random number generator. (Default: 42)
         """
@@ -194,17 +196,27 @@ class PromptableDeTRDataLoader:
         # Normalize weights.
         total_weight = sum(weight for _, weight in self.dataset.values())
         self.dataset = {dirpath: (samples, int(batch_size * (weight / total_weight))) for dirpath, (samples, weight) in self.dataset.items()}
+        self.full_dataset = []
         print("-" * 20)
         print("Datasets:")
         for dirpath, (samples, n_samples) in self.dataset.items():
+            self.full_dataset.extend(samples)
             print(f"\t{dirpath} | Samples: {len(samples)} - Num Samples per batch: {n_samples}")
         print("-" * 20)
+
+        # Shuffle dataset.
+        if shuffle:
+            random.seed(a=seed)
+            random.shuffle(self.full_dataset)
 
         # Compute the number of batches.
         self.num_batches = sum(len(samples) for samples, _ in self.dataset.values()) // batch_size + 1
 
         # Attributes.
+        self.current_index = 0
+        self.max_index = len(self.full_dataset) // batch_size
         self.batch_size = batch_size
+        self.use_sample_weights = use_sample_weights
         self.shuffle = shuffle
         self.transformations = transformations
         self.seed = seed
@@ -226,12 +238,20 @@ class PromptableDeTRDataLoader:
         Returns the iterator object.
         """
         # Get samples based on weights.
-        sample_file_paths = []
-        for samples, n_samples in self.dataset.values():
-            if n_samples > len(samples):
-                n_samples = len(samples)
-            selected_samples = random.sample(population=samples, k=n_samples)
-            sample_file_paths += selected_samples
+        if self.use_sample_weights:
+            sample_file_paths = []
+            for samples, n_samples in self.dataset.values():
+                if n_samples > len(samples):
+                    n_samples = len(samples)
+                selected_samples = random.sample(population=samples, k=n_samples)
+                sample_file_paths += selected_samples
+
+        # Get samples normally.
+        else:
+            sample_file_paths = self.full_dataset[self.current_index*self.batch_size:(self.current_index+1)*self.batch_size]
+            self.current_index += 1
+            if self.current_index >= self.max_index:
+                self.current_index = 0
 
         curr_samples = []
         for curr_sample_file in sample_file_paths:
