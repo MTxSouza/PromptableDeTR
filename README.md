@@ -14,11 +14,7 @@ Overall performance of valid sets of PhraseCutDataset and RefCOCO.
 |**GIoU@0.75**|12.85%|12.96%|12.80%|12.47%|12.12%|
 
 <div style="display: flex;">
-    <img src="./figs/example0.png" style="height: 200px;">
-    <img src="./figs/example1.png" style="height: 200px;">
-    <img src="./figs/example2.png" style="height: 200px;">
-    <img src="./figs/example3.png" style="height: 200px;">
-    <img src="./figs/example4.png" style="height: 200px;">
+    <img src="./figs/sample_results.png" style="height: 200px;">
 </div>
 
 ---
